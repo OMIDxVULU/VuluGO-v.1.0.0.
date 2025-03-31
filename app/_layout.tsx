@@ -1,39 +1,47 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { Provider as PaperProvider, MD3DarkTheme } from 'react-native-paper';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+// Create a custom Material theme
+const paperTheme = {
+  ...MD3DarkTheme,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#6E69F4',
+    background: '#131318',
+    surface: '#1C1D23',
+    surfaceVariant: '#2C2D35',
+    onSurface: '#FFFFFF',
+    onSurfaceVariant: '#AAAAAB',
+  },
+};
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// Create a custom Navigation theme based on the dark theme
+const navigationTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: '#6E69F4',
+    background: '#131318',
+    card: '#1C1D23',
+    text: '#FFFFFF',
+    border: '#2C2D35',
+    notification: '#F23535',
+  },
+};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={paperTheme}>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(main)" />
+        </Stack>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
