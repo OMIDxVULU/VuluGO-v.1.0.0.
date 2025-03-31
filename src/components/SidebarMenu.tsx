@@ -1,47 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { IconButton, Text } from 'react-native-paper';
-
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
 }
 
-// Define magnet positions
+// Define constants for positioning
 const { width, height } = Dimensions.get('window');
-const MAGNET_POSITIONS = [
-  { x: 10, y: 77 },             // Top Left
-  { x: 10, y: height - 150 },   // Bottom Left
-  { x: width - 60, y: 77 },     // Top Right
-  { x: width - 60, y: height - 150 } // Bottom Right
-];
+const SAFE_TOP = 61; // Height of the header/status bar area
+const SAFE_BOTTOM = 91; // Height of the tab bar
+const BUTTON_SIZE = 50; // Button width/height
 
-const BUTTON_SIZE = 50; // Button width/height for more precise dragging
+// Define six magnetic positions
+const MAGNET_POSITIONS = [
+  { x: 10, y: SAFE_TOP + 16 },                           // Top Left
+  { x: width - BUTTON_SIZE - 10, y: SAFE_TOP + 16 },     // Top Right
+  { x: 10, y: Math.floor(height/2 - BUTTON_SIZE/2) },    // Middle Left
+  { x: width - BUTTON_SIZE - 10, y: Math.floor(height/2 - BUTTON_SIZE/2) }, // Middle Right
+  { x: 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10 }, // Bottom Left
+  { x: width - BUTTON_SIZE - 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10 } // Bottom Right
+];
 
 const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [activeIndex, setActiveIndex] = useState(1); // Voice rooms active by default
   const navigation = useNavigation();
   
-  // Use separate Animated values for JS and native drivers
+  // Animation values
   const slideAnim = useRef(new Animated.Value(isExpanded ? 65 : 0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   
-  // Position state for the floating button - set default to top-left corner
-  const [buttonPosition, setButtonPosition] = useState({ x: MAGNET_POSITIONS[0].x, y: MAGNET_POSITIONS[0].y });
+  // Button position state
+  const [buttonPosition, setButtonPosition] = useState(MAGNET_POSITIONS[3]); // Default to Middle Right
   const [isDragging, setIsDragging] = useState(false);
   
-  // Track initial touch position for drag calculations
-  const initialTouch = useRef({ x: 0, y: 0 });
-  const initialButtonPos = useRef({ x: 0, y: 0 });
+  // References for drag calculations
+  const touchOffset = useRef({ x: 0, y: 0 });
   
-  // Define menu items first before using them
+  // Menu items
   const menuItems = [
     { id: '1', icon: 'home', name: 'Home', route: 'Home', badge: '3' },
     { id: '2', icon: 'mic', name: 'Voice Rooms', route: 'Notifications', badge: '5' },
@@ -51,7 +50,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     { id: '6', icon: 'settings', name: 'Settings', route: 'Home' },
   ];
   
-  // Get total notification count
+  // Get total notifications
   const getTotalNotifications = () => {
     return menuItems.reduce((total, item) => {
       return total + (item.badge ? parseInt(item.badge) : 0);
@@ -60,15 +59,16 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   
   const totalNotifications = getTotalNotifications();
 
-  // Find closest magnet position
-  const findClosestMagnetPosition = (x: number, y: number) => {
+  // Find the closest magnet position
+  const getClosestMagnetPosition = (x: number, y: number) => {
     let closestPosition = MAGNET_POSITIONS[0];
     let minDistance = Number.MAX_VALUE;
     
     MAGNET_POSITIONS.forEach(position => {
-      const dx = position.x - x;
-      const dy = position.y - y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = Math.sqrt(
+        Math.pow(position.x - x, 2) + 
+        Math.pow(position.y - y, 2)
+      );
       
       if (distance < minDistance) {
         minDistance = distance;
@@ -78,25 +78,29 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     
     return closestPosition;
   };
+  
+  // Keep position within screen boundaries
+  const keepWithinBoundaries = (x: number, y: number) => {
+    return {
+      x: Math.max(0, Math.min(width - BUTTON_SIZE, x)),
+      y: Math.max(SAFE_TOP, Math.min(height - SAFE_BOTTOM - BUTTON_SIZE, y))
+    };
+  };
 
-  // Create simple pan responder for reliable dragging
+  // Pan responder for dragging
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      
       onPanResponderGrant: (evt) => {
-        // Record starting point of touch and current button position
-        initialTouch.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY
+        // Store where in the button the user touched
+        touchOffset.current = {
+          x: evt.nativeEvent.locationX || 0,
+          y: evt.nativeEvent.locationY || 0
         };
         
-        initialButtonPos.current = {
-          x: buttonPosition.x,
-          y: buttonPosition.y
-        };
-        
-        // Animate button scale up
+        // Scale up the button for visual feedback
         Animated.spring(buttonScale, {
           toValue: 1.15,
           useNativeDriver: true,
@@ -107,63 +111,66 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       },
       
       onPanResponderMove: (evt) => {
-        // Calculate drag distance from start point
-        const dx = evt.nativeEvent.pageX - initialTouch.current.x;
-        const dy = evt.nativeEvent.pageY - initialTouch.current.y;
+        // Calculate position so the touch point remains under the finger
+        const newX = evt.nativeEvent.pageX - touchOffset.current.x;
+        const newY = evt.nativeEvent.pageY - touchOffset.current.y;
         
-        // Move button to new position, based on initial position
-        setButtonPosition({
-          x: initialButtonPos.current.x + dx,
-          y: initialButtonPos.current.y + dy
-        });
+        // Apply boundary constraints
+        const boundedPosition = keepWithinBoundaries(newX, newY);
+        
+        // Update button position immediately
+        setButtonPosition(boundedPosition);
       },
       
-      onPanResponderRelease: (evt, gestureState) => {
-        // Calculate the final position directly from gesture state
-        const finalX = initialButtonPos.current.x + gestureState.dx;
-        const finalY = initialButtonPos.current.y + gestureState.dy;
+      onPanResponderRelease: (evt) => {
+        // Get the final position
+        const finalX = evt.nativeEvent.pageX - touchOffset.current.x;
+        const finalY = evt.nativeEvent.pageY - touchOffset.current.y;
         
-        console.log("Released at:", finalX, finalY);
-        console.log("Magnet positions:", MAGNET_POSITIONS);
+        // Apply boundary constraints
+        const boundedPosition = keepWithinBoundaries(finalX, finalY);
         
-        // Find the closest magnet position using the final position
-        const closestPosition = findClosestMagnetPosition(finalX, finalY);
+        // Find the closest magnetic position
+        const closestPosition = getClosestMagnetPosition(
+          boundedPosition.x, 
+          boundedPosition.y
+        );
         
-        console.log("Closest position:", closestPosition);
-        
-        // Animate scale back to normal
+        // Scale down the button for visual feedback
         Animated.spring(buttonScale, {
           toValue: 1,
           useNativeDriver: true,
           friction: 5
         }).start();
         
-        // Snap to the closest magnet position
-        setButtonPosition({
-          x: closestPosition.x,
-          y: closestPosition.y
-        });
-        
+        // Update button position to snap to closest position
+        setButtonPosition(closestPosition);
         setIsDragging(false);
       }
     })
   ).current;
 
-  // Animate the menu when expanded/collapsed
+  // Animate sidebar width
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: isExpanded ? 65 : 0,
       duration: 300,
-      useNativeDriver: false, // Must be false for width animations
-      // Add easing for smoother animation
-      easing: (t) => {
-        return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      }
+      useNativeDriver: false, // For width animation
+      easing: (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
     }).start();
-  }, [isExpanded, slideAnim]);
+    
+    // Animate button scale for visual feedback
+    Animated.spring(buttonScale, {
+      toValue: isExpanded ? 0 : 1,
+      useNativeDriver: true,
+      friction: 5,
+      tension: 40
+    }).start();
+  }, [isExpanded, slideAnim, buttonScale]);
 
+  // Handle expand/collapse toggle
   const toggleExpand = () => {
-    if (isDragging) return; // Prevent toggle while dragging
+    if (isDragging) return; // Don't toggle during drag
     
     const newState = !isExpanded;
     setIsExpanded(newState);
@@ -172,13 +179,11 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     }
   };
 
-  const sidebarWidth = slideAnim;
-  
   return (
     <View style={styles.sidebarContainer}>
       {/* Sidebar menu */}
       <View style={styles.sidebarWrapper}>
-        <Animated.View style={[styles.sidebar, { width: sidebarWidth }]}>
+        <Animated.View style={[styles.sidebar, { width: slideAnim }]}>
           {/* Toggle button at the top of the menu */}
           <View style={styles.toggleButtonHeader}>
             <IconButton
@@ -235,47 +240,39 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         </Animated.View>
       </View>
       
-      {/* Draggable toggle button */}
+      {/* Draggable toggle button (only visible when menu is collapsed) */}
       {!isExpanded && (
-        <View
+        <Animated.View
           style={[
             styles.floatingToggleContainer,
             {
               left: buttonPosition.x,
-              top: buttonPosition.y
+              top: buttonPosition.y,
+              transform: [{ scale: buttonScale }]
             }
           ]}
+          {...panResponder.panHandlers}
         >
-          <Animated.View
-            {...panResponder.panHandlers}
-            style={[
-              styles.scaleContainer,
-              {
-                transform: [{ scale: buttonScale }]
-              }
-            ]}
+          <TouchableOpacity
+            onPress={!isDragging ? toggleExpand : undefined}
+            activeOpacity={0.7}
+            style={styles.floatingButtonTouchable}
           >
-            <TouchableOpacity
-              onPress={!isDragging ? toggleExpand : undefined}
-              activeOpacity={0.7}
-              style={styles.floatingButtonTouchable}
-            >
-              <IconButton
-                icon="chevron-right"
-                iconColor="white"
-                size={24}
-                style={styles.toggleButton}
-                mode="contained"
-                containerColor="#6E69F4"
-              />
-              {totalNotifications > 0 && !isDragging && (
-                <View style={styles.toggleNotificationBadge}>
-                  <Text style={styles.toggleNotificationText}>{totalNotifications}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+            <IconButton
+              icon="chevron-right"
+              iconColor="white"
+              size={24}
+              style={styles.toggleButton}
+              mode="contained"
+              containerColor="#6E69F4"
+            />
+            {totalNotifications > 0 && !isDragging && (
+              <View style={styles.toggleNotificationBadge}>
+                <Text style={styles.toggleNotificationText}>{totalNotifications}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
       )}
     </View>
   );
@@ -291,7 +288,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0, // Start from the top of the screen
     height: '100%', // Full height
-    width: '100%', // Add width to ensure dragability across screen
+    width: '100%', // Full width
     zIndex: 10,
     pointerEvents: 'box-none', // Allow interactions with content behind
   },
@@ -452,13 +449,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     paddingHorizontal: 4,
-  },
-  scaleContainer: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  }
 });
 
 export default SidebarMenu; 
