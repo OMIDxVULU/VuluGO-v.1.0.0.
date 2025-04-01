@@ -43,11 +43,10 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   // Menu items
   const menuItems = [
     { id: '1', icon: 'home', name: 'Home', route: 'Home', badge: '3' },
-    { id: '2', icon: 'mic', name: 'Voice Rooms', route: 'Notifications', badge: '5' },
-    { id: '3', icon: 'library-music', name: 'Music Library', route: 'Profile' },
-    { id: '4', icon: 'monetization-on', name: 'Mine Gold', route: 'Home' },
-    { id: '5', icon: 'person', name: 'User', route: 'Profile' },
-    { id: '6', icon: 'settings', name: 'Settings', route: 'Home' },
+    { id: '2', icon: 'chat', name: 'Messages', route: 'DirectMessages', badge: '5' },
+    { id: '3', icon: 'notifications', name: 'Notifications', route: 'Notifications', badge: '2' },
+    { id: '4', icon: 'person', name: 'Profile', route: 'Profile' },
+    { id: '5', icon: 'settings', name: 'Settings', route: 'Account' },
   ];
   
   // Get total notifications

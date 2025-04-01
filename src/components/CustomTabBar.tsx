@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-nati
 import { MaterialIcons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HomeIcon from './HomeIcon';
+import NotificationIcon from './NotificationIcon';
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -26,29 +28,63 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
             iconComponent = (
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <MaterialIcons name="home" size={26} color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} />
+                  <HomeIcon 
+                    color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
+                    size={26} 
+                    active={isFocused}
+                  />
                 </View>
-                <Text style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}>
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
+                >
                   {label}
                 </Text>
-                {isFocused && <View style={styles.activeIndicator} />}
               </View>
             );
           } else if (route.name === 'Notifications') {
             iconComponent = (
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <MaterialIcons name="notifications" size={26} color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} />
+                  <NotificationIcon 
+                    color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
+                    size={26} 
+                    active={isFocused}
+                  />
                   {badge && (
                     <View style={styles.notificationsBadge}>
                       <Text style={styles.notificationsBadgeValue}>{badge}</Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}>
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
+                >
                   {label}
                 </Text>
-                {isFocused && <View style={styles.activeIndicator} />}
+              </View>
+            );
+          } else if (route.name === 'DirectMessages') {
+            iconComponent = (
+              <View style={styles.tabItemContainer}>
+                <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
+                  <MaterialIcons name="chat" size={26} color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} />
+                  {badge && (
+                    <View style={styles.notificationsBadge}>
+                      <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
+                >
+                  {label}
+                </Text>
               </View>
             );
           } else if (route.name === 'Profile') {
@@ -60,10 +96,13 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                   </View>
                   <View style={styles.profileStatus} />
                 </View>
-                <Text style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}>
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
+                >
                   {label}
                 </Text>
-                {isFocused && <View style={styles.activeIndicator} />}
               </View>
             );
           }
@@ -95,9 +134,6 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
           );
         })}
       </View>
-      <View style={styles.homeIndicatorContainer}>
-        <View style={styles.homeIndicator} />
-      </View>
     </View>
   );
 };
@@ -112,27 +148,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'transparent',
     zIndex: 999,
+    shadowColor: 'transparent',
+    elevation: 0,
   },
   bottomBarContent: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingTop: 15,
-    paddingBottom: 5,
+    paddingTop: 18,
+    paddingBottom: 18,
     width: '100%',
     backgroundColor: '#1C1D23',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(44, 45, 53, 0.5)',
+    borderTopWidth: 0,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    shadowColor: '#000',
+    shadowColor: 'transparent',
     shadowOffset: {
       width: 0,
-      height: -2,
+      height: 0,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 10,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     overflow: 'hidden',
   },
   tabButton: {
@@ -145,8 +182,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
     position: 'relative',
-    width: 80,
-    height: 60,
+    width: 100,
+    height: 72,
   },
   iconContainer: {
     width: 48,
@@ -154,7 +191,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 5,
+    marginBottom: 8,
     position: 'relative',
   },
   activeIconContainer: {
@@ -168,19 +205,14 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  activeIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#6E69F4',
-    position: 'absolute',
-    bottom: 0,
-  },
   // Tab labels
   tabBarLabel: {
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 3,
+    maxWidth: 120,
+    overflow: 'hidden',
+    paddingBottom: 4,
   },
   tabBarLabelActive: {
     color: '#FFFFFF',
@@ -230,20 +262,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#FFFFFF',
     textAlign: 'center',
-  },
-  // Home indicator
-  homeIndicatorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
-    width: '100%',
-    backgroundColor: '#1C1D23',
-  },
-  homeIndicator: {
-    width: 134,
-    height: 5,
-    backgroundColor: 'rgba(44, 45, 53, 0.8)',
-    borderRadius: 100,
   },
 });
 
