@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import HomeScreen from '../../src/screens/HomeScreen';
+import { View, StyleSheet } from 'react-native';
+import NotificationsScreen from '../../src/screens/NotificationsScreen';
 import SidebarMenu from '../../src/components/SidebarMenu';
 
-export default function Index() {
+export default function Notifications() {
   return (
     <View style={styles.container}>
-      <HomeScreen />
+      <NotificationsScreen />
       <SidebarMenu onMenuStateChange={() => {}} />
     </View>
   );

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
 // Import screens
@@ -11,6 +10,11 @@ import ProfileScreen from '../screens/ProfileScreen';
 import AccountScreen from '../screens/AccountScreen';
 import DirectMessagesScreen from '../screens/DirectMessagesScreen';
 import ChatScreen from '../screens/ChatScreen';
+import LiveScreen from '../screens/LiveScreen';
+import MusicScreen from '../screens/MusicScreen';
+import MiningScreen from '../screens/MiningScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
+import ShopScreen from '../screens/ShopScreen';
 
 // Import components
 import CustomTabBar from '../components/CustomTabBar';
@@ -26,7 +30,16 @@ export type MainTabParamList = {
 // Define stack navigation params
 export type RootStackParamList = {
   Main: undefined;
+  Home: undefined;
+  Notifications: undefined;
+  DirectMessages: undefined;
+  Live: undefined;
+  Music: undefined;
+  Mining: undefined;
+  Leaderboard: undefined;
+  Shop: undefined;
   Account: undefined;
+  Profile: undefined;
   Chat: {
     userId: string;
     name: string;
@@ -47,8 +60,8 @@ const MainTabNavigator = () => {
           backgroundColor: '#1C1D23',
           elevation: 0,
           shadowOpacity: 0,
-          borderBottomWidth: 0, // Remove bottom border as screens will handle it
-          height: 61, // Match Figma height
+          borderBottomWidth: 0,
+          height: 61,
         },
         headerTintColor: '#FFFFFF',
         headerTitleStyle: {
@@ -56,16 +69,17 @@ const MainTabNavigator = () => {
           fontSize: 20,
         },
         tabBarStyle: {
-          position: 'absolute',
           backgroundColor: 'transparent',
-          elevation: 0,
+          elevation: 10,
           borderTopWidth: 0,
-          bottom: 0, // Ensure it's at the bottom
+          position: 'absolute',
+          bottom: 0,
           left: 0,
           right: 0,
-          height: 80, // Reduced height to remove extra space
+          height: 91,
+          zIndex: 999,
         },
-        headerShown: false, // Hide the header as we're handling it in screens
+        headerShown: false,
       }}
     >
       <Tab.Screen 
@@ -79,12 +93,15 @@ const MainTabNavigator = () => {
         name="Notifications" 
         component={NotificationsScreen} 
         options={{
-          tabBarBadge: 9, // Example badge count
+          tabBarBadge: 9,
         }}
       />
       <Tab.Screen 
         name="Profile" 
         component={ProfileScreen} 
+        options={{
+          tabBarBadge: 3,
+        }}
       />
     </Tab.Navigator>
   );
@@ -92,7 +109,6 @@ const MainTabNavigator = () => {
 
 // Root navigator that contains both tab and stack navigation
 const MainNavigator = () => {
-  // We still track the sidebar state but don't adjust layout based on it
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   const handleSidebarStateChange = (expanded: boolean) => {
@@ -101,7 +117,7 @@ const MainNavigator = () => {
 
   return (
     <View style={styles.container}>
-      {/* Main content container - full width and not affected by sidebar */}
+      {/* Main content container */}
       <View style={styles.contentContainer}>
         <Stack.Navigator
           screenOptions={{
@@ -109,12 +125,19 @@ const MainNavigator = () => {
           }}
         >
           <Stack.Screen name="Main" component={MainTabNavigator} />
+          <Stack.Screen name="DirectMessages" component={DirectMessagesScreen} />
+          <Stack.Screen name="Live" component={LiveScreen} />
+          <Stack.Screen name="Music" component={MusicScreen} />
+          <Stack.Screen name="Mining" component={MiningScreen} />
+          <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+          <Stack.Screen name="Shop" component={ShopScreen} />
           <Stack.Screen name="Account" component={AccountScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Navigator>
       </View>
       
-      {/* Sidebar menu that shows on top but doesn't affect layout */}
+      {/* Sidebar menu overlay */}
       <SidebarMenu onMenuStateChange={handleSidebarStateChange} />
     </View>
   );
@@ -125,13 +148,13 @@ const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#131318', // Match Figma background color
+    backgroundColor: '#131318',
   },
   contentContainer: {
     flex: 1,
     backgroundColor: '#131318',
     overflow: 'hidden',
-    width: '100%', // Ensure it takes full width regardless of sidebar
+    width: '100%',
   },
 });
 

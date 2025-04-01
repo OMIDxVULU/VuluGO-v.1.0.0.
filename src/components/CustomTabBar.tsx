@@ -9,22 +9,31 @@ import NotificationIcon from './NotificationIcon';
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   
+  // Filter routes to only include index, notifications, and profile
+  const allowedRoutes = ['index', 'notifications', 'profile'];
+  const visibleRoutes = state.routes.filter(route => allowedRoutes.includes(route.name));
+  const visibleRouteIndices = visibleRoutes.map(route => state.routes.findIndex(r => r.key === route.key));
+  
   return (
     <View style={styles.container}>
       <View style={styles.bottomBarContent}>
-        {state.routes.map((route, index) => {
+        {visibleRoutes.map((route, idx) => {
+          const index = visibleRouteIndices[idx];
           const { options } = descriptors[route.key];
-          const label = 
-            typeof options.tabBarLabel === 'string'
-              ? options.tabBarLabel
-              : options.title || route.name;
+          
+          let label = 'Home';
+          if (route.name === 'notifications') label = 'Notifications';
+          if (route.name === 'profile') label = 'Profile';
+          
           const isFocused = state.index === index;
           
           // Get badge count if specified in options
           const badge = options.tabBarBadge ? options.tabBarBadge : null;
           
+          // Get icon component based on route name
           let iconComponent;
-          if (route.name === 'Home') {
+          
+          if (route.name === 'index') {
             iconComponent = (
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
@@ -43,7 +52,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                 </Text>
               </View>
             );
-          } else if (route.name === 'Notifications') {
+          } else if (route.name === 'notifications') {
             iconComponent = (
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
@@ -67,27 +76,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                 </Text>
               </View>
             );
-          } else if (route.name === 'DirectMessages') {
-            iconComponent = (
-              <View style={styles.tabItemContainer}>
-                <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <MaterialIcons name="chat" size={26} color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} />
-                  {badge && (
-                    <View style={styles.notificationsBadge}>
-                      <Text style={styles.notificationsBadgeValue}>{badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text 
-                  numberOfLines={1} 
-                  ellipsizeMode="tail" 
-                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          } else if (route.name === 'Profile') {
+          } else if (route.name === 'profile') {
             iconComponent = (
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
@@ -95,6 +84,11 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                     <MaterialIcons name="person" size={22} color="#FFFFFF" />
                   </View>
                   <View style={styles.profileStatus} />
+                  {badge && (
+                    <View style={styles.notificationsBadge}>
+                      <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text 
                   numberOfLines={1} 
@@ -115,13 +109,13 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, { merge: true });
+              navigation.navigate(route.name);
             }
           };
 
           return (
             <TouchableOpacity
-              key={index}
+              key={route.key}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
@@ -138,8 +132,6 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
   );
 };
 
-const { width } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
@@ -148,42 +140,41 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'transparent',
     zIndex: 999,
-    shadowColor: 'transparent',
-    elevation: 0,
+    elevation: 10,
+    width: '100%',
   },
   bottomBarContent: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 18,
+    paddingVertical: 10,
+    paddingBottom: 25,
     width: '100%',
     backgroundColor: '#1C1D23',
     borderTopWidth: 0,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    shadowColor: 'transparent',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 0,
+      height: -3,
     },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
     overflow: 'hidden',
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 12,
   },
   tabItemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
-    position: 'relative',
-    width: 100,
-    height: 72,
+    width: '100%',
   },
   iconContainer: {
     width: 48,
@@ -191,7 +182,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
     position: 'relative',
   },
   activeIconContainer: {
@@ -205,14 +196,12 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  // Tab labels
   tabBarLabel: {
     fontSize: 12,
     textAlign: 'center',
     marginTop: 3,
-    maxWidth: 120,
+    maxWidth: 80,
     overflow: 'hidden',
-    paddingBottom: 4,
   },
   tabBarLabelActive: {
     color: '#FFFFFF',
@@ -221,7 +210,6 @@ const styles = StyleSheet.create({
   tabBarLabelInactive: {
     color: '#8F8F8F',
   },
-  // Profile styles
   profileImage: {
     width: 36,
     height: 36,
@@ -243,13 +231,12 @@ const styles = StyleSheet.create({
     borderColor: '#1C1D23',
     borderRadius: 6,
   },
-  // Notification styles
   notificationsBadge: {
     position: 'absolute',
     width: 18,
     height: 18,
-    right: 4,
-    top: 4,
+    right: 0,
+    top: 0,
     backgroundColor: '#F23535',
     borderWidth: 2,
     borderColor: '#1C1D23',

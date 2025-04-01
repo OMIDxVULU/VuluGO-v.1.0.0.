@@ -3,7 +3,6 @@ import {
   StyleSheet, 
   Text, 
   View, 
-  ScrollView, 
   TouchableOpacity, 
   Image, 
   TextInput,
@@ -12,19 +11,17 @@ import {
   Dimensions,
   Animated,
   Modal,
-  Alert
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Feather, FontAwesome, AntDesign, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/MainNavigator';
+import { useRouter } from 'expo-router';
 import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
-
-type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Main'>;
+import ScrollableContentContainer from '../components/ScrollableContentContainer';
 
 const { width } = Dimensions.get('window');
 
@@ -36,7 +33,7 @@ const STATUS_TYPES = {
 };
 
 const ProfileScreen = () => {
-  const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('photos');
   const [showBioExpanded, setShowBioExpanded] = useState(false);
   const [userStatus, setUserStatus] = useState(STATUS_TYPES.ONLINE);
@@ -53,7 +50,7 @@ const ProfileScreen = () => {
   };
 
   const navigateToAccount = () => {
-    navigation.navigate('Account');
+    router.push('/(main)/account');
   };
 
   // Function to show status selector with animation
@@ -145,7 +142,7 @@ const ProfileScreen = () => {
         <MenuButton onPress={handleMenuPress} color="#6C5CE7" />
       </View>
       
-      <ScrollView 
+      <ScrollableContentContainer
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -191,13 +188,6 @@ const ProfileScreen = () => {
           </TouchableOpacity>
           
           <View style={styles.actionsContainer}>
-            <TouchableOpacity style={styles.actionButton}>
-              <View style={styles.actionCircle}>
-                <Feather name="shopping-bag" size={18} color="#FFFFFF" />
-              </View>
-              <Text style={styles.actionLabel}>Shop</Text>
-            </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={navigateToAccount}
@@ -257,7 +247,7 @@ const ProfileScreen = () => {
         
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          {['Photos', 'Activity', 'Friends', 'Shop'].map((tab) => (
+          {['Photos', 'Activity', 'Friends'].map((tab) => (
             <TouchableOpacity 
               key={tab}
               onPress={() => handleTabChange(tab.toLowerCase())}
@@ -533,7 +523,7 @@ const ProfileScreen = () => {
         
         {/* Spacing for bottom of screen */}
         <View style={{ height: 70 }} />
-      </ScrollView>
+      </ScrollableContentContainer>
 
       {/* Status Selector Modal */}
       <Modal

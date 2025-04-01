@@ -18,6 +18,7 @@ import { Feather, AntDesign } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
+import ScrollableContentContainer from '../components/ScrollableContentContainer';
 
 const { height } = Dimensions.get('window');
 
@@ -371,7 +372,7 @@ const AccountScreen = () => {
         <MenuButton onPress={handleMenuPress} color="#6C5CE7" />
       </View>
       
-      <ScrollView 
+      <ScrollableContentContainer 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -384,7 +385,7 @@ const AccountScreen = () => {
         
         {/* Bottom padding for scrolling */}
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </ScrollableContentContainer>
       
       {renderEditModal()}
     </View>

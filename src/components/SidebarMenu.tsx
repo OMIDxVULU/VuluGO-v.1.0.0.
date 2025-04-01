@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter, usePathname } from 'expo-router';
 import { IconButton, Text } from 'react-native-paper';
+import { RootStackParamList } from '../navigation/MainNavigator';
+// Import custom icon components
+import MessagesIcon from './icons/MessagesIcon';
+import LiveIcon from './icons/LiveIcon';
+import MusicIcon from './icons/MusicIcon';
+import RanksIcon from './icons/RanksIcon';
+import MiningIcon from './icons/MiningIcon';
+import ShopIcon from './icons/ShopIcon';
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
@@ -26,8 +34,8 @@ const MAGNET_POSITIONS = [
 
 const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(1); // Voice rooms active by default
-  const navigation = useNavigation();
+  const router = useRouter();
+  const pathname = usePathname();
   
   // Animation values
   const slideAnim = useRef(new Animated.Value(isExpanded ? 65 : 0)).current;
@@ -40,13 +48,52 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   // References for drag calculations
   const touchOffset = useRef({ x: 0, y: 0 });
   
-  // Menu items
+  // Menu items with custom icon components
   const menuItems = [
-    { id: '1', icon: 'home', name: 'Home', route: 'Home', badge: '3' },
-    { id: '2', icon: 'chat', name: 'Messages', route: 'DirectMessages', badge: '5' },
-    { id: '3', icon: 'notifications', name: 'Notifications', route: 'Notifications', badge: '2' },
-    { id: '4', icon: 'person', name: 'Profile', route: 'Profile' },
-    { id: '5', icon: 'settings', name: 'Settings', route: 'Account' },
+    { 
+      id: '1', 
+      name: 'Messages', 
+      route: 'directmessages', 
+      badge: '5',
+      description: 'Chat with friends',
+      icon: (color: string, active: boolean) => <MessagesIcon color={color} size={24} active={active} />
+    },
+    { 
+      id: '2', 
+      name: 'Live', 
+      route: 'live', 
+      badge: '3',
+      description: 'Watch livestreams',
+      icon: (color: string, active: boolean) => <LiveIcon color={color} size={24} active={active} />
+    },
+    { 
+      id: '3', 
+      name: 'Music', 
+      route: 'music',
+      description: 'Listen to music',
+      icon: (color: string, active: boolean) => <MusicIcon color={color} size={24} active={active} />
+    },
+    { 
+      id: '4', 
+      name: 'Ranks', 
+      route: 'leaderboard',
+      description: 'View leaderboard',
+      icon: (color: string, active: boolean) => <RanksIcon color={color} size={24} active={active} />
+    },
+    { 
+      id: '5', 
+      name: 'Mining', 
+      route: 'mining',
+      description: 'Mine gold',
+      icon: (color: string, active: boolean) => <MiningIcon color={color} size={24} active={active} />
+    },
+    { 
+      id: '6', 
+      name: 'Shop', 
+      route: 'shop',
+      description: 'Buy items',
+      icon: (color: string, active: boolean) => <ShopIcon color={color} size={24} active={active} />
+    }
   ];
   
   // Get total notifications
@@ -57,6 +104,17 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   };
   
   const totalNotifications = getTotalNotifications();
+
+  // Check which menu item is active based on current route
+  const getActiveIndex = () => {
+    if (!pathname) return -1;
+    
+    const routeName = pathname.split('/').pop();
+    const index = menuItems.findIndex(item => item.route === routeName);
+    return index;
+  };
+
+  const activeIndex = getActiveIndex();
 
   // Find the closest magnet position
   const getClosestMagnetPosition = (x: number, y: number) => {
@@ -201,39 +259,41 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.sidebarContent}>
-              {menuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.sidebarIcon,
-                    activeIndex === index && styles.sidebarIconActive
-                  ]}
-                  onPress={() => {
-                    setActiveIndex(index);
-                    navigation.navigate(item.route as never);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={[
-                    styles.iconContainer,
-                    activeIndex === index && styles.iconContainerActive
-                  ]}>
-                    <MaterialIcons 
-                      name={item.icon as any} 
-                      size={24} 
-                      color={activeIndex === index ? "#FFFFFF" : "rgba(255, 255, 255, 0.5)"} 
-                    />
-                    {item.badge && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeValue}>{item.badge}</Text>
-                      </View>
+              {menuItems.map((item, index) => {
+                const isActive = activeIndex === index;
+                
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.sidebarIcon,
+                      isActive && styles.sidebarIconActive
+                    ]}
+                    onPress={() => {
+                      router.push(`/(main)/${item.route}` as any);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[
+                      styles.iconContainer,
+                      isActive && styles.iconContainerActive
+                    ]}>
+                      {item.icon(
+                        isActive ? "#FFFFFF" : "rgba(255, 255, 255, 0.5)",
+                        isActive
+                      )}
+                      {item.badge && (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeValue}>{item.badge}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {isActive && (
+                      <View style={styles.sidebarItemIndicator} />
                     )}
-                  </View>
-                  {activeIndex === index && (
-                    <View style={styles.sidebarItemIndicator} />
-                  )}
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
         </Animated.View>
@@ -345,9 +405,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     position: 'relative',
+    marginBottom: 8,
+    alignItems: 'center',
   },
   sidebarIconActive: {
-    // Properties for active state are now on iconContainerActive
+    // Active styles are now on the icon container
   },
   iconContainer: {
     display: 'flex',
@@ -448,7 +510,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     paddingHorizontal: 4,
-  }
+  },
 });
 
 export default SidebarMenu; 

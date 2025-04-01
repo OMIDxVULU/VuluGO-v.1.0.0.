@@ -1,112 +1,76 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { Text, Button, Card, Avatar } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import ScrollableContentContainer from '../components/ScrollableContentContainer';
 
-interface ChatItem {
-  id: string;
-  name: string;
-  message: string;
-  time: string;
-  unread: number;
-  avatar?: string;
-  online: boolean;
-}
-
-const chats: ChatItem[] = [
-  {
-    id: '1',
-    name: 'Emma Wilson',
-    message: 'Are you coming to the meeting today?',
-    time: '10:32 AM',
-    unread: 2,
-    online: true
-  },
-  {
-    id: '2',
-    name: 'James Rodriguez',
-    message: 'The new design looks amazing! 🔥',
-    time: '9:14 AM',
-    unread: 0,
-    online: true
-  },
-  {
-    id: '3',
-    name: 'Sophie Turner',
-    message: 'Can you send me those files please?',
-    time: 'Yesterday',
-    unread: 3,
-    online: false
-  },
-  {
-    id: '4',
-    name: 'Alex Johnson',
-    message: "Let me know when you're free",
-    time: 'Yesterday',
-    unread: 0,
-    online: false
-  },
-  {
-    id: '5',
-    name: 'VULU Team',
-    message: 'Welcome to VULU GO! We hope you enjoy...',
-    time: '2 days ago',
-    unread: 1,
-    online: true
-  }
-];
-
+// Use the router for navigation
 const HomeScreen = () => {
+  const router = useRouter();
+
+  // Define card routes with their proper typing
+  const cards = [
+    { title: 'Direct Messages', subtitle: 'Chat with your friends', icon: 'chat', route: 'directmessages', color: '#6E69F4' },
+    { title: 'Live Stream', subtitle: 'Watch live content', icon: 'live-tv', route: 'live', color: '#FF5C8D' },
+    { title: 'Music', subtitle: 'Listen to your favorite tracks', icon: 'music-note', route: 'music', color: '#38B6FF' },
+    { title: 'Leaderboard', subtitle: 'View top performers', icon: 'leaderboard', route: 'leaderboard', color: '#FF914D' },
+    { title: 'Mining Gold', subtitle: 'Earn rewards', icon: 'monetization-on', route: 'mining', color: '#FFD700' },
+    { title: 'Shop', subtitle: 'Browse and buy items', icon: 'shopping-cart', route: 'shop', color: '#4CAF50' }
+  ];
+
   return (
-    <SafeAreaView style={styles.container} edges={['right', 'top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Messages</Text>
-        <TouchableOpacity style={styles.newChat}>
-          <MaterialIcons name="edit" size={24} color="#FFFFFF" />
+        <View style={styles.headerLeft}>
+          <Avatar.Image
+            source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }}
+            size={40}
+          />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.welcomeText}>Welcome back</Text>
+            <Text style={styles.usernameText}>David Chen</Text>
+          </View>
+        </View>
+        <TouchableOpacity 
+          style={styles.notificationButton} 
+          onPress={() => router.push('/(main)/notifications')}
+        >
+          <MaterialIcons name="notifications" size={24} color="#FFFFFF" />
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>9</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <MaterialIcons name="search" size={22} color="#8F8F8F" style={styles.searchIcon} />
-          <Text style={styles.searchPlaceholder}>Search messages</Text>
-        </View>
-      </View>
+      <ScrollableContentContainer
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionTitle}>VULU GO</Text>
+        <Text style={styles.subtitle}>Explore our features</Text>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Chats</Text>
-          
-          {chats.map((chat) => (
-            <TouchableOpacity key={chat.id} style={styles.chatItem}>
-              <View style={styles.avatarContainer}>
-                <View style={[styles.avatar, chat.online && styles.avatarOnline]}>
-                  <Text style={styles.avatarText}>{chat.name.charAt(0)}</Text>
-                  {chat.online && <View style={styles.onlineIndicator} />}
-                </View>
-              </View>
-              
-              <View style={styles.chatContent}>
-                <View style={styles.chatHeader}>
-                  <Text style={styles.chatName}>{chat.name}</Text>
-                  <Text style={styles.chatTime}>{chat.time}</Text>
-                </View>
-                <View style={styles.chatFooter}>
-                  <Text style={styles.chatMessage} numberOfLines={1}>
-                    {chat.message}
-                  </Text>
-                  {chat.unread > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{chat.unread}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
+        <View style={styles.cardsContainer}>
+          {cards.map((card, index) => (
+            <TouchableOpacity 
+              key={index}
+              style={styles.cardWrapper}
+              onPress={() => router.push(`/(main)/${card.route}` as any)}
+            >
+              <Card style={styles.card}>
+                <Card.Content style={styles.cardContent}>
+                  <View style={[styles.iconContainer, { backgroundColor: card.color }]}>
+                    <MaterialIcons name={card.icon as any} size={28} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.cardTitle}>{card.title}</Text>
+                  <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+                </Card.Content>
+              </Card>
             </TouchableOpacity>
           ))}
         </View>
-        <View style={{ height: 80 }} />
-      </ScrollView>
+      </ScrollableContentContainer>
     </SafeAreaView>
   );
 };
@@ -120,176 +84,104 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(44, 45, 53, 0.5)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  heading: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTextContainer: {
+    marginLeft: 12,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  usernameText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#F23535',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  content: {
+    padding: 16,
+  },
+  sectionTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginTop: 16,
   },
-  newChat: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#6E69F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#6E69F4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+  subtitle: {
+    fontSize: 16,
+    color: '#8E8E93',
+    marginBottom: 24,
   },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  searchBar: {
+  cardsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  cardWrapper: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  card: {
     backgroundColor: '#1C1D23',
     borderRadius: 16,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(44, 45, 53, 0.5)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    elevation: 4,
   },
-  searchIcon: {
-    marginRight: 10,
+  cardContent: {
+    padding: 16,
+    alignItems: 'center',
   },
-  searchPlaceholder: {
-    color: '#8F8F8F',
-    fontSize: 16,
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  scrollView: {
-    flex: 1,
-  },
-  section: {
-    paddingHorizontal: 20,
-    paddingTop: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 15,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
+    textAlign: 'center',
     marginBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(44, 45, 53, 0.5)',
   },
-  avatarContainer: {
-    marginRight: 15,
-  },
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#6E69F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  avatarOnline: {
-    shadowColor: '#7ADA72',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#7ADA72',
-    borderWidth: 2,
-    borderColor: '#131318',
-    right: 0,
-    bottom: 0,
-  },
-  chatContent: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  chatName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  chatTime: {
+  cardSubtitle: {
     fontSize: 12,
-    color: '#8F8F8F',
-  },
-  chatFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  chatMessage: {
-    fontSize: 14,
-    color: '#AAAAAA',
-    flex: 1,
-    marginRight: 10,
-  },
-  unreadBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#F23535',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#F23535',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  unreadText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: '#8E8E93',
+    textAlign: 'center',
   },
 });
 

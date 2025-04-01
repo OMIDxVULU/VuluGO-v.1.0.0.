@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
-import HomeScreen from '../../src/screens/HomeScreen';
+import { View, StyleSheet } from 'react-native';
+import ProfileScreen from '../../src/screens/ProfileScreen';
 import SidebarMenu from '../../src/components/SidebarMenu';
 
-export default function Index() {
+export default function Profile() {
   return (
     <View style={styles.container}>
-      <HomeScreen />
+      <ProfileScreen />
       <SidebarMenu onMenuStateChange={() => {}} />
     </View>
   );

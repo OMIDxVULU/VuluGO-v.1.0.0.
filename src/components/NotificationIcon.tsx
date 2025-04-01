@@ -40,16 +40,6 @@ const NotificationIcon: React.FC<NotificationIconProps> = ({ color, size = 26, a
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {active && (
-          <Circle
-            cx="18"
-            cy="7"
-            r="3"
-            fill="#F23535"
-            stroke="#1C1D23"
-            strokeWidth="1.5"
-          />
-        )}
       </Svg>
     </View>
   );
