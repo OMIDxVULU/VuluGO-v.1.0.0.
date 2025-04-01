@@ -19,6 +19,7 @@ import ShopScreen from '../screens/ShopScreen';
 // Import components
 import CustomTabBar from '../components/CustomTabBar';
 import SidebarMenu from '../components/SidebarMenu';
+import { MenuPositionProvider } from '../components/SidebarMenu';
 
 // Define types for the navigation
 export type MainTabParamList = {

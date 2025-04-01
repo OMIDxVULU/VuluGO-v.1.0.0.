@@ -23,6 +23,7 @@ const LiveScreen = () => {
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [inSpotlightQueue, setInSpotlightQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState(2);
+  const [showSpotlightedUser, setShowSpotlightedUser] = useState(true);
   
   // Timer state for the spotlight countdown
   const [remainingTime, setRemainingTime] = useState(261); // 4:21 in seconds
@@ -37,6 +38,7 @@ const LiveScreen = () => {
       setRemainingTime(prev => {
         if (prev <= 1) {
           clearInterval(timer.current!);
+          setShowSpotlightedUser(false); // Hide spotlighted user when timer ends
           return 0;
         }
         // Calculate new percentage based on remaining time
@@ -98,6 +100,17 @@ const LiveScreen = () => {
             <Text style={styles.modalTitle}>Spotlight Duration</Text>
             <Text style={styles.modalSubtitle}>Choose how long to spotlight your profile</Text>
             
+            {inSpotlightQueue && (
+              <View style={styles.queueInfoContainer}>
+                <Text style={styles.queueInfoText}>
+                  You are in queue position <Text style={styles.queueInfoHighlight}>{queuePosition}</Text>
+                </Text>
+                <Text style={styles.queueInfoDescription}>
+                  You will be featured after {queuePosition === 1 ? 'the current' : 'other'} spotlight{queuePosition > 1 ? 's' : ''}.
+                </Text>
+              </View>
+            )}
+            
             <TouchableOpacity 
               style={styles.durationOption} 
               onPress={() => {
@@ -158,7 +171,7 @@ const LiveScreen = () => {
           showsHorizontalScrollIndicator={false} 
           contentContainerStyle={styles.spotlightScroll}
         >
-          {/* Your profile - with popup options */}
+          {/* Your profile - with spotlight options */}
           <View style={styles.spotlightUserContainer}>
             <TouchableOpacity 
               style={styles.spotlightStatusContainer}
@@ -172,38 +185,35 @@ const LiveScreen = () => {
                   />
                 </View>
               </View>
-              {inSpotlightQueue && (
-                <View style={styles.queuePosition}>
-                  <Text style={styles.queuePositionText}>{queuePosition}</Text>
-                </View>
-              )}
             </TouchableOpacity>
             <Text style={styles.spotlightUsername}>You</Text>
             {inSpotlightQueue && (
-              <View style={styles.queueLabel}>
-                <Text style={styles.queueLabelText}>Queue Position</Text>
+              <View style={styles.queueInfo}>
+                <Text style={styles.spotlightStatusText}>Queue: {queuePosition}</Text>
               </View>
             )}
           </View>
           
-          {/* Spotlighted user with circular progress */}
-          <View style={styles.spotlightUserContainer}>
-            <View style={styles.spotlightStatusContainer}>
-              <CircularProgress percentage={percentage} />
-              <View style={[styles.spotlightAvatarBorder, styles.statusSpotlight]}>
-                <View style={styles.spotlightAvatarInner}>
-                  <Image 
-                    source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
-                    style={styles.spotlightAvatarImage} 
-                  />
+          {/* Spotlighted user with circular progress - only show if there's an active spotlight */}
+          {showSpotlightedUser && (
+            <View style={styles.spotlightUserContainer}>
+              <View style={styles.spotlightStatusContainer}>
+                <CircularProgress percentage={percentage} />
+                <View style={[styles.spotlightAvatarBorder, styles.statusSpotlight]}>
+                  <View style={styles.spotlightAvatarInner}>
+                    <Image 
+                      source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
+                      style={styles.spotlightAvatarImage} 
+                    />
+                  </View>
                 </View>
               </View>
+              <Text style={styles.spotlightUsername}>Sophia</Text>
+              <View style={styles.timeRemaining}>
+                <Text style={styles.timeRemainingText}>{formatTime(remainingTime)}</Text>
+              </View>
             </View>
-            <Text style={styles.spotlightUsername}>Sophia</Text>
-            <View style={styles.timeRemaining}>
-              <Text style={styles.timeRemainingText}>{formatTime(remainingTime)}</Text>
-            </View>
-          </View>
+          )}
           
           {/* Friend who is hosting - Red outline */}
           <View style={styles.spotlightUserContainer}>
@@ -218,7 +228,7 @@ const LiveScreen = () => {
               </View>
             </View>
             <Text style={styles.spotlightUsername}>James</Text>
-            <Text style={styles.spotlightStatus}>Hosting</Text>
+            <Text style={styles.spotlightStatusText}>Hosting</Text>
           </View>
           
           {/* Friend who is watching - Blue outline */}
@@ -234,7 +244,7 @@ const LiveScreen = () => {
               </View>
             </View>
             <Text style={styles.spotlightUsername}>Ella</Text>
-            <Text style={styles.spotlightStatus}>Watching</Text>
+            <Text style={styles.spotlightStatusText}>Watching</Text>
           </View>
           
           {/* Another Friend who is watching - Blue outline */}
@@ -250,7 +260,7 @@ const LiveScreen = () => {
               </View>
             </View>
             <Text style={styles.spotlightUsername}>Emma</Text>
-            <Text style={styles.spotlightStatus}>Watching</Text>
+            <Text style={styles.spotlightStatusText}>Watching</Text>
           </View>
         </ScrollView>
         
@@ -263,61 +273,37 @@ const LiveScreen = () => {
     return (
       <View style={styles.section}>
         <View style={styles.tournamentContainer}>
-          <LinearGradient
-            colors={['#7A5C00', '#FFD700']}
-            style={styles.tournamentContent}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.tournamentHeader}>
-              <View style={styles.tournamentTitleContainer}>
-                <MaterialIcons name="emoji-events" size={24} color="#FFFFFF" style={styles.tournamentIcon} />
-                <Text style={styles.tournamentTitleText}>
-                  Weekly Tournament 🏆
-                </Text>
-                <View style={[styles.tournamentStatus, styles.liveBadge]}>
-                  <Text style={styles.liveBadgeText}>LIVE</Text>
+          <View style={styles.eventContent}>
+            <Text style={styles.eventTitle}>Event</Text>
+            
+            <View style={styles.eventProgressTrack}>
+              <View style={styles.eventProgressFill} />
+            </View>
+            
+            <View style={styles.eventInfoGrid}>
+              <View style={styles.eventInfoBox}>
+                <Text style={styles.eventInfoValue}>02:17:36</Text>
+                <Text style={styles.eventInfoLabel}>Next Event</Text>
+              </View>
+              
+              <View style={styles.eventInfoBox}>
+                <View style={styles.prizeContainer}>
+                  <View style={styles.coinIcon} />
+                  <Text style={styles.eventInfoValue}>420</Text>
                 </View>
+                <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+              </View>
+              
+              <View style={styles.eventInfoBox}>
+                <Text style={styles.eventInfoValue}>7</Text>
+                <Text style={styles.eventInfoLabel}>Entries</Text>
               </View>
             </View>
             
-            <View style={styles.tournamentInfo}>
-              <View style={styles.tournamentInfoItem}>
-                <Text style={styles.tournamentInfoLabel}>TIME REMAINING</Text>
-                <Text style={styles.tournamentInfoValue}>03:24:15</Text>
-              </View>
-              
-              <View style={styles.tournamentInfoItem}>
-                <Text style={styles.tournamentInfoLabel}>PRIZE POOL</Text>
-                <View style={styles.prizePoolContainer}>
-                  <MaterialIcons name="monetization-on" size={18} color="#FFFFFF" />
-                  <Text style={styles.prizePoolValue}>25,750</Text>
-                </View>
-              </View>
-              
-              <View style={styles.tournamentInfoItem}>
-                <Text style={styles.tournamentInfoLabel}>PARTICIPANTS</Text>
-                <Text style={styles.tournamentInfoValue}>307</Text>
-              </View>
-            </View>
-            
-            <ProgressBar 
-              progress={0.65} 
-              color="#FFFFFF" 
-              style={styles.tournamentProgress} 
-            />
-            
-            <View style={styles.tournamentFooter}>
-              <View style={styles.entryFeeContainer}>
-                <Text style={styles.entryFeeLabel}>Entry Fee:</Text>
-                <Text style={styles.entryFeeAmount}>500</Text>
-              </View>
-              
-              <TouchableOpacity style={styles.joinTournamentButton}>
-                <Text style={styles.joinTournamentText}>Join Tournament</Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
+            <TouchableOpacity style={styles.enterButton}>
+              <Text style={styles.enterButtonText}>Enter • 100</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -662,103 +648,86 @@ const styles = StyleSheet.create({
   
   // Tournament Section
   tournamentContainer: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  tournamentContent: {
-    padding: 16,
-  },
-  tournamentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  tournamentTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tournamentIcon: {
-    marginRight: 8,
-  },
-  tournamentTitleText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  tournamentStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
+    backgroundColor: '#1D1E26',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    marginHorizontal: 0,
+    marginVertical: -6,
   },
-  liveBadge: {
-    backgroundColor: '#FFFFFF',
+  eventContent: {
+    padding: 12,
   },
-  liveBadgeText: {
-    color: '#000000',
-    fontSize: 12,
+  eventTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: 'bold',
-  },
-  tournamentInfo: {
-    marginBottom: 16,
-  },
-  tournamentInfoItem: {
     marginBottom: 8,
   },
-  tournamentInfoLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    marginBottom: 4,
+  eventProgressTrack: {
+    height: 3,
+    backgroundColor: '#2D2E38',
+    borderRadius: 1.5,
+    marginBottom: 14,
+    overflow: 'hidden',
   },
-  tournamentInfoValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+  eventProgressFill: {
+    height: '100%',
+    width: '25%', // Adjust based on progress
+    backgroundColor: '#FFD700',
+    borderRadius: 1.5,
   },
-  prizePoolContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  prizePoolValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  tournamentProgress: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  tournamentFooter: {
+  eventInfoGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 14,
   },
-  entryFeeContainer: {
+  eventInfoBox: {
+    flex: 1,
+    backgroundColor: '#2D2E38',
+    borderRadius: 10,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 3,
+    minHeight: 60,
+  },
+  prizeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  entryFeeLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    marginRight: 4,
+  coinIcon: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFD700',
+    marginRight: 3,
   },
-  entryFeeAmount: {
+  eventInfoValue: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
-  joinTournamentButton: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  eventInfoLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
   },
-  joinTournamentText: {
-    color: '#000000',
+  enterButton: {
+    backgroundColor: '#FFD700',
+    borderRadius: 100,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enterButtonText: {
+    color: '#1D1E26',
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -908,22 +877,24 @@ const styles = StyleSheet.create({
   
   // Bottom Bar
   bottomBar: {
-    padding: 16,
+    padding: 4,
+    paddingVertical: 2,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: 2,
   },
   goLiveButton: {
-    borderRadius: 24,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   goLiveGradient: {
-    paddingVertical: 12,
+    paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   goLiveText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   
@@ -1005,35 +976,33 @@ const styles = StyleSheet.create({
   },
   
   // Queue styles
-  queuePosition: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  queueInfoContainer: {
+    marginBottom: 20,
   },
-  queuePositionText: {
+  queueInfoText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  queueInfoHighlight: {
+    color: '#34C759',
+    fontWeight: 'bold',
+  },
+  queueInfoDescription: {
+    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
-    fontWeight: 'bold',
   },
-  queueLabel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    padding: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
+  queueInfo: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
   },
-  queueLabelText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+  spotlightStatusText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
   },
 });
 
 export default LiveScreen; 
+

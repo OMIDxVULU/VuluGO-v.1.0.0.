@@ -4,6 +4,7 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { Provider as PaperProvider, MD3DarkTheme } from 'react-native-paper';
+import { MenuPositionProvider } from '../src/components/SidebarMenu';
 
 // Create a custom Material theme
 const paperTheme = {
@@ -35,13 +36,15 @@ const navigationTheme = {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <PaperProvider theme={paperTheme}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(main)" />
-        </Stack>
-      </PaperProvider>
-    </SafeAreaProvider>
+    <MenuPositionProvider>
+      <SafeAreaProvider>
+        <PaperProvider theme={paperTheme}>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(main)" />
+          </Stack>
+        </PaperProvider>
+      </SafeAreaProvider>
+    </MenuPositionProvider>
   );
 }

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { IconButton, Text } from 'react-native-paper';
+// @ts-ignore
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../navigation/MainNavigator';
 // Import custom icon components
 import MessagesIcon from './icons/MessagesIcon';
@@ -32,17 +34,103 @@ const MAGNET_POSITIONS = [
   { x: width - BUTTON_SIZE - 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10 } // Bottom Right
 ];
 
-const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
+// Create a global context to store the menu button position and expanded state
+interface MenuPositionContextType {
+  position: {x: number, y: number};
+  updatePosition: (position: {x: number, y: number}) => void;
+  isExpanded: boolean;
+  setIsExpanded: (expanded: boolean) => void;
+}
+
+const MenuPositionContext = createContext<MenuPositionContextType>({
+  position: MAGNET_POSITIONS[3], // Default to Middle Right
+  updatePosition: () => {},
+  isExpanded: true,
+  setIsExpanded: () => {},
+});
+
+// Global provider component that should wrap the entire app
+export const MenuPositionProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [position, setPosition] = useState(MAGNET_POSITIONS[3]);
   const [isExpanded, setIsExpanded] = useState(true);
+  
+  useEffect(() => {
+    // Load saved position and state on initial render
+    const loadSavedData = async () => {
+      try {
+        const savedPosition = await AsyncStorage.getItem('menuButtonPosition');
+        if (savedPosition) {
+          setPosition(JSON.parse(savedPosition));
+        }
+        
+        const savedExpandedState = await AsyncStorage.getItem('menuExpandedState');
+        if (savedExpandedState) {
+          setIsExpanded(JSON.parse(savedExpandedState));
+        }
+      } catch (error: unknown) {
+        console.log('Error loading menu data:', error);
+      }
+    };
+    
+    loadSavedData();
+  }, []);
+  
+  const updatePosition = (newPosition: {x: number, y: number}) => {
+    setPosition(newPosition);
+    // Save to AsyncStorage
+    AsyncStorage.setItem('menuButtonPosition', JSON.stringify(newPosition))
+      .catch((error: unknown) => console.log('Error saving menu position:', error));
+  };
+  
+  const updateExpandedState = (expanded: boolean) => {
+    setIsExpanded(expanded);
+    // Save to AsyncStorage
+    AsyncStorage.setItem('menuExpandedState', JSON.stringify(expanded))
+      .catch((error: unknown) => console.log('Error saving menu expanded state:', error));
+  };
+  
+  return (
+    <MenuPositionContext.Provider value={{ 
+      position, 
+      updatePosition, 
+      isExpanded, 
+      setIsExpanded: updateExpandedState 
+    }}>
+      {children}
+    </MenuPositionContext.Provider>
+  );
+};
+
+// Hook to access the menu position context
+export const useMenuPosition = () => useContext(MenuPositionContext);
+
+const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Get both position and expanded state from context
+  const menuPositionContext = useContext(MenuPositionContext);
+  
+  // Button position from context
+  const buttonPosition = menuPositionContext ? menuPositionContext.position : MAGNET_POSITIONS[3];
+  const setButtonPosition = menuPositionContext ? menuPositionContext.updatePosition : 
+    (pos: {x: number, y: number}) => {
+      AsyncStorage.setItem('menuButtonPosition', JSON.stringify(pos))
+        .catch((error: unknown) => console.log('Error saving menu position:', error));
+    };
+  
+  // Menu expanded state from context
+  const isExpanded = menuPositionContext ? menuPositionContext.isExpanded : true;
+  const setIsExpanded = menuPositionContext ? menuPositionContext.setIsExpanded :
+    (expanded: boolean) => {
+      AsyncStorage.setItem('menuExpandedState', JSON.stringify(expanded))
+        .catch((error: unknown) => console.log('Error saving menu expanded state:', error));
+    };
   
   // Animation values
   const slideAnim = useRef(new Animated.Value(isExpanded ? 65 : 0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   
-  // Button position state
-  const [buttonPosition, setButtonPosition] = useState(MAGNET_POSITIONS[3]); // Default to Middle Right
   const [isDragging, setIsDragging] = useState(false);
   
   // References for drag calculations
@@ -175,7 +263,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         // Apply boundary constraints
         const boundedPosition = keepWithinBoundaries(newX, newY);
         
-        // Update button position immediately
+        // Update button position immediately through context
         setButtonPosition(boundedPosition);
       },
       
@@ -200,14 +288,15 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
           friction: 5
         }).start();
         
-        // Update button position to snap to closest position
+        // Update button position to snap to closest position through context
         setButtonPosition(closestPosition);
+        
         setIsDragging(false);
       }
     })
   ).current;
 
-  // Animate sidebar width
+  // Animate sidebar width when isExpanded changes
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: isExpanded ? 65 : 0,
@@ -223,7 +312,12 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       friction: 5,
       tension: 40
     }).start();
-  }, [isExpanded, slideAnim, buttonScale]);
+    
+    // Notify parent if callback exists
+    if (onMenuStateChange) {
+      onMenuStateChange(isExpanded);
+    }
+  }, [isExpanded, slideAnim, buttonScale, onMenuStateChange]);
 
   // Handle expand/collapse toggle
   const toggleExpand = () => {
@@ -231,9 +325,6 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     
     const newState = !isExpanded;
     setIsExpanded(newState);
-    if (onMenuStateChange) {
-      onMenuStateChange(newState);
-    }
   };
 
   return (
