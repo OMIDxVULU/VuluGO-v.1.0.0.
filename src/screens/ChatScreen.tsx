@@ -16,11 +16,15 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../navigation/MainNavigator';
 
-type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 const { width, height } = Dimensions.get('window');
+
+interface ChatScreenProps {
+  userId: string;
+  name: string;
+  avatar: string;
+  goBack: () => void;
+}
 
 interface Message {
   id: string;
@@ -109,13 +113,10 @@ const DUMMY_MESSAGES: Message[] = [
   },
 ];
 
-const ChatScreen = () => {
+const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState(DUMMY_MESSAGES);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const navigation = useNavigation();
-  const route = useRoute<ChatScreenRouteProp>();
-  const { name, avatar } = route.params;
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -184,7 +185,7 @@ const ChatScreen = () => {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => navigation.goBack()}
+          onPress={goBack}
         >
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>

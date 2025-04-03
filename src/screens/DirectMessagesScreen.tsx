@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/MainNavigator';
+import { router } from 'expo-router';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -192,10 +193,13 @@ const DirectMessagesScreen = () => {
   const renderChatItem = ({ item }: { item: ChatPreview }) => (
     <TouchableOpacity 
       style={styles.chatItem}
-      onPress={() => navigation.navigate('Chat', {
-        userId: item.id,
-        name: item.name,
-        avatar: item.avatar
+      onPress={() => router.push({
+        pathname: '/(main)/chat',
+        params: {
+          userId: item.id,
+          name: item.name,
+          avatar: item.avatar
+        }
       })}
     >
       <View style={styles.avatarContainer}>
