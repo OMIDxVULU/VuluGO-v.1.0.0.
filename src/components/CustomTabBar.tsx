@@ -39,7 +39,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
                   <HomeIcon 
                     color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
-                    size={26} 
+                    size={22} 
                     active={isFocused}
                   />
                 </View>
@@ -58,7 +58,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
                   <NotificationIcon 
                     color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
-                    size={26} 
+                    size={22} 
                     active={isFocused}
                   />
                   {badge && (
@@ -81,7 +81,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
               <View style={styles.tabItemContainer}>
                 <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
                   <View style={styles.profileImage}>
-                    <MaterialIcons name="person" size={22} color="#FFFFFF" />
+                    <MaterialIcons name="person" size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.profileStatus} />
                   {badge && (
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingBottom: 25,
+    paddingVertical: 5,
+    paddingBottom: 15,
     width: '100%',
     backgroundColor: '#1C1D23',
     borderTopWidth: 0,
@@ -173,16 +173,16 @@ const styles = StyleSheet.create({
   tabItemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    padding: 4,
     width: '100%',
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
     position: 'relative',
   },
   activeIconContainer: {
@@ -197,9 +197,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   tabBarLabel: {
-    fontSize: 12,
+    fontSize: 10,
     textAlign: 'center',
-    marginTop: 3,
+    marginTop: 1,
     maxWidth: 80,
     overflow: 'hidden',
   },
@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
     color: '#8F8F8F',
   },
   profileImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: '#5865F2',
     borderWidth: 2,
     borderColor: '#1C1D23',

@@ -22,6 +22,8 @@ interface SidebarMenuProps {
 const { width, height } = Dimensions.get('window');
 const SAFE_TOP = 61; // Height of the header/status bar area
 const SAFE_BOTTOM = 91; // Height of the tab bar
+const expandedWidth = 70; // Smaller width of expanded sidebar
+const collapsedWidth = 0; // Width of collapsed sidebar
 const BUTTON_SIZE = 50; // Button width/height
 
 // Define six magnetic positions
@@ -43,7 +45,7 @@ interface MenuPositionContextType {
 }
 
 const MenuPositionContext = createContext<MenuPositionContextType>({
-  position: MAGNET_POSITIONS[3], // Default to Middle Right
+  position: MAGNET_POSITIONS[2], // Default to Middle Left
   updatePosition: () => {},
   isExpanded: true,
   setIsExpanded: () => {},
@@ -51,7 +53,7 @@ const MenuPositionContext = createContext<MenuPositionContextType>({
 
 // Global provider component that should wrap the entire app
 export const MenuPositionProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [position, setPosition] = useState(MAGNET_POSITIONS[3]);
+  const [position, setPosition] = useState(MAGNET_POSITIONS[2]);
   const [isExpanded, setIsExpanded] = useState(true);
   
   useEffect(() => {
@@ -429,7 +431,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
 };
 
 // Calculate height for the menu to avoid overlapping with the navigation bar
-const TAB_BAR_HEIGHT = 91; // Match the height of our custom tab bar
+const TAB_BAR_HEIGHT = SAFE_BOTTOM; // Match the height of our custom tab bar
 const MENU_HEIGHT = height - TAB_BAR_HEIGHT;
 
 const styles = StyleSheet.create({
@@ -452,8 +454,11 @@ const styles = StyleSheet.create({
   sidebar: {
     position: 'absolute',
     left: 0,
-    top: 61, // Leave space for the header
-    height: MENU_HEIGHT - 61, // Subtract header height
+    // Position in the middle of the screen vertically
+    top: Math.floor(height/2 - 210), // Centered vertically with space for buttons
+    // Auto-fit height based on content instead of full screen
+    height: 'auto', // Will be sized based on content
+    maxHeight: 420, // Maximum height for the menu
     backgroundColor: '#1C1D23', // Slightly lighter than the main background
     zIndex: 10,
     borderRightWidth: 1,
@@ -489,14 +494,15 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingVertical: 16,
-    gap: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    gap: 12, // Reduce vertical spacing between items
   },
   sidebarIcon: {
-    width: 48,
-    height: 48,
+    width: 40, // Smaller width
+    height: 40, // Smaller height
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: 6, // Reduced margin
     alignItems: 'center',
   },
   sidebarIconActive: {
@@ -507,10 +513,10 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 48,
-    height: 48,
+    width: 40, // Smaller width
+    height: 40, // Smaller height
     backgroundColor: '#2C2D35',
-    borderRadius: 16,
+    borderRadius: 14,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: {
@@ -551,11 +557,11 @@ const styles = StyleSheet.create({
   },
   sidebarItemIndicator: {
     position: 'absolute',
-    width: 4,
-    height: 48,
-    left: -8,
+    width: 3, // Thinner indicator
+    height: 40, // Match the new icon height
+    left: -6, // Adjusted position
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 6,
   },
   floatingToggleContainer: {
     position: 'absolute',
