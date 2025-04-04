@@ -6,6 +6,7 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { Provider as PaperProvider, MD3DarkTheme } from 'react-native-paper';
 import { MenuPositionProvider } from '../src/components/SidebarMenu';
 import { View, ActivityIndicator, Platform, Text } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Create a custom Material theme
 const paperTheme = {
@@ -77,17 +78,22 @@ export default function RootLayout() {
   }
 
   return (
-    <AppContext.Provider value={{ fontsLoaded }}>
-      <MenuPositionProvider>
-        <SafeAreaProvider>
-          <PaperProvider theme={paperTheme}>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(main)" />
-            </Stack>
-          </PaperProvider>
-        </SafeAreaProvider>
-      </MenuPositionProvider>
-    </AppContext.Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppContext.Provider value={{ fontsLoaded }}>
+        <MenuPositionProvider>
+          <SafeAreaProvider>
+            <PaperProvider theme={paperTheme}>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ 
+                headerShown: false, 
+                gestureEnabled: true // Explicitly enable swipe gesture
+              }}>
+                <Stack.Screen name="(main)" />
+              </Stack>
+            </PaperProvider>
+          </SafeAreaProvider>
+        </MenuPositionProvider>
+      </AppContext.Provider>
+    </GestureHandlerRootView>
   );
 }

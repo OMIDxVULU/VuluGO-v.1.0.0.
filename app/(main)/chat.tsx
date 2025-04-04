@@ -11,6 +11,8 @@ export default function Chat() {
   const name = typeof params.name === 'string' ? params.name : '';
   const avatar = typeof params.avatar === 'string' ? params.avatar : '';
 
+  // Use the standard back button in the ChatScreen component
+
   // Pass the params directly to the ChatScreen component
   return (
     <View style={styles.container}>

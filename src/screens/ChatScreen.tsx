@@ -245,18 +245,39 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   const textInputRef = useRef<TextInput>(null);
   const inputContainerRef = useRef<View>(null);
 
+  // Robust auto-scroll implementation
   useEffect(() => {
-    // Auto-scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: false });
+    // Ensure list is scrolled to bottom on initial render
+    const timeout = setTimeout(() => {
+      if (flatListRef.current && messages.length > 0) {
+        flatListRef.current.scrollToOffset({ offset: 100000, animated: false });
+      }
     }, 100);
-  }, []);
-
-  // Focus input when component mounts
+    
+    return () => clearTimeout(timeout);
+  }, []); // Only run once on mount
+  
+  // Ensure scroll to bottom when messages change
   useEffect(() => {
-    setTimeout(() => {
-      textInputRef.current?.focus();
-    }, 500);
+    if (flatListRef.current && messages.length > 0) {
+      // Use scrollToOffset with a very large number to ensure we hit the bottom
+      flatListRef.current.scrollToOffset({ offset: 100000, animated: true });
+    }
+  }, [messages]); // Run whenever messages change
+
+  // Focus input when component mounts with better timing
+  useEffect(() => {
+    // Wait for UI to be ready before focusing
+    const timers = [300, 600, 1000].map(delay => 
+      setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }
+      }, delay)
+    );
+    
+    return () => timers.forEach(timer => clearTimeout(timer));
   }, []);
 
   // State for handling replies and mentions
@@ -287,7 +308,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     return mentions;
   };
   
-  // Function to handle sending a message
+  // Updated sendMessage function to use the more reliable scrolling
   const sendMessage = () => {
     if (message.trim()) {
       // Detect mentions in the message
@@ -315,17 +336,64 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       setMessage('');
       setReplyingTo(null);
       
-      // Auto-scroll to bottom
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      // The scroll will happen automatically through the useEffect above
     }
   };
   
-  // Function to handle replying to a message
+  // Enhanced input focus handler to ensure proper scrolling
+  const handleInputFocus = () => {
+    setIsInputFocused(true);
+    
+    // First ensure we see the newest messages
+    setTimeout(() => {
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 100000, animated: true });
+      }
+    }, 200);
+    
+    // If replying to a specific message, make it visible after a delay
+    if (replyingTo) {
+      setTimeout(() => {
+        const index = messages.findIndex(msg => msg.id === replyingTo.id);
+        if (index !== -1 && flatListRef.current) {
+          try {
+            flatListRef.current.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0.5, // Position in the middle of the screen
+            });
+          } catch (e) {
+            // Fallback if the message isn't in view
+            flatListRef.current.scrollToOffset({ offset: index * 100, animated: true });
+          }
+        }
+      }, 500);
+    }
+  };
+  
+  // Enhanced reply handler to ensure visibility
   const handleReply = (message: Message) => {
     setReplyingTo(message);
-    textInputRef.current?.focus();
+    
+    // Focus the input after a short delay
+    setTimeout(() => {
+      textInputRef.current?.focus();
+      
+      // Scroll to the message being replied to
+      const index = messages.findIndex(msg => msg.id === message.id);
+      if (index !== -1 && flatListRef.current) {
+        try {
+          flatListRef.current.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        } catch (e) {
+          // Fallback
+          console.log("Error scrolling to message", e);
+        }
+      }
+    }, 100);
   };
   
   // Function to add a reaction to a message
@@ -382,16 +450,45 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     );
   };
 
-  const handleInputFocus = () => {
-    console.log("Input focused - keyboard should appear with minimal space");
-    setIsInputFocused(true);
+  // Add keyboard listeners to handle scrolling when keyboard appears/disappears
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
+        const keyboardHeight = event.endCoordinates.height;
+        
+        // Use an extremely aggressive overlap to ensure complete connection
+        inputContainerRef.current?.setNativeProps({
+          style: {
+            position: 'absolute',
+            bottom: keyboardHeight - 30, // Much more aggressive overlap
+            left: 0,
+            right: 0,
+          },
+        });
+      });
+      
+      // Keep the rest of the keyboard handling
+      const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
+        inputContainerRef.current?.setNativeProps({
+          style: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+          },
+        });
+      });
+      
+      return () => {
+        keyboardWillShowListener.remove();
+        keyboardWillHideListener.remove();
+      };
+    }
     
-    // Ensure the flatlist scrolls to the bottom when keyboard appears
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-  
+    return () => {};
+  }, []);
+
+  // Updated input focus handler
   const handleInputBlur = () => {
     setIsInputFocused(false);
   };
@@ -414,8 +511,8 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     }
   };
 
-  // Keyboard handling setup - reduce offset to minimum possible
-  const keyboardVerticalOffset = Platform.OS === 'ios' ? 0 : 0;
+  // Adjust keyboard offset to ensure proper spacing
+  const keyboardVerticalOffset = Platform.OS === 'ios' ? 10 : 0;
 
   // Helper function to render message text with mentions highlighted
   const renderMessageWithMentions = (text: string, mentions?: Array<{id: string, name: string, startIndex: number, endIndex: number}>) => {
@@ -864,53 +961,79 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     padding: 0,
   };
   
-  // Add listeners for keyboard events to help with debugging and fine-tuning
+  // Re-add the effect to handle replying to messages properly
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        console.log('Keyboard shown');
-        // Scroll to bottom when keyboard appears
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        console.log('Keyboard hidden');
-      }
-    );
+    if (replyingTo) {
+      // When replying to a message, scroll to ensure it's visible
+      setTimeout(() => {
+        if (flatListRef.current) {
+          const index = messages.findIndex(msg => msg.id === replyingTo.id);
+          if (index !== -1) {
+            flatListRef.current.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0.5, // Center the message
+            });
+          }
+        }
+      }, 100);
+    }
+  }, [replyingTo]);
 
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
+  // Add an extender view that will fill any tiny gaps
   return (
     <SafeAreaView style={container}>
       <StatusBar barStyle="light-content" />
       {renderHeader()}
       
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-        keyboardVerticalOffset={keyboardVerticalOffset}
-        style={[styles.keyboardContainer, { margin: 0, padding: 0 }]}
-        enabled
-      >
-        <View style={styles.chatContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesContainer}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            showsVerticalScrollIndicator={false}
-          />
-          
-          {/* Input container with Discord-like styling and features */}
-          <View style={styles.inputContainerWrapper} ref={inputContainerRef}>
+      <View style={styles.chatContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.messagesContainer,
+            { paddingBottom: 100 }
+          ]}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => {
+            flatListRef.current?.scrollToOffset({ offset: 100000, animated: false });
+          }}
+          onLayout={() => {
+            flatListRef.current?.scrollToOffset({ offset: 100000, animated: false });
+          }}
+        />
+        
+        {/* Add a background extender that will fill any gap */}
+        <View style={{
+          position: 'absolute',
+          bottom: -50, // Larger extender
+          left: 0,
+          right: 0,
+          height: 50, // Taller extender
+          backgroundColor: '#36393F', // Match input color
+        }} />
+        
+        {/* Input container with zero padding/margin */}
+        <View 
+          style={[
+            styles.inputWrapper, 
+            { 
+              position: 'absolute', 
+              bottom: 0, 
+              left: 0, 
+              right: 0,
+              margin: 0,
+              padding: 0,
+            }
+          ]} 
+          ref={inputContainerRef}
+        >
+          <View style={[styles.inputContainerWrapper, { 
+            borderTopWidth: 1,
+            borderTopColor: '#202225',
+          }]}>
             {/* Reply interface */}
             {replyingTo && (
               <View style={styles.replyingContainer}>
@@ -927,8 +1050,8 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
               </View>
             )}
             
-            {/* Discord-style input area */}
-            <View style={styles.discordInputContainer}>
+            {/* Discord-style input area with minimal padding */}
+            <View style={[styles.discordInputContainer, { paddingVertical: 2 }]}>
               {/* Left side buttons */}
               <View style={styles.discordInputLeftButtons}>
                 <TouchableOpacity 
@@ -1047,7 +1170,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
             )}
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -1055,14 +1178,10 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#36393F', // Discord dark theme background
-    margin: 0,
-    padding: 0,
+    backgroundColor: '#36393F',
   },
   keyboardContainer: {
     flex: 1,
-    margin: 0,
-    padding: 0,
   },
   chatContainer: {
     flex: 1,
@@ -1070,30 +1189,33 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 70 : 50, // Further reduced bottom padding
+    paddingBottom: 120, // Larger padding to ensure enough space
   },
-  inputContainerWrapper: {
+  inputWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#36393F', // Discord dark theme background
-    borderTopWidth: 1,
-    borderTopColor: '#202225',
     zIndex: 999,
     elevation: Platform.OS === 'android' ? 10 : 0,
-    padding: 0, // Remove all padding
-    margin: 0, // Remove all margin
-    shadowOpacity: 0, // Remove shadow that might add visual space
+    backgroundColor: '#36393F', // Match input background to ensure no visual gaps
   },
-  // Discord-style input container - reduce all spacing
+  inputContainerWrapper: {
+    backgroundColor: '#36393F',
+    borderTopWidth: 1,
+    borderTopColor: '#202225',
+    width: '100%',
+    padding: 0,
+    margin: 0,
+  },
   discordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6, // Minimize vertical padding
+    paddingVertical: 2, // Minimal vertical padding
     backgroundColor: '#36393F',
-    margin: 0, // Ensure no margin
+    minHeight: 38, // Keep reasonable height but smaller
+    margin: 0,
   },
   discordInputLeftButtons: {
     flexDirection: 'row',
@@ -1104,32 +1226,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   discordInputButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 2,
+    marginBottom: Platform.OS === 'ios' ? 2 : 0, // Adjust button position
   },
   discordInputFieldContainer: {
     flex: 1,
     backgroundColor: '#40444B',
     borderRadius: 8,
-    marginHorizontal: 6, // Reduce horizontal margins
+    marginHorizontal: 6,
     paddingHorizontal: 10,
-    minHeight: 36, // Reduce minimum height
+    minHeight: 32,
+    maxHeight: 100,
     justifyContent: 'center',
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   discordInputField: {
     color: '#DCDDDE',
     fontSize: 16,
-    paddingVertical: Platform.OS === 'ios' ? 6 : 2, // Reduce padding even more
-    margin: 0, // Ensure no margin
+    padding: Platform.OS === 'ios' ? 8 : 4, // Add padding for better visibility
+    margin: 0,
+    lineHeight: 20, // Slightly larger for better readability
+    textAlignVertical: 'center',
   },
   sendButton: {
     backgroundColor: '#5865F2',
   },
-  // Discord-style attachment picker
   discordAttachmentPicker: {
     flexDirection: 'row',
     padding: 16,
@@ -1154,7 +1281,6 @@ const styles = StyleSheet.create({
     color: '#B9BBBE',
     fontSize: 12,
   },
-  // Discord-style emoji picker
   discordEmojiPicker: {
     backgroundColor: '#2F3136',
     borderTopWidth: 1,
@@ -1187,7 +1313,6 @@ const styles = StyleSheet.create({
   emojiText: {
     fontSize: 24,
   },
-  // Discord message styling
   messageText: {
     color: '#DCDDDE',
     fontSize: 15,
@@ -1200,7 +1325,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     fontWeight: '500',
   },
-  // Reply styling
   replyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1227,7 +1351,6 @@ const styles = StyleSheet.create({
     color: '#72767D',
     fontSize: 12,
   },
-  // Attachment styling
   attachmentsContainer: {
     marginTop: 8,
   },
@@ -1241,7 +1364,6 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 3,
   },
-  // Reactions styling
   reactionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1275,7 +1397,6 @@ const styles = StyleSheet.create({
   reactionCountSelected: {
     color: '#5865F2',
   },
-  // Message actions
   messageActionsContainer: {
     flexDirection: 'row',
     position: 'absolute',
@@ -1300,7 +1421,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 2,
   },
-  // Replying interface
   replyingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1435,7 +1555,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   currentUserName: {
-    color: '#5865F2', // Discord blue for current user
+    color: '#5865F2',
   },
   discordTimestamp: {
     color: '#6E7377',
@@ -1450,7 +1570,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   currentUserBubble: {
-    backgroundColor: '#5865F2', // Discord blue
+    backgroundColor: '#5865F2',
     alignSelf: 'flex-end',
   },
   groupedMessageBubble: {
@@ -1604,7 +1724,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   joinLiveButton: {
-    backgroundColor: '#5865F2', // Discord blue
+    backgroundColor: '#5865F2',
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
