@@ -12,8 +12,8 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import SVGIcon from '../components/SVGIcon';
 
 const { width, height } = Dimensions.get('window');
 
@@ -103,9 +103,9 @@ const StatusIndicator = ({ status }: { status: ChatPreview['status'] }) => {
       break;
     case 'idle':
       specificStyle = styles.statusIdle;
-      // Using Ionicons moon as per Figma (approximated size/position)
-      // Pass size and color directly to the Icon component, not via StyleSheet
-      content = <Ionicons name="moon" size={8} color="#FFCB0E" />;
+      // Replace Ionicons with a colored view for now
+      // We'll add more SVG icons later for specific status indicators
+      content = <View style={{ width: 8, height: 8, backgroundColor: '#FFCB0E', borderRadius: 4 }} />;
       break;
     case 'offline':
       specificStyle = styles.statusOffline;
@@ -165,8 +165,8 @@ const DirectMessagesScreen = () => {
             <Text style={[styles.chatItemName, { color: textColor }]}>{item.name}</Text>
             {item.level && (
               <View style={styles.chatItemLevelContainer}>
-                {/* Using Ionicons flame as placeholder for level icon */}
-                <Ionicons name="flame" size={11.57} color="#6E69F4" />
+                {/* Replacing Ionicons with a placeholder (we'll add SVG for flame later) */}
+                <View style={{ width: 12, height: 12, backgroundColor: '#6E69F4', borderRadius: 6 }} />
                 <Text style={[styles.chatItemLevel, { color: textColor }]}>{item.level}</Text>
               </View>
             )}
@@ -194,12 +194,14 @@ const DirectMessagesScreen = () => {
               {/* Top Bar with Search and Add Friends */}
               <View style={styles.topBar}>
                 <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-                  {/* search icon from figma */}
-                  <Ionicons name="search" size={17} color="#B5BAC1" />
+                  {/* Replace Ionicons with SVGIcon */}
+                  <SVGIcon name="visibility" size={17} color="#B5BAC1" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.addFriendsButton} onPress={handleAddFriend}>
-                   {/* person-add icon approximately matching figma */}
-                  <Ionicons name="person-add-outline" size={20} color="#B5BAC1" style={styles.addFriendsIcon} />
+                  {/* Replace Ionicons with SVGIcon */}
+                  <View style={styles.addFriendsIconContainer}>
+                    <SVGIcon name="add" size={20} color="#B5BAC1" />
+                  </View>
                   <Text style={styles.addFriendsText}>Add Friends</Text>
                 </TouchableOpacity>
               </View>
@@ -227,8 +229,10 @@ const DirectMessagesScreen = () => {
             style={styles.groupChatButton}
             onPress={handleCreateGroup}
           >
-             {/* Using Ionicons chatbubbles to approximate figma icon */}
-            <Ionicons name="chatbubbles-outline" size={28} color="#FFFFFF" style={styles.groupChatIcon} />
+            {/* Replace Ionicons with SVGIcon */}
+            <View style={styles.groupChatIconContainer}>
+              <SVGIcon name="chat" size={28} color="#FFFFFF" />
+            </View>
             <Text style={styles.groupChatText}>Group Chat</Text>
           </TouchableOpacity>
       </View>
@@ -329,7 +333,7 @@ const styles = StyleSheet.create({
     flexGrow: 1, // Allow button to grow slightly if needed
     marginLeft: 10, // Space between search and add friends
   },
-  addFriendsIcon: {
+  addFriendsIconContainer: {
     // Position adjusted by flex gap in button
     // Shadow applied to button container
      marginRight: 5, // Add some space between icon and text
@@ -500,7 +504,7 @@ const styles = StyleSheet.create({
     shadowRadius: 1, // Adjust radius to match '1px' blur effect
     elevation: 8, // for Android
   },
-  groupChatIcon: {
+  groupChatIconContainer: {
      // Shadow applied to button container
      marginBottom: 2, // Space between icon and text
   },

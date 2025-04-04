@@ -13,8 +13,8 @@ import {
   Animated,
   StatusBar,
   Dimensions,
+  Keyboard,
 } from 'react-native';
-import { MaterialIcons, Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconFallback } from '../../app/_layout';
 import SVGIcon from '../components/SVGIcon';
@@ -383,8 +383,13 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   };
 
   const handleInputFocus = () => {
+    console.log("Input focused - keyboard should appear with minimal space");
     setIsInputFocused(true);
-    textInputRef.current?.focus();
+    
+    // Ensure the flatlist scrolls to the bottom when keyboard appears
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
   
   const handleInputBlur = () => {
@@ -409,8 +414,8 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     }
   };
 
-  // Keyboard handling setup with platform-specific offset for optimal visibility
-  const keyboardVerticalOffset = Platform.OS === 'ios' ? 90 : 80;
+  // Keyboard handling setup - reduce offset to minimum possible
+  const keyboardVerticalOffset = Platform.OS === 'ios' ? 0 : 0;
 
   // Helper function to render message text with mentions highlighted
   const renderMessageWithMentions = (text: string, mentions?: Array<{id: string, name: string, startIndex: number, endIndex: number}>) => {
@@ -612,7 +617,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   setMessageActionsVisible(null);
                 }}
               >
-                {renderIcon(MaterialIcons, "emoji-emotions", 16, "#B9BBBE")}
+                {renderIcon('emoji-emotions', 16, '#B9BBBE')}
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.messageAction}
@@ -621,10 +626,10 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   setMessageActionsVisible(null);
                 }}
               >
-                {renderIcon(MaterialIcons, "reply", 16, "#B9BBBE")}
+                {renderIcon('reply', 16, '#B9BBBE')}
               </TouchableOpacity>
               <TouchableOpacity style={styles.messageAction}>
-                {renderIcon(MaterialIcons, "more-horiz", 16, "#B9BBBE")}
+                {renderIcon('more-horiz', 16, '#B9BBBE')}
               </TouchableOpacity>
             </View>
           )}
@@ -640,20 +645,20 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
           style={styles.backButton} 
           onPress={goBack}
         >
-          {renderIcon(MaterialIcons, "arrow-back", 24, "#FFFFFF")}
+          {renderIcon('arrow-back', 24, '#FFFFFF')}
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>{name}</Text>
         
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton}>
-            {renderIcon(MaterialIcons, "call", 24, "#FFFFFF")}
+            {renderIcon('call', 24, '#FFFFFF')}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
-            {renderIcon(MaterialIcons, "videocam", 24, "#FFFFFF")}
+            {renderIcon('videocam', 24, '#FFFFFF')}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
-            {renderIcon(MaterialIcons, "more-vert", 24, "#FFFFFF")}
+            {renderIcon('more-vert', 24, '#FFFFFF')}
           </TouchableOpacity>
         </View>
       </View>
@@ -666,42 +671,42 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
         <View style={styles.shareOptionsRow}>
           <TouchableOpacity style={styles.shareOption}>
             <View style={styles.shareIconContainer}>
-              {renderIcon(MaterialIcons, "share", 20, "#FFFFFF")}
+              {renderIcon('share', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>Share/Invite</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.shareOption}>
             <View style={[styles.shareIconContainer, { backgroundColor: '#4299E1' }]}>
-              {renderIcon(MaterialIcons, "link", 20, "#FFFFFF")}
+              {renderIcon('link', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>Copy Link</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.shareOption}>
             <View style={[styles.shareIconContainer, { backgroundColor: '#9F7AEA' }]}>
-              {renderIcon(MaterialIcons, "message", 20, "#FFFFFF")}
+              {renderIcon('message', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>Messages</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.shareOption}>
             <View style={[styles.shareIconContainer, { backgroundColor: '#38B2AC' }]}>
-              {renderIcon(MaterialIcons, "email", 20, "#FFFFFF")}
+              {renderIcon('email', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>Email</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.shareOption}>
             <View style={[styles.shareIconContainer, { backgroundColor: '#4299E1' }]}>
-              {renderIcon(MaterialIcons, "facebook", 20, "#FFFFFF")}
+              {renderIcon('facebook', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>Messenger</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.shareOption}>
             <View style={[styles.shareIconContainer, { backgroundColor: '#48BB78' }]}>
-              {renderIcon(MaterialIcons, "send", 20, "#FFFFFF")}
+              {renderIcon('send', 20, '#FFFFFF')}
             </View>
             <Text style={styles.shareOptionText}>WhatsApp</Text>
           </TouchableOpacity>
@@ -740,7 +745,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
               <Text style={styles.friendName}>Sophia</Text>
               <Text style={styles.friendUsername}>@sophia2000</Text>
               <TouchableOpacity style={styles.cancelButton}>
-                {renderIcon(MaterialIcons, "close", 16, "#FFFFFF")}
+                {renderIcon('close', 16, '#FFFFFF')}
               </TouchableOpacity>
             </View>
           </View>
@@ -800,75 +805,97 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
         
         <TouchableOpacity style={styles.joinLiveButton}>
           <Text style={styles.joinLiveText}>Join Stream</Text>
-          <SVGIcon name="arrow-back" size={18} color="#FFFFFF" />
+          {renderIcon('arrow-back', 18, '#FFFFFF')}
         </TouchableOpacity>
       </View>
     );
   };
 
-  // Updated icon rendering function that uses our SVGIcon component
-  const renderIcon = (
-    IconComponent: typeof MaterialIcons | typeof Ionicons | typeof MaterialCommunityIcons | typeof FontAwesome5,
-    iconName: string,
-    size: number,
-    color: string
-  ) => {
-    // Map icon library names to our SVGIcon compatible names
+  // Updated to use SVGIcon instead of various icon libraries
+  const renderIcon = (iconName: string, size: number, color: string) => {
+    // Map commonly used icons to SVGIcon names
     const iconMap: {[key: string]: string} = {
       'arrow-back': 'arrow-back',
+      'chevron-left': 'arrow-back',
       'send': 'send',
-      'close': 'close',
-      'add': 'add',
+      'camera': 'camera',
       'image': 'image',
-      'camera-alt': 'camera',
-      'photo-library': 'photo-library',
       'emoji-emotions': 'emoji-emotions',
+      'photo-library': 'photo-library',
       'mic': 'mic',
-      'microphone': 'mic',
       'gif': 'gif',
-      'call': 'call',
-      'videocam': 'videocam',
-      'more-vert': 'more-vert',
       'visibility': 'visibility',
       'chat': 'chat',
-      'share': 'share',
-      'link': 'link',
-      'message': 'message',
-      'email': 'email',
-      'facebook': 'facebook',
-      'file-present': 'file',
-      'more-horiz': 'more-horiz',
-      'reply': 'reply'
+      'more-vert': 'more-vert',
+      'close': 'close',
     };
+
+    const mappedName = iconMap[iconName] || iconName;
     
-    const mappedName = iconMap[iconName] || '';
-    
-    if (mappedName) {
+    try {
+      // Try to use our SVGIcon if we have the icon
       return <SVGIcon name={mappedName as any} size={size} color={color} />;
+    } catch (error) {
+      // Fallback to a placeholder for missing icons
+      console.log(`Icon not found: ${iconName}, mapped to ${mappedName}`);
+      return (
+        <View 
+          style={{
+            width: size,
+            height: size,
+            backgroundColor: color === '#FFFFFF' ? '#666' : '#333',
+            borderRadius: size / 2
+          }}
+        />
+      );
     }
-    
-    // Fallback to a simple colored shape for icons we haven't mapped
-    return (
-      <View 
-        style={{ 
-          width: size, 
-          height: size, 
-          backgroundColor: color === '#FFFFFF' ? '#666' : '#333',
-          borderRadius: size / 2
-        }} 
-      />
-    );
   };
 
+  // Update container styles for absolute minimal space
+  const container: {
+    flex: 1,
+    backgroundColor: '#36393F', // Discord dark theme background
+    margin: 0,
+    padding: 0,
+  } = {
+    flex: 1,
+    backgroundColor: '#36393F', // Discord dark theme background
+    margin: 0,
+    padding: 0,
+  };
+  
+  // Add listeners for keyboard events to help with debugging and fine-tuning
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        console.log('Keyboard shown');
+        // Scroll to bottom when keyboard appears
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        console.log('Keyboard hidden');
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={container}>
       <StatusBar barStyle="light-content" />
       {renderHeader()}
       
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         keyboardVerticalOffset={keyboardVerticalOffset}
-        style={styles.keyboardContainer}
+        style={[styles.keyboardContainer, { margin: 0, padding: 0 }]}
         enabled
       >
         <View style={styles.chatContainer}>
@@ -895,7 +922,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
-                  {renderIcon(MaterialIcons, "close", 16, "#B9BBBE")}
+                  {renderIcon('close', 16, '#B9BBBE')}
                 </TouchableOpacity>
               </View>
             )}
@@ -908,7 +935,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   style={styles.discordInputButton}
                   onPress={handleImagePress}
                 >
-                  {renderIcon(MaterialIcons, "add", 24, "#B9BBBE")}
+                  {renderIcon('add', 24, '#B9BBBE')}
                 </TouchableOpacity>
               </View>
               
@@ -923,6 +950,9 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   onChangeText={setMessage}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  keyboardAppearance="dark"
                   multiline
                   numberOfLines={Platform.OS === 'ios' ? undefined : 1}
                   textAlignVertical="center"
@@ -935,21 +965,21 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                   style={styles.discordInputButton}
                   onPress={() => setShowEmojiPicker(!showEmojiPicker)}
                 >
-                  {renderIcon(MaterialIcons, "emoji-emotions", 24, "#B9BBBE")}
+                  {renderIcon('emoji-emotions', 24, '#B9BBBE')}
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.discordInputButton}
                   onPress={handleImagePress}
                 >
-                  {renderIcon(MaterialIcons, "gif", 24, "#B9BBBE")}
+                  {renderIcon('gif', 24, '#B9BBBE')}
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
                   style={styles.discordInputButton}
                   onPress={handleImagePress}
                 >
-                  {renderIcon(MaterialIcons, "image", 24, "#B9BBBE")}
+                  {renderIcon('image', 24, '#B9BBBE')}
                 </TouchableOpacity>
                 
                 {message.trim() ? (
@@ -957,11 +987,11 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
                     style={[styles.discordInputButton, styles.sendButton]}
                     onPress={sendMessage}
                   >
-                    {renderIcon(MaterialIcons, "send", 24, "#FFFFFF")}
+                    {renderIcon('send', 24, '#FFFFFF')}
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity style={styles.discordInputButton}>
-                    {renderIcon(MaterialCommunityIcons, "microphone", 24, "#B9BBBE")}
+                    {renderIcon('mic', 24, '#B9BBBE')}
                   </TouchableOpacity>
                 )}
               </View>
@@ -972,21 +1002,21 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
               <View style={styles.discordAttachmentPicker}>
                 <TouchableOpacity style={styles.attachmentOption}>
                   <View style={styles.attachmentIconContainer}>
-                    {renderIcon(MaterialIcons, "camera-alt", 24, "#FFFFFF")}
+                    {renderIcon('camera', 24, '#FFFFFF')}
                   </View>
                   <Text style={styles.attachmentText}>Camera</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.attachmentOption}>
                   <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
-                    {renderIcon(MaterialIcons, "photo-library", 24, "#FFFFFF")}
+                    {renderIcon('photo-library', 24, '#FFFFFF')}
                   </View>
                   <Text style={styles.attachmentText}>Gallery</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.attachmentOption}>
                   <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
-                    {renderIcon(MaterialIcons, "file-present", 24, "#FFFFFF")}
+                    {renderIcon('file', 24, '#FFFFFF')}
                   </View>
                   <Text style={styles.attachmentText}>File</Text>
                 </TouchableOpacity>
@@ -1026,9 +1056,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#36393F', // Discord dark theme background
+    margin: 0,
+    padding: 0,
   },
   keyboardContainer: {
     flex: 1,
+    margin: 0,
+    padding: 0,
   },
   chatContainer: {
     flex: 1,
@@ -1036,7 +1070,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 120 : 100, // Adjusted space for input container
+    paddingBottom: Platform.OS === 'ios' ? 70 : 50, // Further reduced bottom padding
   },
   inputContainerWrapper: {
     position: 'absolute',
@@ -1046,21 +1080,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#36393F', // Discord dark theme background
     borderTopWidth: 1,
     borderTopColor: '#202225',
-    zIndex: 999, // Higher z-index to ensure it's above all other elements
-    elevation: Platform.OS === 'android' ? 10 : 0, // Android elevation
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16, // Adjusted padding for better keyboard interaction
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    zIndex: 999,
+    elevation: Platform.OS === 'android' ? 10 : 0,
+    padding: 0, // Remove all padding
+    margin: 0, // Remove all margin
+    shadowOpacity: 0, // Remove shadow that might add visual space
   },
-  // Discord-style input container
+  // Discord-style input container - reduce all spacing
   discordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6, // Minimize vertical padding
     backgroundColor: '#36393F',
+    margin: 0, // Ensure no margin
   },
   discordInputLeftButtons: {
     flexDirection: 'row',
@@ -1071,9 +1104,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   discordInputButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 2,
@@ -1082,14 +1115,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#40444B',
     borderRadius: 8,
-    marginHorizontal: 8,
-    paddingHorizontal: 12,
-    minHeight: 44,
+    marginHorizontal: 6, // Reduce horizontal margins
+    paddingHorizontal: 10,
+    minHeight: 36, // Reduce minimum height
+    justifyContent: 'center',
   },
   discordInputField: {
     color: '#DCDDDE',
     fontSize: 16,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    paddingVertical: Platform.OS === 'ios' ? 6 : 2, // Reduce padding even more
+    margin: 0, // Ensure no margin
   },
   sendButton: {
     backgroundColor: '#5865F2',
