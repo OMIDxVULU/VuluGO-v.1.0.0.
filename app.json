@@ -19,16 +19,20 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "newArchEnabled": true,
+      "bundleIdentifier": "com.anonymous.vulugonew"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#131318"
-      }
+      },
+      "newArchEnabled": true
     },
     "web": {
       "bundler": "metro",
       "output": "static"
-    }
+    },
+    "newArchEnabled": true
   }
 }
