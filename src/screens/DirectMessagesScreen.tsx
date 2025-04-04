@@ -13,24 +13,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-
-type RootStackParamList = {
-  Main: undefined;
-  DirectMessages: undefined;
-  Chat: {
-    userId: string;
-    name: string;
-    avatar: string;
-  };
-  // ... other screens in your stack
-};
-
-type DirectMessagesScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'DirectMessages' // Current screen name
->;
+import { router } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -137,8 +120,6 @@ const StatusIndicator = ({ status }: { status: ChatPreview['status'] }) => {
 };
 
 const DirectMessagesScreen = () => {
-  const navigation = useNavigation<DirectMessagesScreenNavigationProp>();
-
   const handleAddFriend = () => {
     // TODO: Implement navigation or modal for adding friends
     console.log("Add Friends Pressed");
@@ -163,10 +144,13 @@ const DirectMessagesScreen = () => {
     return (
       <TouchableOpacity
         style={[styles.chatItemContainer, isSelected && styles.chatItemSelected]}
-        onPress={() => navigation.navigate('Chat', {
-          userId: item.id,
-          name: item.name,
-          avatar: item.avatar
+        onPress={() => router.push({
+          pathname: '/(main)/chat', // Ensure this path matches your file structure
+          params: {
+            userId: item.id,
+            name: item.name,
+            avatar: item.avatar
+          }
         })}
       >
         {/* Avatar */}

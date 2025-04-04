@@ -95,7 +95,13 @@ const Layout = () => {
         <Tabs.Screen name="mining" options={{ href: null }} />
         <Tabs.Screen name="shop" options={{ href: null }} />
         <Tabs.Screen name="account" options={{ href: null }} />
-        <Tabs.Screen name="chat" options={{ href: null }} />
+        <Tabs.Screen 
+          name="chat" 
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' }
+          }} 
+        />
       </Tabs>
     </SafeAreaProvider>
   );

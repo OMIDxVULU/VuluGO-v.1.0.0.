@@ -302,7 +302,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     padding: 16,
-    paddingBottom: 20,
+    paddingBottom: 115,
   },
   messageContainer: {
     marginVertical: 8,
@@ -445,10 +445,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#1E1E1E',
-    borderTopWidth: 1,
-    borderTopColor: '#2C2C2E',
+    paddingVertical: 15,
+    backgroundColor: '#1C1D23',
+    height: 100,
   },
   attachButton: {
     width: 40,

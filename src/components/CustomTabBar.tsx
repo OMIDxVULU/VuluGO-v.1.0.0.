@@ -9,7 +9,17 @@ import NotificationIcon from './NotificationIcon';
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
   
-  // Filter routes to only include index, notifications, and profile
+  // Get options for the *currently active* route
+  const activeRouteKey = state.routes[state.index].key;
+  const activeDescriptor = descriptors[activeRouteKey];
+  const activeOptions = activeDescriptor.options;
+
+  // If the active route's tabBarStyle is set to display: 'none', hide the tab bar
+  if (activeOptions.tabBarStyle && typeof activeOptions.tabBarStyle === 'object' && (activeOptions.tabBarStyle as any).display === 'none') {
+    return null;
+  }
+  
+  // Filter routes to only include index, notifications, and profile for display
   const allowedRoutes = ['index', 'notifications', 'profile'];
   const visibleRoutes = state.routes.filter(route => allowedRoutes.includes(route.name));
   const visibleRouteIndices = visibleRoutes.map(route => state.routes.findIndex(r => r.key === route.key));
