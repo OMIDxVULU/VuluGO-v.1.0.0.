@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,613 +9,527 @@ import {
   Image,
   SafeAreaView,
   Platform,
-  Animated,
   Dimensions,
   StatusBar,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/MainNavigator';
-import { router } from 'expo-router';
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+type RootStackParamList = {
+  Main: undefined;
+  DirectMessages: undefined;
+  Chat: {
+    userId: string;
+    name: string;
+    avatar: string;
+  };
+  // ... other screens in your stack
+};
 
-const { width } = Dimensions.get('window');
+type DirectMessagesScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'DirectMessages' // Current screen name
+>;
 
+const { width, height } = Dimensions.get('window');
+
+// Enhanced ChatPreview to include status and level based on Figma
 interface ChatPreview {
   id: string;
   name: string;
   lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
+  timestamp: string; // Using relative time like "44m" from Figma
   avatar: string;
-  isOnline: boolean;
-  isGroup?: boolean;
-  participants?: { avatar: string }[];
+  status: 'online' | 'offline' | 'busy' | 'idle';
+  level?: number; // Optional level
+  isSelected?: boolean; // For the highlighted item in Figma
 }
 
-// Sample data
+// Updated Sample data based on Figma structure
 const DUMMY_CHATS: ChatPreview[] = [
-  {
-    id: '1',
-    name: 'Live title, test test',
-    lastMessage: 'test test test 123, test test test',
-    timestamp: '2:30 PM',
-    unreadCount: 0,
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-    isOnline: true,
-    isGroup: true,
-    participants: [
-      { avatar: 'https://randomuser.me/api/portraits/women/1.jpg' },
-      { avatar: 'https://randomuser.me/api/portraits/men/2.jpg' },
-      { avatar: 'https://randomuser.me/api/portraits/women/3.jpg' },
-      { avatar: 'https://randomuser.me/api/portraits/men/4.jpg' },
-    ]
-  },
   {
     id: '2',
     name: 'Sophia',
     lastMessage: 'Luna: Help me!',
-    timestamp: '4:44 PM',
-    unreadCount: 0,
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    isOnline: true,
+    timestamp: '44m', // Relative time
+    avatar: 'https://randomuser.me/api/portraits/men/1.jpg', // Changed to men/1 for variety
+    status: 'online',
+    level: 48,
   },
   {
     id: '3',
     name: 'Sophia',
     lastMessage: 'Luna: Help me!',
-    timestamp: '4:44 PM',
-    unreadCount: 0,
+    timestamp: '44m',
     avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
-    isOnline: true,
+    status: 'busy',
+    level: 48,
+    isSelected: true, // Example of selected item
   },
   {
     id: '4',
     name: 'Sophia',
     lastMessage: 'Luna: Help me!',
-    timestamp: '4:44 PM',
-    unreadCount: 0,
+    timestamp: '44m',
     avatar: 'https://randomuser.me/api/portraits/women/4.jpg',
-    isOnline: true,
+    status: 'idle',
+    level: 48,
   },
   {
     id: '5',
     name: 'Sophia',
     lastMessage: 'Luna: Help me!',
-    timestamp: '4:44 PM',
-    unreadCount: 0,
+    timestamp: '44m',
     avatar: 'https://randomuser.me/api/portraits/women/5.jpg',
-    isOnline: true,
+    status: 'offline',
+    level: 48,
+  },
+   {
+    id: '6',
+    name: 'David',
+    lastMessage: 'Check this out!',
+    timestamp: '1h',
+    avatar: 'https://randomuser.me/api/portraits/men/2.jpg', // Changed
+    status: 'online',
+    level: 12,
+  },
+   {
+    id: '7',
+    name: 'Another User',
+    lastMessage: 'Okay, sounds good.',
+    timestamp: '3h',
+    avatar: 'https://randomuser.me/api/portraits/men/3.jpg', // Changed
+    status: 'offline',
   },
 ];
 
-// Search history
-const SEARCH_HISTORY = [
-  {
-    id: '1',
-    name: 'sapper',
-    username: 'sapper@sapper',
-    avatar: 'https://randomuser.me/api/portraits/men/10.jpg',
-  },
-  {
-    id: '2',
-    name: 'sapper',
-    username: 'sapper@sapper',
-    avatar: 'https://randomuser.me/api/portraits/men/11.jpg',
-  },
-  {
-    id: '3',
-    name: 'sapper',
-    username: 'sapper@sapper',
-    avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
-  },
-];
+// Status Indicator Component refined based on Figma specs
+const StatusIndicator = ({ status }: { status: ChatPreview['status'] }) => {
+  const baseStyle = styles.statusIndicatorBase;
+  let specificStyle;
+  let content = null;
+
+  switch (status) {
+    case 'online':
+      specificStyle = styles.statusOnline;
+      break;
+    case 'busy':
+      specificStyle = styles.statusBusy;
+      content = <View style={styles.statusBusyInner} />;
+      break;
+    case 'idle':
+      specificStyle = styles.statusIdle;
+      // Using Ionicons moon as per Figma (approximated size/position)
+      // Pass size and color directly to the Icon component, not via StyleSheet
+      content = <Ionicons name="moon" size={8} color="#FFCB0E" />;
+      break;
+    case 'offline':
+      specificStyle = styles.statusOffline;
+      // Nested view for the inner circle effect
+      content = <View style={styles.statusOfflineInner} />;
+      break;
+    default:
+      specificStyle = {};
+  }
+
+  return <View style={[baseStyle, specificStyle]}>{content}</View>;
+};
 
 const DirectMessagesScreen = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState(0); // 0 for Messages, 1 for Search
-  const navigation = useNavigation<NavigationProp>();
-  const searchInputRef = useRef<TextInput>(null);
-  
-  const slideAnimation = useRef(new Animated.Value(0)).current;
-
-  const activateSearch = () => {
-    setIsSearchFocused(true);
-    setActiveTab(1);
-    Animated.timing(slideAnimation, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 100);
-  };
-
-  const deactivateSearch = () => {
-    setIsSearchFocused(false);
-    setActiveTab(0);
-    setSearchQuery('');
-    Animated.timing(slideAnimation, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+  const navigation = useNavigation<DirectMessagesScreenNavigationProp>();
 
   const handleAddFriend = () => {
-    // Navigate to Add Friends screen
-    // This would be implemented in a real app
+    // TODO: Implement navigation or modal for adding friends
+    console.log("Add Friends Pressed");
   };
 
   const handleCreateGroup = () => {
-    // Navigate to Create Group screen
-    // This would be implemented in a real app
+    // TODO: Implement navigation or modal for creating group chat
+    console.log("Group Chat Pressed");
   };
   
-  const renderSearchHistoryItem = ({ item }: { item: any }) => (
-    <View style={styles.searchHistoryItem}>
-      <Image source={{ uri: item.avatar }} style={styles.searchHistoryAvatar} />
-      <View style={styles.searchHistoryInfo}>
-        <Text style={styles.searchHistoryName}>{item.name}</Text>
-        <Text style={styles.searchHistoryUsername}>{item.username}</Text>
-      </View>
-      <TouchableOpacity style={styles.clearSearchButton}>
-        <MaterialIcons name="close" size={18} color="#8E8E93" />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderGroupAvatar = (participants: { avatar: string }[]) => {
-    return (
-      <View style={styles.groupAvatarContainer}>
-        {participants.slice(0, 4).map((participant, index) => (
-          <Image 
-            key={index}
-            source={{ uri: participant.avatar }} 
-            style={[
-              styles.groupAvatar, 
-              {
-                top: index < 2 ? 0 : 15,
-                left: index % 2 === 0 ? 0 : 15,
-              }
-            ]} 
-          />
-        ))}
-      </View>
-    );
+  const handleSearch = () => {
+    // TODO: Implement navigation or modal for search
+    console.log("Search Pressed");
   };
 
-  const renderChatItem = ({ item }: { item: ChatPreview }) => (
-    <TouchableOpacity 
-      style={styles.chatItem}
-      onPress={() => router.push({
-        pathname: '/(main)/chat',
-        params: {
+  // Updated renderChatItem based on Figma specs
+  const renderChatItem = ({ item }: { item: ChatPreview }) => {
+    const isSelected = item.isSelected;
+    const textColor = isSelected ? '#FFFFFF' : '#818491'; // White for selected, grey otherwise
+    const timestampColor = isSelected ? '#FFFFFF' : '#6E717D';
+
+    return (
+      <TouchableOpacity
+        style={[styles.chatItemContainer, isSelected && styles.chatItemSelected]}
+        onPress={() => navigation.navigate('Chat', {
           userId: item.id,
           name: item.name,
           avatar: item.avatar
-        }
-      })}
-    >
-      <View style={styles.avatarContainer}>
-        {item.isGroup && item.participants ? (
-          renderGroupAvatar(item.participants)
-        ) : (
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        )}
-        {item.isOnline && !item.isGroup && <View style={styles.onlineIndicator} />}
-      </View>
-      
-      <View style={styles.chatInfo}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{item.name}</Text>
-          <Text style={styles.timestamp}>{item.timestamp}</Text>
+        })}
+      >
+        {/* Avatar */}
+        <View style={styles.chatItemAvatarContainer}>
+          <Image source={{ uri: item.avatar }} style={styles.chatItemAvatar} />
+          <StatusIndicator status={item.status} />
         </View>
-        
-        <View style={styles.lastMessageContainer}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
+
+        {/* Info */}
+        <View style={styles.chatItemInfo}>
+          <View style={styles.chatItemNameLevel}>
+            <Text style={[styles.chatItemName, { color: textColor }]}>{item.name}</Text>
+            {item.level && (
+              <View style={styles.chatItemLevelContainer}>
+                {/* Using Ionicons flame as placeholder for level icon */}
+                <Ionicons name="flame" size={11.57} color="#6E69F4" />
+                <Text style={[styles.chatItemLevel, { color: textColor }]}>{item.level}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.chatItemLastMessage, { color: textColor }]} numberOfLines={1}>
             {item.lastMessage}
           </Text>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unreadCount}</Text>
-            </View>
-          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
 
-  const renderHeader = () => {
-    return (
-      <View style={styles.headerContainer}>
-        {!isSearchFocused ? (
-          // Default header
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>Messages</Text>
-            </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={activateSearch}
-              >
-                <MaterialIcons name="search" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={handleAddFriend}
-              >
-                <MaterialIcons name="person-add" size={22} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          // Search active header
-          <View style={styles.searchHeader}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={deactivateSearch}
-            >
-              <MaterialIcons name="arrow-back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <View style={styles.searchInputContainer}>
-              <MaterialIcons name="search" size={18} color="#8E8E93" />
-              <TextInput
-                ref={searchInputRef}
-                style={styles.searchInput}
-                placeholder="Search"
-                placeholderTextColor="#8E8E93"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-              />
-              {searchQuery !== '' && (
-                <TouchableOpacity 
-                  style={styles.clearButton}
-                  onPress={() => setSearchQuery('')}
-                >
-                  <MaterialIcons name="close" size={16} color="#8E8E93" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
-      </View>
+        {/* Timestamp */}
+        <Text style={[styles.chatItemTimestamp, { color: timestampColor }]}>{item.timestamp}</Text>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.container}>
-        {renderHeader()}
-        
-        <Animated.View 
-          style={[
-            styles.contentContainer,
-            {
-              transform: [
-                {
-                  translateX: slideAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -width]
-                  })
-                }
-              ]
-            }
-          ]}
-        >
-          {/* Main messages list */}
-          <View style={styles.tabContent}>
-            <View style={styles.addFriendsButton}>
-              <View style={styles.addFriendsIconContainer}>
-                <MaterialIcons name="group-add" size={20} color="#FFFFFF" />
+      <View style={styles.outerContainer}>
+          {/* Custom Header based on Figma */}
+          {/* Removed the extra View for header, applying styles directly */}
+           <Text style={styles.headerTitle}>Messages</Text>
+
+          <View style={styles.mainContentBackground}>
+              {/* Top Bar with Search and Add Friends */}
+              <View style={styles.topBar}>
+                <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+                  {/* search icon from figma */}
+                  <Ionicons name="search" size={17} color="#B5BAC1" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.addFriendsButton} onPress={handleAddFriend}>
+                   {/* person-add icon approximately matching figma */}
+                  <Ionicons name="person-add-outline" size={20} color="#B5BAC1" style={styles.addFriendsIcon} />
+                  <Text style={styles.addFriendsText}>Add Friends</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.addFriendsText}>Add Friends</Text>
-            </View>
-            
-            <FlatList
-              data={DUMMY_CHATS}
-              renderItem={renderChatItem}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.chatList}
-            />
+
+              {/* TODO: Add Horizontal Active Chats Section here based on Figma component */}
+              {/* This section requires a horizontal FlatList or ScrollView */}
+              <View style={styles.horizontalScrollPlaceholder}>
+                 <Text style={styles.placeholderText}>Horizontal Active Chats (TODO)</Text>
+              </View>
+
+
+              {/* Messages List */}
+              <FlatList
+                data={DUMMY_CHATS}
+                renderItem={renderChatItem}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.chatList}
+                style={styles.flatListStyle} // Ensures list takes up available space
+              />
           </View>
-          
-          {/* Search view */}
-          <View style={[styles.tabContent, { width }]}>
-            <View style={styles.searchHistoryHeader}>
-              <Text style={styles.searchHistoryTitle}>Search History</Text>
-              <TouchableOpacity>
-                <Text style={styles.clearAllText}>Clear all</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <FlatList
-              data={SEARCH_HISTORY}
-              renderItem={renderSearchHistoryItem}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.searchHistoryList}
-            />
-          </View>
-        </Animated.View>
-        
-        {/* New chat floating button */}
-        <TouchableOpacity 
-          style={styles.newChatButton}
-          onPress={handleCreateGroup}
-        >
-          <MaterialIcons name="chat" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+
+          {/* Group Chat Floating Button */}
+          <TouchableOpacity
+            style={styles.groupChatButton}
+            onPress={handleCreateGroup}
+          >
+             {/* Using Ionicons chatbubbles to approximate figma icon */}
+            <Ionicons name="chatbubbles-outline" size={28} color="#FFFFFF" style={styles.groupChatIcon} />
+            <Text style={styles.groupChatText}>Group Chat</Text>
+          </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
+// Adjusted styles based on Figma CSS specs
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121214',
+    backgroundColor: '#131318', // Overall page background
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, // Handle Android status bar
   },
-  container: {
+  outerContainer: {
     flex: 1,
-    backgroundColor: '#121214',
+    // Removed padding, using absolute positioning and margins where needed
   },
-  headerContainer: {
-    backgroundColor: '#121214',
-    paddingHorizontal: 16,
-    borderBottomWidth: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 52,
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
+  // Header Title - applied directly to Text component now
+  headerTitle: {
+    // position: 'absolute', // Removed, let it flow naturally in the safe area top part
+    // left: 24, // Use padding/margin instead if needed, or rely on flex alignment
+    // top: 16, // Adjust based on actual layout needs relative to safe area top
+    marginTop: 16, // Added margin top
+    marginLeft: 24, // Added margin left
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'System', // Use System font as fallback
+    fontWeight: '600',
+    fontSize: 25,
+    lineHeight: 30,
     color: '#FFFFFF',
+    // React Native textShadow is basic
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 2,
+    marginBottom: 8, // Space below title before main content
   },
-  headerActions: {
+  mainContentBackground: {
+    flex: 1, // Take remaining space
+    backgroundColor: '#1C1D23',
+    borderTopLeftRadius: 5, // Figma: border-radius: 5px 5px 0px 0px;
+    borderTopRightRadius: 5,
+    // Removed absolute positioning, using flex: 1 instead
+    marginTop: 5, // Space between header title and this container
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    // padding: 5px 0px 5px 10px; -> Use paddingHorizontal/Vertical
+    paddingVertical: 10, // Increased padding for better touch area
+    paddingHorizontal: 16, // Adjusted padding
+    // gap: 163px; -> Use justifyContent: 'space-between' or margins
+    justifyContent: 'space-between', // Pushes search to left, add friends to right
+    // width: 365px; -> Use width: '100%' or rely on container
+    width: '100%',
+    // Removed absolute positioning
+    // background: '#1C1D23', // Already set by mainContentBackground
+    // border-radius: 5px 0px 0px 0px; // Already handled by mainContentBackground
+    marginBottom: 10, // Space below top bar
   },
-  actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
+  searchButton: {
+    // box-sizing: border-box;
+    flexDirection: 'row',
     justifyContent: 'center',
-    marginLeft: 8,
-  },
-  searchHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2C2C2E',
+    padding: 10, // Adjusted padding
+    // gap: 10px;
+    // width: 37px; height: 37.38px; -> Let padding define size or set fixed size
+    width: 40, // Fixed size for consistency
+    height: 40,
+    backgroundColor: '#434751',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 36,
+    // Shadow properties might need Platform adjustment
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 1,
+    elevation: 5, // for Android
   },
-  searchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginLeft: 8,
-    height: '100%',
-    padding: 0,
-  },
-  clearButton: {
-    padding: 4,
-  },
-  contentContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    width: width * 2,
-  },
-  tabContent: {
-    width,
-    flex: 1,
-  },
+  // Search icon style (already set size/color in component)
   addFriendsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2C2C2E',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  addFriendsIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#6C5CE7',
-    alignItems: 'center',
+    // box-sizing: border-box;
+    flexDirection: 'row', // Changed from column to row
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
+    paddingVertical: 9, // Adjusted padding
+    paddingHorizontal: 15, // Adjusted padding
+    gap: 8, // Added gap between icon and text
+    // width: 266px; -> Width will be determined by content + padding
+    height: 40, // Fixed height
+    backgroundColor: '#434751',
+    borderRadius: 10,
+    // Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 }, // Figma: 0px 4px 2px -> use offset y=4, radius=2
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 5, // for Android
+    flexGrow: 1, // Allow button to grow slightly if needed
+    marginLeft: 10, // Space between search and add friends
+  },
+  addFriendsIcon: {
+    // Position adjusted by flex gap in button
+    // Shadow applied to button container
+     marginRight: 5, // Add some space between icon and text
   },
   addFriendsText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'System', // Use System font as fallback
+    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 17,
+    color: '#B5BAC1',
+     // Shadow applied to button container
+  },
+  // Placeholder for Horizontal Scroll Section
+  horizontalScrollPlaceholder: {
+      height: 102, // Approximate height from Figma component
+      backgroundColor: 'rgba(67, 71, 81, 0.5)', // Semi-transparent version of #434751
+      borderRadius: 10,
+      marginHorizontal: 16, // Match other padding
+      marginBottom: 18, // Space before the vertical list
+      justifyContent: 'center',
+      alignItems: 'center',
+  },
+  placeholderText: {
+      color: '#B5BAC1',
+      fontFamily: Platform.OS === 'ios' ? 'Inter' : 'System',
+      fontSize: 14,
+  },
+  // Styles for Vertical FlatList
+  flatListStyle: {
+      flex: 1, // Ensure list takes available space within mainContentBackground
+      paddingHorizontal: 16, // Add horizontal padding to list container
   },
   chatList: {
-    paddingHorizontal: 16,
+    paddingBottom: 100, // Ensure space for Group Chat button
+    paddingTop: 0, // Remove default padding if any
   },
-  chatItem: {
+  chatItemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#2C2C2E',
+    // padding: 0px; -> Set padding/margin as needed
+    marginBottom: 18, // Figma: gap: 18px between items
+    paddingHorizontal: 5, // Add some horizontal padding within the item if needed
+    // height: 40px; // Height determined by content, matches non-selected figma item height
   },
-  avatarContainer: {
-    position: 'relative',
-    width: 50,
-    height: 50,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  groupAvatarContainer: {
-    width: 50,
-    height: 50,
-    position: 'relative',
-  },
-  groupAvatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: '#121214',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4ADE80',
-    borderWidth: 2,
-    borderColor: '#121214',
-  },
-  chatInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  lastMessageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  lastMessage: {
-    flex: 1,
-    fontSize: 14,
-    color: '#8E8E93',
-    marginRight: 10,
-  },
-  unreadBadge: {
-    backgroundColor: '#6C5CE7',
+  chatItemSelected: {
+    backgroundColor: '#2A2E37', // Background for selected item
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadCount: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  newChatButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6C5CE7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 5,
+    paddingVertical: 10, // Add padding when selected to contain the background
+    paddingHorizontal: 12, // Add padding when selected
+    marginBottom: 18, // Keep consistent margin
+    // height: 59px; // Height from Figma selected item
+    // Shadow for selected item
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOpacity: 0.1, // Subtle shadow
+    shadowRadius: 4,
+    elevation: 3,
   },
-  searchHistoryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  chatItemAvatarContainer: {
+    position: 'relative', // For status indicator positioning
+    marginRight: 12, // Space between avatar and text info
+  },
+  chatItemAvatar: {
+    width: 37,
+    height: 37,
+    borderRadius: 18.5, // Make it circular
+    borderWidth: 1, // Figma spec border
+    borderColor: '#15151A', // Figma spec border color
+  },
+  // Status Indicator Styles - Base and Specifics
+  statusIndicatorBase: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7, // Make it circular
+    borderWidth: 1.2, // Figma spec border
+    borderColor: '#15151A', // Figma spec border color (or match container bg?) Using #15151A for now.
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
   },
-  searchHistoryTitle: {
-    fontSize: 16,
+  statusOnline: {
+    backgroundColor: '#7ADA72', // Green
+  },
+  statusBusy: {
+    backgroundColor: '#D94430', // Red
+  },
+  statusBusyInner: { // Minus sign for Busy
+    width: 7.53,
+    height: 1.4,
+    backgroundColor: '#15151A', // Dark color for the minus sign
+  },
+  statusIdle: {
+    backgroundColor: '#282828', // Dark background for idle icon container
+    // Moon icon is positioned inside using Ionicons
+  },
+  statusOffline: {
+    backgroundColor: '#000000', // Outer circle color for offline
+    // Inner circle achieved with nested view
+  },
+  statusOfflineInner: { // Inner circle for Offline
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3B3A3A', // Inner circle color from Figma spec
+    // Border applied to outer container (statusOffline)
+  },
+  // End Status Indicator Styles
+  chatItemInfo: {
+    flex: 1, // Take remaining space
+    justifyContent: 'center',
+  },
+  chatItemNameLevel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4, // Space between name/level and last message
+  },
+  chatItemName: {
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'System',
     fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 19,
+    marginRight: 6, // Space between name and level
+    // Color set dynamically based on isSelected
   },
-  clearAllText: {
-    fontSize: 14,
-    color: '#6C5CE7',
-  },
-  searchHistoryList: {
-    paddingHorizontal: 16,
-  },
-  searchHistoryItem: {
+  chatItemLevelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#2C2C2E',
   },
-  searchHistoryAvatar: {
-    width: 40,
-    height: 40,
+  chatItemLevel: {
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'System',
+    fontWeight: '400',
+    fontSize: 12,
+    lineHeight: 14,
+    marginLeft: 3, // Space between icon and level number
+    // Color set dynamically based on isSelected
+  },
+  chatItemLastMessage: {
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'System',
+    fontWeight: '400',
+    fontSize: 14,
+    lineHeight: 17,
+    // Color set dynamically based on isSelected
+  },
+  chatItemTimestamp: {
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'System',
+    fontWeight: '400',
+    fontSize: 13,
+    lineHeight: 16,
+    marginLeft: 10, // Space between text info and timestamp
+    // Color set dynamically based on isSelected
+  },
+  groupChatButton: {
+    position: 'absolute',
+    bottom: 24, // Align with Figma padding
+    right: 24, // Align with Figma padding
+    width: 70,
+    height: 70,
+    backgroundColor: '#6E69F4',
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 }, // Figma: 0px 4px 1px
+    shadowOpacity: 0.25,
+    shadowRadius: 1, // Adjust radius to match '1px' blur effect
+    elevation: 8, // for Android
   },
-  searchHistoryInfo: {
-    flex: 1,
-    marginLeft: 12,
+  groupChatIcon: {
+     // Shadow applied to button container
+     marginBottom: 2, // Space between icon and text
   },
-  searchHistoryName: {
-    fontSize: 16,
-    fontWeight: '600',
+  groupChatText: {
+    fontFamily: Platform.OS === 'ios' ? 'Inter' : 'System',
+    fontWeight: '700',
+    fontSize: 10,
+    lineHeight: 12,
     color: '#FFFFFF',
-  },
-  searchHistoryUsername: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  clearSearchButton: {
-    padding: 6,
+    // Text Shadow
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 2,
   },
 });
 
