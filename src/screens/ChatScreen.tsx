@@ -33,6 +33,7 @@ interface ChatScreenProps {
   name: string;
   avatar: string;
   goBack: () => void;
+  goToDMs?: () => void; // Optional dedicated function to navigate to DMs list
 }
 
 interface Message {
@@ -283,7 +284,7 @@ const triggerHapticFeedback = (type?: 'selection' | 'longPress' | 'error' | 'rea
   }
 };
 
-const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
+const ChatScreen = ({ userId, name, avatar, goBack, goToDMs }: ChatScreenProps) => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>(() => 
     DUMMY_MESSAGES.map(msg => 
@@ -932,12 +933,32 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     );
   };
 
+  // Add a navigation helper that always goes to DMs
+  const navigateToMessages = () => {
+    if (goToDMs) {
+      // Use provided navigation function if available
+      goToDMs();
+    } else {
+      // Use router to navigate to direct-messages as fallback
+      try {
+        // Import and use router from expo-router if available
+        const { router } = require('expo-router');
+        router.push('/(main)/direct-messages');
+      } catch (error) {
+        // If expo-router is not available, just use the provided goBack
+        console.log('Navigation error, falling back to goBack:', error);
+        goBack();
+      }
+    }
+  };
+
+  // Now update the back button handler to use our new navigation helper
   const renderHeader = () => {
     return (
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={goBack}
+          onPress={navigateToMessages}
         >
           {renderIcon('arrow-back', 24, '#FFFFFF')}
         </TouchableOpacity>
@@ -1412,159 +1433,270 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     return renderMessage(item, index);
   };
 
-  return (
-    <SafeAreaView style={container}>
-      <StatusBar barStyle="light-content" />
-      {renderHeader()}
-      
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-          <View style={styles.chatContainer}>
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.messagesContainer}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={messages.length}
-            />
+  // Add new state for swipe back gesture
+  const screenWidth = Dimensions.get('window').width;
+  const swipeAnim = useRef(new Animated.Value(0)).current;
+  const swipeOpacity = useRef(new Animated.Value(1)).current;
+  
+  // Create a pan responder for the swipe back gesture
+  const swipeBackResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only respond to horizontal swipes starting from left edge (first 50px)
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && 
+               gestureState.dx > 10 && 
+               evt.nativeEvent.pageX < 50; // Only trigger when starting from left edge
+      },
+      onPanResponderGrant: () => {
+        // When the gesture starts, show a subtle hint by slightly moving the screen
+        Animated.timing(swipeAnim, {
+          toValue: 10,
+          duration: 100,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Only allow right swipes (positive dx)
+        if (gestureState.dx > 0) {
+          // Move the screen as the user swipes
+          swipeAnim.setValue(gestureState.dx);
+          
+          // Calculate opacity based on swipe distance
+          const newOpacity = 1 - (gestureState.dx / (screenWidth * 0.8));
+          swipeOpacity.setValue(Math.max(newOpacity, 0.3));
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // If swiped more than 30% of screen width, go back
+        if (gestureState.dx > screenWidth * 0.3) {
+          // Complete the animation before navigating back
+          Animated.parallel([
+            Animated.timing(swipeAnim, {
+              toValue: screenWidth,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            })
+          ]).start(() => {
+            // Properly reset animation values before navigating
+            swipeAnim.setValue(0);
+            swipeOpacity.setValue(1);
             
-            {/* Input container - NOT absolutely positioned */}
-            <View style={styles.inputWrapper}>
-              <View style={[styles.inputContainerWrapper, { 
-                borderTopWidth: 1,
-                borderTopColor: '#202225',
-              }]}>
-                {/* Reply interface */}
-                {replyingTo && (
-                  <View style={styles.replyingContainer}>
-                    <View style={styles.replyingContent}>
-                      <View style={styles.replyingBar} />
-                      <View style={styles.replyingTextContainer}>
-                        <Text style={styles.replyingToText}>Replying to </Text>
-                        <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+            // Always navigate to messages list
+            navigateToMessages();
+          });
+        } else {
+          // Otherwise snap back to original position
+          Animated.parallel([
+            Animated.spring(swipeAnim, {
+              toValue: 0,
+              friction: 5,
+              useNativeDriver: true,
+            }),
+            Animated.timing(swipeOpacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            })
+          ]).start();
+        }
+      }
+    })
+  ).current;
+
+  // 2. Add cleanup for animations and event listeners on unmount
+  useEffect(() => {
+    return () => {
+      // Reset animation values when component unmounts
+      swipeAnim.setValue(0);
+      swipeOpacity.setValue(1);
+      actionSheetAnim.setValue(0);
+      
+      // Reset any highlighted message
+      setHighlightedMessageId(null);
+      
+      // Close any open modals
+      setMessageActionsVisible(false);
+      setIsImagePickerVisible(false);
+      setShowEmojiPicker(false);
+    };
+  }, []);
+
+  // Modify the return statement to wrap everything in an Animated.View with the swipe gesture
+  return (
+    <Animated.View 
+      style={[
+        { 
+          flex: 1, 
+          backgroundColor: '#36393f',
+          width: '100%',
+          height: '100%'
+        },
+        { 
+          transform: [{ translateX: swipeAnim }],
+          opacity: swipeOpacity
+        }
+      ]}
+      {...swipeBackResponder.panHandlers}
+    >
+      <SafeAreaView style={container}>
+        <StatusBar barStyle="light-content" />
+        {renderHeader()}
+        
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
+            <View style={styles.chatContainer}>
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.messagesContainer}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                initialNumToRender={messages.length}
+              />
+              
+              {/* Input container - NOT absolutely positioned */}
+              <View style={styles.inputWrapper}>
+                <View style={[styles.inputContainerWrapper, { 
+                  borderTopWidth: 1,
+                  borderTopColor: '#202225',
+                }]}>
+                  {/* Reply interface */}
+                  {replyingTo && (
+                    <View style={styles.replyingContainer}>
+                      <View style={styles.replyingContent}>
+                        <View style={styles.replyingBar} />
+                        <View style={styles.replyingTextContainer}>
+                          <Text style={styles.replyingToText}>Replying to </Text>
+                          <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
+                        {renderIcon('close', 16, '#B9BBBE')}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
+                  {/* Discord-style input area */}
+                  <View style={styles.discordInputContainer}>
+                    {/* Input field with emoji button inside */}
+                    <View style={[styles.discordInputFieldContainer, { flex: 1 }]}>
+                      <View style={styles.inputWithEmojiContainer}>
+                        <TextInput
+                          ref={textInputRef}
+                          style={[styles.discordInputField, { flex: 1 }]}
+                          placeholder={`Message ${name}`}
+                          placeholderTextColor="#72767D"
+                          value={message}
+                          onChangeText={setMessage}
+                          onFocus={handleInputFocus}
+                          onBlur={handleInputBlur}
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          keyboardAppearance="dark"
+                          multiline
+                          numberOfLines={Platform.OS === 'ios' ? undefined : 1}
+                          textAlignVertical="center"
+                        />
+                        {/* Emoji button inside text field */}
+                        <TouchableOpacity 
+                          style={styles.inlineEmojiButton}
+                          onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                        >
+                          {renderIcon('emoji-emotions', 22, '#B9BBBE')}
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
-                      {renderIcon('close', 16, '#B9BBBE')}
-                    </TouchableOpacity>
-                  </View>
-                )}
-                
-                {/* Discord-style input area */}
-                <View style={styles.discordInputContainer}>
-                  {/* Input field with emoji button inside */}
-                  <View style={[styles.discordInputFieldContainer, { flex: 1 }]}>
-                    <View style={styles.inputWithEmojiContainer}>
-                      <TextInput
-                        ref={textInputRef}
-                        style={[styles.discordInputField, { flex: 1 }]}
-                        placeholder={`Message ${name}`}
-                        placeholderTextColor="#72767D"
-                        value={message}
-                        onChangeText={setMessage}
-                        onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        keyboardAppearance="dark"
-                        multiline
-                        numberOfLines={Platform.OS === 'ios' ? undefined : 1}
-                        textAlignVertical="center"
-                      />
-                      {/* Emoji button inside text field */}
+                    
+                    {/* Right side - only image and send buttons */}
+                    <View style={styles.discordInputRightButtons}>
                       <TouchableOpacity 
-                        style={styles.inlineEmojiButton}
-                        onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                        style={styles.discordInputButton}
+                        onPress={handleImagePress}
                       >
-                        {renderIcon('emoji-emotions', 22, '#B9BBBE')}
+                        {renderIcon('image', 24, '#B9BBBE')}
                       </TouchableOpacity>
+                      
+                      {message.trim() ? (
+                        <TouchableOpacity
+                          style={[styles.discordInputButton, styles.sendButton]}
+                          onPress={handleSendMessage}
+                        >
+                          {renderIcon(isEditingMode ? 'check' : 'send', 24, '#FFFFFF')}
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                   
-                  {/* Right side - only image and send buttons */}
-                  <View style={styles.discordInputRightButtons}>
-                    <TouchableOpacity 
-                      style={styles.discordInputButton}
-                      onPress={handleImagePress}
-                    >
-                      {renderIcon('image', 24, '#B9BBBE')}
-                    </TouchableOpacity>
-                    
-                    {message.trim() ? (
-                      <TouchableOpacity
-                        style={[styles.discordInputButton, styles.sendButton]}
-                        onPress={handleSendMessage}
-                      >
-                        {renderIcon(isEditingMode ? 'check' : 'send', 24, '#FFFFFF')}
+                  {/* Image picker UI */}
+                  {isImagePickerVisible && (
+                    <View style={styles.discordAttachmentPicker}>
+                      <TouchableOpacity style={styles.attachmentOption}>
+                        <View style={styles.attachmentIconContainer}>
+                          {renderIcon('camera', 24, '#FFFFFF')}
+                        </View>
+                        <Text style={styles.attachmentText}>Camera</Text>
                       </TouchableOpacity>
-                    ) : null}
-                  </View>
+                      
+                      <TouchableOpacity style={styles.attachmentOption}>
+                        <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
+                          {renderIcon('photo-library', 24, '#FFFFFF')}
+                        </View>
+                        <Text style={styles.attachmentText}>Gallery</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity style={styles.attachmentOption}>
+                        <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
+                          {renderIcon('file', 24, '#FFFFFF')}
+                        </View>
+                        <Text style={styles.attachmentText}>File</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  
+                  {/* Emoji picker UI */}
+                  {showEmojiPicker && (
+                    <View style={styles.discordEmojiPicker}>
+                      <View style={styles.emojiPickerHeader}>
+                        <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
+                      </View>
+                      <View style={styles.emojiGrid}>
+                        {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
+                          <TouchableOpacity 
+                            key={emoji} 
+                            style={styles.emojiItem}
+                            onPress={() => {
+                              setMessage(prev => prev + emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                          >
+                            <Text style={styles.emojiText}>{emoji}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
                 </View>
-                
-                {/* Image picker UI */}
-                {isImagePickerVisible && (
-                  <View style={styles.discordAttachmentPicker}>
-                    <TouchableOpacity style={styles.attachmentOption}>
-                      <View style={styles.attachmentIconContainer}>
-                        {renderIcon('camera', 24, '#FFFFFF')}
-                      </View>
-                      <Text style={styles.attachmentText}>Camera</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.attachmentOption}>
-                      <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
-                        {renderIcon('photo-library', 24, '#FFFFFF')}
-                      </View>
-                      <Text style={styles.attachmentText}>Gallery</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.attachmentOption}>
-                      <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
-                        {renderIcon('file', 24, '#FFFFFF')}
-                      </View>
-                      <Text style={styles.attachmentText}>File</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                
-                {/* Emoji picker UI */}
-                {showEmojiPicker && (
-                  <View style={styles.discordEmojiPicker}>
-                    <View style={styles.emojiPickerHeader}>
-                      <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
-                    </View>
-                    <View style={styles.emojiGrid}>
-                      {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
-                        <TouchableOpacity 
-                          key={emoji} 
-                          style={styles.emojiItem}
-                          onPress={() => {
-                            setMessage(prev => prev + emoji);
-                            setShowEmojiPicker(false);
-                          }}
-                        >
-                          <Text style={styles.emojiText}>{emoji}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
               </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
-      
-      {/* Render the message action sheet */}
-      {renderMessageActionSheet()}
-    </SafeAreaView>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+        
+        {/* Render the message action sheet */}
+        {renderMessageActionSheet()}
+      </SafeAreaView>
+    </Animated.View>
   );
 };
 
