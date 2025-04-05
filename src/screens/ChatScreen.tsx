@@ -16,10 +16,15 @@ import {
   Keyboard,
   EmitterSubscription,
   KeyboardEvent,
+  Modal,
+  TouchableWithoutFeedback,
+  Vibration,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconFallback } from '../../app/_layout';
 import SVGIcon from '../components/SVGIcon';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,6 +43,7 @@ interface Message {
   text: string;
   timestamp: string;
   isLive?: boolean;
+  edited?: boolean;
   attachments?: Array<{
     id: string;
     type: 'image' | 'file' | 'gif';
@@ -231,11 +237,55 @@ const DUMMY_MESSAGES: Message[] = [
   },
 ];
 
+// Configure haptic feedback patterns based on device capabilities
+const triggerHapticFeedback = (type?: 'selection' | 'longPress' | 'error' | 'reaction' | 'light' | 'medium' | 'warning') => {
+  if (Platform.OS === 'ios') {
+    switch (type) {
+      case 'selection':
+      case 'light':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        break;
+      case 'longPress':
+      case 'medium':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        break;
+      case 'error':
+      case 'warning':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        break;
+      case 'reaction':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        break;
+      default:
+        Haptics.selectionAsync();
+    }
+  } else {
+    // For Android, use Vibration API
+    switch (type) {
+      case 'selection':
+      case 'light':
+        Vibration.vibrate(10);
+        break;
+      case 'longPress':
+      case 'medium':
+        Vibration.vibrate(15);
+        break;
+      case 'error':
+      case 'warning':
+        Vibration.vibrate([0, 30, 30, 30]);
+        break;
+      case 'reaction':
+        Vibration.vibrate(10);
+        break;
+      default:
+        Vibration.vibrate(10);
+    }
+  }
+};
+
 const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   const [message, setMessage] = useState('');
-  // Update initial state type
   const [messages, setMessages] = useState<Message[]>(() => 
-    // Use chat partner details for initial non-currentUser messages
     DUMMY_MESSAGES.map(msg => 
       msg.senderId !== CURRENT_USER_ID ? { ...msg, senderName: name, senderAvatar: avatar } : msg
     )
@@ -246,23 +296,190 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
   const inputContainerRef = useRef<View>(null);
-
-  // Focus input when component mounts - with a single attempt to avoid loops
-  useEffect(() => {
-    // Only try focusing once after a short delay
-    const timer = setTimeout(() => {
-      if (textInputRef.current) {
-        textInputRef.current.focus();
-      }
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // State for handling replies and mentions
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
+  // Add new state for message actions
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [messageActionsVisible, setMessageActionsVisible] = useState(false);
+  const actionSheetAnim = useRef(new Animated.Value(0)).current;
+  
+  // Add PanResponder for dragging down the action sheet
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (e, gestureState) => {
+        if (gestureState.dy > 0) {
+          // Only allow dragging down, not up
+          actionSheetAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (e, gestureState) => {
+        if (gestureState.dy > 50) {
+          // If dragged more than 50px down, close the action sheet
+          closeMessageActions();
+        } else {
+          // Otherwise, snap back to original position
+          Animated.spring(actionSheetAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  // Show message actions method
+  const showMessageActions = (message: Message) => {
+    setSelectedMessage(message);
+    setMessageActionsVisible(true);
+    
+    // Reset animation value first
+    actionSheetAnim.setValue(0);
+    
+    // Animate action sheet sliding up
+    Animated.timing(actionSheetAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
+    // Provide haptic feedback
+    triggerHapticFeedback('longPress');
+  };
+  
+  // Close message actions method
+  const closeMessageActions = () => {
+    // Animate action sheet sliding down
+    Animated.timing(actionSheetAnim, {
+      toValue: 500, // Fully off screen
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setMessageActionsVisible(false);
+      setSelectedMessage(null);
+    });
+  };
+  
+  // Add state for message highlight animation
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const messageAnimations = React.useRef(new Map());
+
+  // Function to get or create animation value for a message
+  const getMessageAnimation = (messageId: string) => {
+    if (!messageAnimations.current.has(messageId)) {
+      messageAnimations.current.set(messageId, new Animated.Value(0));
+    }
+    return messageAnimations.current.get(messageId);
+  };
+
+  // Function to animate message highlight
+  const animateMessage = (messageId: string) => {
+    setHighlightedMessageId(messageId);
+    const animation = getMessageAnimation(messageId);
+    
+    // Reset animation value
+    animation.setValue(0);
+    
+    // Sequence of animations: grow slightly, then shrink back
+    Animated.sequence([
+      Animated.timing(animation, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: 0.5,
+        duration: 100,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      // Keep a subtle highlight after animation completes
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 500);
+    });
+  };
+
+  // Function to handle long press on messages
+  const handleLongPress = (message: Message) => {
+    // Provide haptic feedback
+    triggerHapticFeedback('longPress');
+    
+    // Animate the message
+    animateMessage(message.id);
+    
+    // Show action sheet
+    setTimeout(() => {
+      showMessageActions(message);
+    }, 50);
+  };
+
+  // Function to handle tap on messages
+  const handleMessagePress = (message: Message) => {
+    // Animate the message with a light tap animation
+    animateMessage(message.id);
+    
+    // Provide subtle feedback
+    triggerHapticFeedback('selection');
+  };
+
+  // Reply handler from action sheet
+  const handleReplyFromActions = () => {
+    if (selectedMessage) {
+      setReplyingTo(selectedMessage);
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 100);
+      closeMessageActions();
+      // Add subtle feedback when initiating a reply
+      triggerHapticFeedback('selection');
+    }
+  };
+  
+  // Edit handler (for own messages only)
+  const handleEditMessage = () => {
+    if (selectedMessage && selectedMessage.senderId === CURRENT_USER_ID) {
+      // Set message text to the selected message
+      setMessage(selectedMessage.text);
+      
+      // Enter edit mode
+      setIsEditingMode(true);
+      setEditingMessageId(selectedMessage.id);
+      
+      // Close the action sheet and focus the input
+      closeMessageActions();
+      setTimeout(() => {
+        textInputRef.current?.focus();
+      }, 100);
+      
+      // Add subtle feedback when editing
+      triggerHapticFeedback('selection');
+    }
+  };
+  
+  // Delete handler (for own messages only)
+  const handleDeleteMessage = () => {
+    if (selectedMessage) {
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => msg.id !== selectedMessage.id)
+      );
+      closeMessageActions();
+      // Add error-type feedback for destructive action
+      triggerHapticFeedback('error');
+    }
+  };
+  
+  // Copy text handler
+  const handleCopyText = () => {
+    if (selectedMessage) {
+      // In a real app, you would use Clipboard.setString
+      // For this example we'll just close the action sheet
+      closeMessageActions();
+    }
+  };
+
   // Function to detect mentions in the message
   const detectMentions = (text: string): Array<{id: string, name: string, startIndex: number, endIndex: number}> => {
     const mentions = [];
@@ -287,10 +504,29 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     return mentions;
   };
   
-  // Updated sendMessage function with reliable scrolling
-  const sendMessage = () => {
-    if (message.trim()) {
-      // Detect mentions in the message
+  // Fix edited message handling without using window references
+  const [isEditingMode, setIsEditingMode] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+
+  const handleSendMessage = () => {
+    if (isEditingMode && editingMessageId && message.trim()) {
+      // Update the existing message with the new text and mark as edited
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === editingMessageId 
+            ? { ...msg, text: message, edited: true } 
+            : msg
+        )
+      );
+      
+      // Clear input and exit edit mode
+      setMessage('');
+      setIsEditingMode(false);
+      setEditingMessageId(null);
+      // Add subtle feedback when editing
+      triggerHapticFeedback('selection');
+    } else if (message.trim()) {
+      // Regular send message behavior
       const mentions = detectMentions(message);
       
       const newMessage: Message = {
@@ -315,8 +551,10 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       setMessage('');
       setReplyingTo(null);
       
+      // Add subtle feedback when sending a message
+      triggerHapticFeedback('selection');
+      
       // Reliable scrolling to end after sending a message
-      // Use a sequence of attempts with increasing delays to ensure it works
       const scrollAttempts = [10, 50, 100, 300];
       scrollAttempts.forEach(delay => {
         setTimeout(() => {
@@ -343,6 +581,9 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   
   // Function to add a reaction to a message
   const handleAddReaction = (messageId: string, emoji: string) => {
+    // Trigger a subtle reaction haptic
+    triggerHapticFeedback('reaction');
+    
     setMessages(prevMessages => 
       prevMessages.map(msg => {
         if (msg.id === messageId) {
@@ -462,7 +703,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       );
     }
     
-    return <Text>{textParts}</Text>;
+    return <Text style={styles.messageTextContainer}>{textParts}</Text>;
   };
 
   // Helper function to render message reactions
@@ -521,7 +762,10 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       <View style={styles.replyContainer}>
         <View style={styles.replyBar} />
         <View style={styles.replyContent}>
-          <Text style={[styles.replyUsername, isReplyToCurrentUser && styles.currentUserName]}>
+          <Text style={[
+            styles.replyUsername,
+            isReplyToCurrentUser && { color: '#00b0f4' }
+          ]}>
             {replyTo.senderName}
           </Text>
           <Text style={styles.replyText} numberOfLines={1}>
@@ -532,113 +776,159 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     );
   };
 
-  // State for message actions visibility - moved to component level
-  const [messageActionsVisible, setMessageActionsVisible] = useState<string | null>(null);
+  // Add at the component level:
+  // Message animation values
+  const [messageScaleValues, setMessageScaleValues] = useState<Record<string, Animated.Value>>({});
   
-  const renderMessage = ({ item, index }: { item: Message, index: number }) => {
-    if (item.isLive) {
-      return renderLiveChatPreview();
+  // Initialize animation value for new messages
+  useEffect(() => {
+    const newScaleValues: Record<string, Animated.Value> = {};
+    messages.forEach(msg => {
+      if (!messageScaleValues[msg.id]) {
+        newScaleValues[msg.id] = new Animated.Value(1);
+      }
+    });
+    
+    if (Object.keys(newScaleValues).length > 0) {
+      setMessageScaleValues(prev => ({...prev, ...newScaleValues}));
     }
-    
-    // Grouping Logic
+  }, [messages]);
+
+  // Render message in Discord style without hooks inside
+  const renderMessage = (message: Message, index: number) => {
+    const isOwnMessage = message.senderId === CURRENT_USER_ID;
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    // Group if previous message exists and is from the same sender
-    const isGrouped = previousMessage?.senderId === item.senderId;
-    // Check if messages are within 5 minutes of each other
-    const isWithinTimeWindow = (prev: string, current: string) => {
-      const prevTime = new Date(`1/1/2023 ${prev}`);
-      const currTime = new Date(`1/1/2023 ${current}`);
-      return (currTime.getTime() - prevTime.getTime()) < 5 * 60 * 1000; // 5 minutes in milliseconds
-    };
-
-    // Only group if messages are from same sender AND within time window
-    const shouldGroup = isGrouped && 
-      (!previousMessage?.timestamp || isWithinTimeWindow(previousMessage.timestamp, item.timestamp));
-
-    const showHeader = !shouldGroup;
-    const isCurrentUser = item.senderId === CURRENT_USER_ID;
-
-    // Don't group if the message has a reply (Discord behavior)
-    const hasReply = !!item.replyTo;
+    const showSenderInfo = !previousMessage || previousMessage.senderId !== message.senderId || 
+      (new Date(message.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 5 * 60 * 1000);
     
-    // Check if this message's actions are visible
-    const showActions = messageActionsVisible === item.id;
-
+    // Get animation scale value from component state
+    const scaleValue = messageScaleValues[message.id] || new Animated.Value(1);
+    
+    // Message press handler
+    const onMessagePress = () => {
+      triggerHapticFeedback('light');
+      animateMessagePress(message.id);
+    };
+    
+    // Message long press handler
+    const onMessageLongPress = () => {
+      triggerHapticFeedback('medium');
+      setSelectedMessage(message);
+      setMessageActionsVisible(true);
+      showActionSheet();
+      setHighlightedMessageId(message.id);
+      animateMessageLongPress(message.id);
+    };
+    
     return (
-      <TouchableOpacity 
-        activeOpacity={0.9}
-        onPress={() => setMessageActionsVisible(messageActionsVisible === item.id ? null : item.id)}
-        onLongPress={() => handleReply(item)}
+      <Animated.View
+        key={message.id}
         style={[
           styles.discordMessageContainer,
-          (showHeader || hasReply) && styles.discordMessageGroupStart,
-          isCurrentUser && styles.currentUserMessage
+          highlightedMessageId === message.id && styles.highlightedMessage,
+          { transform: [{ scale: scaleValue }] }
         ]}
       >
-        {(showHeader || hasReply) ? (
-          <Image 
-            source={{ uri: item.senderAvatar }}
-            style={styles.discordAvatar}
-          />
+        {/* User Avatar - Always show left, but can be empty space if continuing same user */}
+        {showSenderInfo ? (
+          <View style={styles.discordAvatar}>
+            <Image
+              source={
+                isOwnMessage 
+                ? require('../../assets/images/react-logo.png')
+                : message.senderAvatar 
+                  ? { uri: message.senderAvatar } 
+                  : require('../../assets/images/splash-icon.png')
+              }
+              style={styles.avatarImage}
+            />
+          </View>
         ) : (
           <View style={styles.discordAvatarPlaceholder} />
         )}
-        <View style={[styles.discordMessageContent, isCurrentUser && styles.currentUserMessageContent]}>
-          {(showHeader || hasReply) && (
+        
+        {/* Message Content */}
+        <View style={styles.discordMessageContent}>
+          {showSenderInfo && (
             <View style={styles.discordMessageHeader}>
-              <Text style={[styles.discordUsername, isCurrentUser && styles.currentUserName]}>
-                {item.senderName}
+              <Text style={[
+                styles.discordUsername,
+                isOwnMessage && { color: '#00b0f4' } // Blue for own name
+              ]}>
+                {isOwnMessage ? 'You' : message.senderName || 'User'}
               </Text>
-              <Text style={styles.discordTimestamp}>{item.timestamp}</Text>
+              <Text style={styles.discordTimestamp}>
+                {formatTimestamp(message.timestamp)}
+              </Text>
             </View>
           )}
-           
-          {/* Reply reference */}
-          {renderReplyReference(item.replyTo)}
-           
-          <View style={[
-            styles.messageBubble,
-            isCurrentUser && styles.currentUserBubble,
-            !showHeader && !hasReply && styles.groupedMessageBubble
-          ]}>
-            {/* Message text with mentions */}
-            {renderMessageWithMentions(item.text, item.mentions)}
-            
-            {/* Attachments */}
-            {renderAttachments(item.attachments)}
-          </View>
           
-          {/* Reactions */}
-          {renderReactions(item.reactions)}
-          
-          {/* Message actions - only show when message is pressed */}
-          {showActions && (
-            <View style={styles.messageActionsContainer}>
-              <TouchableOpacity 
-                style={styles.messageAction}
-                onPress={() => {
-                  handleAddReaction(item.id, '👍');
-                  setMessageActionsVisible(null);
-                }}
-              >
-                {renderIcon('emoji-emotions', 16, '#B9BBBE')}
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.messageAction}
-                onPress={() => {
-                  handleReply(item);
-                  setMessageActionsVisible(null);
-                }}
-              >
-                {renderIcon('reply', 16, '#B9BBBE')}
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.messageAction}>
-                {renderIcon('more-horiz', 16, '#B9BBBE')}
-              </TouchableOpacity>
+          <TouchableWithoutFeedback
+            onPress={onMessagePress}
+            onLongPress={onMessageLongPress}
+            delayLongPress={300}
+          >
+            <View style={styles.messageBubble}>
+              {message.replyTo && (
+                <View style={styles.replyPreview}>
+                  <Text style={styles.replyPreviewText}>
+                    Replying to{' '}
+                    <Text style={styles.replyPreviewName}>
+                      {message.replyTo.senderName}
+                    </Text>
+                  </Text>
+                  <Text style={styles.replyPreviewContent} numberOfLines={1}>
+                    {message.replyTo.text}
+                  </Text>
+                </View>
+              )}
+              
+              {renderMessageWithMentions(message.text, message.mentions)}
+              {message.edited && (
+                <Text style={styles.editedLabel}>(edited)</Text>
+              )}
+              
+              {message.attachments && message.attachments.length > 0 && (
+                <View style={styles.attachmentsContainer}>
+                  {message.attachments.map((attachment) => (
+                    <TouchableOpacity 
+                      key={attachment.id}
+                      style={styles.imageAttachmentContainer}
+                      onPress={() => {
+                        // Handle image press
+                      }}
+                    >
+                      <Image 
+                        source={{ uri: attachment.url }}
+                        style={styles.imageAttachment}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              
+              {message.reactions && message.reactions.length > 0 && (
+                <View style={styles.reactionsContainer}>
+                  {message.reactions.map((reaction, i) => (
+                    <TouchableOpacity 
+                      key={`${reaction.emoji}-${i}`}
+                      style={[
+                        styles.reactionBubble,
+                        reaction.userIds.includes(CURRENT_USER_ID) && styles.reactionBubbleSelected
+                      ]}
+                      onPress={() => handleToggleReaction(message.id, reaction.emoji)}
+                    >
+                      <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
+                      <Text style={styles.reactionCount}>{reaction.count}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
+          </TouchableWithoutFeedback>
         </View>
-      </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -652,15 +942,25 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
           {renderIcon('arrow-back', 24, '#FFFFFF')}
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>{name}</Text>
+        <View style={styles.headerProfileContainer}>
+          <View style={styles.avatarContainer}>
+            <Image 
+              source={{ uri: avatar }} 
+              style={styles.headerAvatar} 
+            />
+            <View style={[
+              styles.onlineStatusIndicator, 
+              { backgroundColor: '#43b581' } // Green for online
+            ]} />
+          </View>
+          
+          <View style={styles.titleContainer}>
+            <Text style={styles.headerTitle}>{name}</Text>
+            <Text style={styles.headerSubtitle}>Online</Text>
+          </View>
+        </View>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            {renderIcon('call', 24, '#FFFFFF')}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            {renderIcon('videocam', 24, '#FFFFFF')}
-          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
             {renderIcon('more-vert', 24, '#FFFFFF')}
           </TouchableOpacity>
@@ -832,6 +1132,12 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       'chat': 'chat',
       'more-vert': 'more-vert',
       'close': 'close',
+      'reply': 'reply',
+      'content-copy': 'content-copy',
+      'edit': 'edit',
+      'delete': 'delete',
+      'forward': 'forward',
+      'check': 'check',
     };
 
     const mappedName = iconMap[iconName] || iconName;
@@ -877,163 +1183,387 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   // Update container styles for absolute minimal space
   const container: {
     flex: 1,
-    backgroundColor: '#36393F',
-    margin: 0,
-    padding: 0,
+    backgroundColor: '#36393f',
   } = {
     flex: 1,
-    backgroundColor: '#36393F',
-    margin: 0,
-    padding: 0,
+    backgroundColor: '#36393f',
   };
   
+  // Message action sheet component
+  const renderMessageActionSheet = () => {
+    const isOwnMessage = selectedMessage?.senderId === CURRENT_USER_ID;
+    
+    return (
+      <Modal
+        visible={messageActionsVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeMessageActions}
+      >
+        <TouchableWithoutFeedback onPress={closeMessageActions}>
+          <View style={styles.modalBackground}>
+            <Animated.View
+              style={[
+                styles.actionSheetContainer,
+                {
+                  transform: [{ 
+                    translateY: actionSheetAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 500]
+                    }) 
+                  }],
+                },
+              ]}
+            >
+              <View {...panResponder.panHandlers}>
+                <View style={styles.actionSheetHandle} />
+                
+                <View style={styles.actionSheetReactions}>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '❤️');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>❤️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '😂');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>😂</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '👍');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>👍</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '🙊');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>🙊</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '🐸');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>🐸</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.reactionButton}
+                    onPress={() => {
+                      if (selectedMessage) {
+                        handleAddReaction(selectedMessage.id, '😊');
+                        triggerHapticFeedback('reaction');
+                        closeMessageActions();
+                      }
+                    }}
+                  >
+                    <Text style={styles.actionSheetReactionEmoji}>😊</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.actionDivider} />
+                
+                {/* Common actions for all messages */}
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={() => {
+                    handleReplyFromActions();
+                    triggerHapticFeedback('light');
+                  }}
+                >
+                  {renderIcon('reply', 24, '#B9BBBE')}
+                  <Text style={styles.actionText}>Reply</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={() => {
+                    handleCopyText();
+                    triggerHapticFeedback('light');
+                  }}
+                >
+                  {renderIcon('content-copy', 24, '#B9BBBE')}
+                  <Text style={styles.actionText}>Copy Text</Text>
+                </TouchableOpacity>
+                
+                {/* Actions only for own messages */}
+                {isOwnMessage && (
+                  <>
+                    <TouchableOpacity 
+                      style={styles.actionButton} 
+                      onPress={() => {
+                        handleEditMessage();
+                        triggerHapticFeedback('light');
+                      }}
+                    >
+                      {renderIcon('edit', 24, '#B9BBBE')}
+                      <Text style={styles.actionText}>Edit Message</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.actionButton} 
+                      onPress={() => {
+                        handleDeleteMessage();
+                        triggerHapticFeedback('warning');
+                      }}
+                    >
+                      {renderIcon('delete', 24, '#ED4245')}
+                      <Text style={[styles.actionText, { color: '#ED4245' }]}>Delete Message</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    );
+  };
+
+  // Format timestamp to Discord style
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Animation helpers
+  const animateMessagePress = (messageId: string) => {
+    const animation = messageScaleValues[messageId];
+    if (animation) {
+      Animated.sequence([
+        Animated.timing(animation, {
+          toValue: 0.95,
+          duration: 100,
+          useNativeDriver: true
+        }),
+        Animated.timing(animation, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true
+        })
+      ]).start();
+    }
+  };
+
+  const animateMessageLongPress = (messageId: string) => {
+    const animation = messageScaleValues[messageId];
+    if (animation) {
+      Animated.timing(animation, {
+        toValue: 1.03,
+        duration: 200,
+        useNativeDriver: true
+      }).start();
+    }
+  };
+
+  // Show action sheet with animation
+  const showActionSheet = () => {
+    Animated.timing(actionSheetAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true
+    }).start();
+  };
+
+  // Helper function to toggle reaction on a message
+  const handleToggleReaction = (messageId: string, emoji: string) => {
+    // Implementation depends on your app's state management
+    triggerHapticFeedback('selection');
+    console.log(`Toggled reaction ${emoji} on message ${messageId}`);
+  };
+
+  // Adapt renderMessage to work with FlatList's renderItem
+  const renderItem = ({ item, index }: { item: Message, index: number }) => {
+    if (item.isLive) {
+      return renderLiveChatPreview();
+    }
+    return renderMessage(item, index);
+  };
+
   return (
     <SafeAreaView style={container}>
       <StatusBar barStyle="light-content" />
       {renderHeader()}
       
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <View style={styles.chatContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesContainer}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            initialNumToRender={messages.length}
-          />
-          
-          {/* Input container - NOT absolutely positioned */}
-          <View style={styles.inputWrapper}>
-            <View style={[styles.inputContainerWrapper, { 
-              borderTopWidth: 1,
-              borderTopColor: '#202225',
-            }]}>
-              {/* Reply interface */}
-              {replyingTo && (
-                <View style={styles.replyingContainer}>
-                  <View style={styles.replyingContent}>
-                    <View style={styles.replyingBar} />
-                    <View style={styles.replyingTextContainer}>
-                      <Text style={styles.replyingToText}>Replying to </Text>
-                      <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.chatContainer}>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messagesContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              initialNumToRender={messages.length}
+            />
+            
+            {/* Input container - NOT absolutely positioned */}
+            <View style={styles.inputWrapper}>
+              <View style={[styles.inputContainerWrapper, { 
+                borderTopWidth: 1,
+                borderTopColor: '#202225',
+              }]}>
+                {/* Reply interface */}
+                {replyingTo && (
+                  <View style={styles.replyingContainer}>
+                    <View style={styles.replyingContent}>
+                      <View style={styles.replyingBar} />
+                      <View style={styles.replyingTextContainer}>
+                        <Text style={styles.replyingToText}>Replying to </Text>
+                        <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
+                      {renderIcon('close', 16, '#B9BBBE')}
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
+                {/* Discord-style input area */}
+                <View style={styles.discordInputContainer}>
+                  {/* Input field with emoji button inside */}
+                  <View style={[styles.discordInputFieldContainer, { flex: 1 }]}>
+                    <View style={styles.inputWithEmojiContainer}>
+                      <TextInput
+                        ref={textInputRef}
+                        style={[styles.discordInputField, { flex: 1 }]}
+                        placeholder={`Message ${name}`}
+                        placeholderTextColor="#72767D"
+                        value={message}
+                        onChangeText={setMessage}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        keyboardAppearance="dark"
+                        multiline
+                        numberOfLines={Platform.OS === 'ios' ? undefined : 1}
+                        textAlignVertical="center"
+                      />
+                      {/* Emoji button inside text field */}
+                      <TouchableOpacity 
+                        style={styles.inlineEmojiButton}
+                        onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                      >
+                        {renderIcon('emoji-emotions', 22, '#B9BBBE')}
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
-                    {renderIcon('close', 16, '#B9BBBE')}
-                  </TouchableOpacity>
-                </View>
-              )}
-              
-              {/* Discord-style input area */}
-              <View style={styles.discordInputContainer}>
-                {/* Input field with emoji button inside */}
-                <View style={[styles.discordInputFieldContainer, { flex: 1 }]}>
-                  <View style={styles.inputWithEmojiContainer}>
-                    <TextInput
-                      ref={textInputRef}
-                      style={[styles.discordInputField, { flex: 1 }]}
-                      placeholder={`Message ${name}`}
-                      placeholderTextColor="#72767D"
-                      value={message}
-                      onChangeText={setMessage}
-                      onFocus={handleInputFocus}
-                      onBlur={handleInputBlur}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      keyboardAppearance="dark"
-                      multiline
-                      numberOfLines={Platform.OS === 'ios' ? undefined : 1}
-                      textAlignVertical="center"
-                    />
-                    {/* Emoji button inside text field */}
+                  
+                  {/* Right side - only image and send buttons */}
+                  <View style={styles.discordInputRightButtons}>
                     <TouchableOpacity 
-                      style={styles.inlineEmojiButton}
-                      onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                      style={styles.discordInputButton}
+                      onPress={handleImagePress}
                     >
-                      {renderIcon('emoji-emotions', 22, '#B9BBBE')}
+                      {renderIcon('image', 24, '#B9BBBE')}
                     </TouchableOpacity>
+                    
+                    {message.trim() ? (
+                      <TouchableOpacity
+                        style={[styles.discordInputButton, styles.sendButton]}
+                        onPress={handleSendMessage}
+                      >
+                        {renderIcon(isEditingMode ? 'check' : 'send', 24, '#FFFFFF')}
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </View>
                 
-                {/* Right side - only image and send buttons */}
-                <View style={styles.discordInputRightButtons}>
-                  <TouchableOpacity 
-                    style={styles.discordInputButton}
-                    onPress={handleImagePress}
-                  >
-                    {renderIcon('image', 24, '#B9BBBE')}
-                  </TouchableOpacity>
-                  
-                  {message.trim() ? (
-                    <TouchableOpacity
-                      style={[styles.discordInputButton, styles.sendButton]}
-                      onPress={sendMessage}
-                    >
-                      {renderIcon('send', 24, '#FFFFFF')}
+                {/* Image picker UI */}
+                {isImagePickerVisible && (
+                  <View style={styles.discordAttachmentPicker}>
+                    <TouchableOpacity style={styles.attachmentOption}>
+                      <View style={styles.attachmentIconContainer}>
+                        {renderIcon('camera', 24, '#FFFFFF')}
+                      </View>
+                      <Text style={styles.attachmentText}>Camera</Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
+                    
+                    <TouchableOpacity style={styles.attachmentOption}>
+                      <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
+                        {renderIcon('photo-library', 24, '#FFFFFF')}
+                      </View>
+                      <Text style={styles.attachmentText}>Gallery</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.attachmentOption}>
+                      <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
+                        {renderIcon('file', 24, '#FFFFFF')}
+                      </View>
+                      <Text style={styles.attachmentText}>File</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
+                {/* Emoji picker UI */}
+                {showEmojiPicker && (
+                  <View style={styles.discordEmojiPicker}>
+                    <View style={styles.emojiPickerHeader}>
+                      <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
+                    </View>
+                    <View style={styles.emojiGrid}>
+                      {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
+                        <TouchableOpacity 
+                          key={emoji} 
+                          style={styles.emojiItem}
+                          onPress={() => {
+                            setMessage(prev => prev + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                        >
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
-              
-              {/* Image picker UI */}
-              {isImagePickerVisible && (
-                <View style={styles.discordAttachmentPicker}>
-                  <TouchableOpacity style={styles.attachmentOption}>
-                    <View style={styles.attachmentIconContainer}>
-                      {renderIcon('camera', 24, '#FFFFFF')}
-                    </View>
-                    <Text style={styles.attachmentText}>Camera</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.attachmentOption}>
-                    <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
-                      {renderIcon('photo-library', 24, '#FFFFFF')}
-                    </View>
-                    <Text style={styles.attachmentText}>Gallery</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.attachmentOption}>
-                    <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
-                      {renderIcon('file', 24, '#FFFFFF')}
-                    </View>
-                    <Text style={styles.attachmentText}>File</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              
-              {/* Emoji picker UI */}
-              {showEmojiPicker && (
-                <View style={styles.discordEmojiPicker}>
-                  <View style={styles.emojiPickerHeader}>
-                    <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
-                  </View>
-                  <View style={styles.emojiGrid}>
-                    {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
-                      <TouchableOpacity 
-                        key={emoji} 
-                        style={styles.emojiItem}
-                        onPress={() => {
-                          setMessage(prev => prev + emoji);
-                          setShowEmojiPicker(false);
-                        }}
-                      >
-                        <Text style={styles.emojiText}>{emoji}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
             </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+      
+      {/* Render the message action sheet */}
+      {renderMessageActionSheet()}
     </SafeAreaView>
   );
 };
@@ -1041,7 +1571,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#36393F',
+    backgroundColor: '#36393f',
   },
   keyboardContainer: {
     flex: 1,
@@ -1051,8 +1581,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   messagesContainer: {
-    paddingTop: 16,
-    paddingBottom: 16, // Reduced since we don't need to artificially create space
+    paddingTop: 10,
+    paddingBottom: 88, // Give some space at the bottom for the input container
   },
   inputWrapper: {
     backgroundColor: '#36393F',
@@ -1174,13 +1704,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   messageText: {
-    color: '#DCDDDE',
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    color: '#dcddde',
+    lineHeight: 22,
   },
   mentionText: {
+    fontSize: 16,
     backgroundColor: 'rgba(88, 101, 242, 0.3)',
-    color: '#5865F2',
+    color: '#00aff4',
     borderRadius: 3,
     overflow: 'hidden',
     fontWeight: '500',
@@ -1234,7 +1765,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#2F3136',
     borderRadius: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
     marginRight: 4,
     marginBottom: 4,
@@ -1242,7 +1773,7 @@ const styles = StyleSheet.create({
     borderColor: '#4F545C',
   },
   reactionBubbleSelected: {
-    backgroundColor: 'rgba(88, 101, 242, 0.3)',
+    backgroundColor: 'rgba(88, 101, 242, 0.15)',
     borderColor: '#5865F2',
   },
   reactionEmoji: {
@@ -1331,36 +1862,65 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#16181C',
     borderBottomWidth: 1,
-    borderBottomColor: '#373941',
+    borderBottomColor: '#2d2f33',
+    backgroundColor: '#36393f',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    marginRight: 8,
+  },
+  headerProfileContainer: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  onlineStatusIndicator: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#43b581', // Green for online
+    borderWidth: 2,
+    borderColor: '#36393f',
+    bottom: -1,
+    right: -1,
+    zIndex: 1,
+  },
+  titleContainer: {
+    flex: 1,
     justifyContent: 'center',
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
-    textAlign: 'center',
+  },
+  headerSubtitle: {
+    color: '#b9bbbe',
+    fontSize: 12,
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   headerButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    alignItems: 'center',
   },
   messagesList: {
     paddingHorizontal: 16,
@@ -1371,14 +1931,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   discordMessageContainer: {
+    width: '100%',
     flexDirection: 'row',
-    paddingVertical: 4,
-    alignItems: 'flex-start',
-    marginVertical: 2,
     paddingHorizontal: 16,
-  },
-  currentUserMessage: {
-    justifyContent: 'flex-end',
+    paddingVertical: 2,
+    alignItems: 'flex-start',
   },
   discordMessageGroupStart: {
     marginTop: 16,
@@ -1387,67 +1944,62 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
-    marginTop: 2,
-    borderWidth: 0.5,
-    borderColor: '#2C2D31',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   discordAvatarPlaceholder: {
     width: 40,
-    marginRight: 12,
+    marginRight: 10,
   },
   discordMessageContent: {
     flex: 1,
-    justifyContent: 'flex-start',
-  },
-  currentUserMessageContent: {
-    alignItems: 'flex-end',
+    flexDirection: 'column',
+    maxWidth: '90%',
   },
   discordMessageHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   discordUsername: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#ffffff',
     fontWeight: '600',
-    marginRight: 8,
-  },
-  currentUserName: {
-    color: '#5865F2',
+    fontSize: 16,
+    marginRight: 6,
   },
   discordTimestamp: {
-    color: '#6E7377',
-    fontSize: 12, 
+    color: '#72767d',
+    fontSize: 12,
   },
-  messageBubble: {
-    backgroundColor: '#36393F',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    maxWidth: '85%',
-    alignSelf: 'flex-start',
+  replyPreview: {
+    padding: 8,
+    backgroundColor: 'rgba(64, 68, 75, 0.3)',
+    borderRadius: 5,
+    marginBottom: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: '#43b581',
   },
-  currentUserBubble: {
-    backgroundColor: '#5865F2',
-    alignSelf: 'flex-end',
+  replyPreviewText: {
+    color: '#b9bbbe',
+    fontSize: 12,
   },
-  groupedMessageBubble: {
+  replyPreviewName: {
+    color: '#00b0f4',
+    fontWeight: '500',
+  },
+  replyPreviewContent: {
+    color: '#dcddde',
+    fontSize: 14,
     marginTop: 2,
-    borderTopRightRadius: 16,
-    borderTopLeftRadius: 16,
   },
-  discordMessageText: {
-    color: '#DCDDDE',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  currentUserMessageText: {
-    color: '#FFFFFF',
-  },
-  discordGroupedMessageText: {
-    marginLeft: 0,
+  highlightedMessage: {
+    backgroundColor: 'rgba(79, 84, 92, 0.16)',
   },
   inputContainerFigma: {
     position: 'absolute',
@@ -1757,6 +2309,72 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContainer: {
+    backgroundColor: '#2f3136',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    paddingBottom: 30,
+  },
+  actionSheetHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#72767d',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  actionSheetReactions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10,
+  },
+  reactionButton: {
+    padding: 8,
+    backgroundColor: '#40444b',
+    borderRadius: 20,
+    marginHorizontal: 4,
+  },
+  actionSheetReactionEmoji: {
+    fontSize: 24,
+  },
+  actionDivider: {
+    height: 1,
+    backgroundColor: '#40444b',
+    marginVertical: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  actionText: {
+    fontSize: 16,
+    color: '#dcddde',
+    marginLeft: 16,
+  },
+  messageTextContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  messageBubble: {
+    backgroundColor: 'transparent',
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+    maxWidth: '100%',
+    borderRadius: 4,
+  },
+  editedLabel: {
+    fontSize: 12,
+    color: '#72767d',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 });
 
