@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import ChatScreen from '../../src/screens/ChatScreen';
 import SidebarMenu from '../../src/components/SidebarMenu';
 
@@ -11,17 +11,28 @@ export default function Chat() {
   const name = typeof params.name === 'string' ? params.name : '';
   const avatar = typeof params.avatar === 'string' ? params.avatar : '';
 
-  // Use the standard back button in the ChatScreen component
+  // Simple handler for back navigation
+  const handleGoBack = () => {
+    router.back();
+  };
 
-  // Pass the params directly to the ChatScreen component
   return (
     <View style={styles.container}>
+      {/* Basic Stack.Screen config with minimal options */}
+      <Stack.Screen 
+        options={{
+          headerShown: false,
+          // Enable gesture navigation with simple configuration
+          gestureEnabled: true
+        }} 
+      />
       <ChatScreen 
         userId={userId}
         name={name}
         avatar={avatar}
-        goBack={() => router.back()}
+        goBack={handleGoBack}
       />
+      {/* Use empty callback to avoid re-renders */}
       <SidebarMenu onMenuStateChange={() => {}} />
     </View>
   );

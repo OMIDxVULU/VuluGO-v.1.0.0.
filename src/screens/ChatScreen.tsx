@@ -14,6 +14,8 @@ import {
   StatusBar,
   Dimensions,
   Keyboard,
+  EmitterSubscription,
+  KeyboardEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconFallback } from '../../app/_layout';
@@ -245,39 +247,16 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
   const textInputRef = useRef<TextInput>(null);
   const inputContainerRef = useRef<View>(null);
 
-  // Robust auto-scroll implementation
+  // Focus input when component mounts - with a single attempt to avoid loops
   useEffect(() => {
-    // Ensure list is scrolled to bottom on initial render
-    const timeout = setTimeout(() => {
-      if (flatListRef.current && messages.length > 0) {
-        flatListRef.current.scrollToOffset({ offset: 100000, animated: false });
+    // Only try focusing once after a short delay
+    const timer = setTimeout(() => {
+      if (textInputRef.current) {
+        textInputRef.current.focus();
       }
-    }, 100);
+    }, 500);
     
-    return () => clearTimeout(timeout);
-  }, []); // Only run once on mount
-  
-  // Ensure scroll to bottom when messages change
-  useEffect(() => {
-    if (flatListRef.current && messages.length > 0) {
-      // Use scrollToOffset with a very large number to ensure we hit the bottom
-      flatListRef.current.scrollToOffset({ offset: 100000, animated: true });
-    }
-  }, [messages]); // Run whenever messages change
-
-  // Focus input when component mounts with better timing
-  useEffect(() => {
-    // Wait for UI to be ready before focusing
-    const timers = [300, 600, 1000].map(delay => 
-      setTimeout(() => {
-        if (textInputRef.current) {
-          textInputRef.current.focus();
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }
-      }, delay)
-    );
-    
-    return () => timers.forEach(timer => clearTimeout(timer));
+    return () => clearTimeout(timer);
   }, []);
 
   // State for handling replies and mentions
@@ -308,7 +287,7 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     return mentions;
   };
   
-  // Updated sendMessage function to use the more reliable scrolling
+  // Updated sendMessage function with reliable scrolling
   const sendMessage = () => {
     if (message.trim()) {
       // Detect mentions in the message
@@ -336,63 +315,29 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       setMessage('');
       setReplyingTo(null);
       
-      // The scroll will happen automatically through the useEffect above
+      // Reliable scrolling to end after sending a message
+      // Use a sequence of attempts with increasing delays to ensure it works
+      const scrollAttempts = [10, 50, 100, 300];
+      scrollAttempts.forEach(delay => {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, delay);
+      });
     }
   };
   
-  // Enhanced input focus handler to ensure proper scrolling
+  // Enhanced input focus handler with auto-scrolling removed
   const handleInputFocus = () => {
     setIsInputFocused(true);
-    
-    // First ensure we see the newest messages
-    setTimeout(() => {
-      if (flatListRef.current) {
-        flatListRef.current.scrollToOffset({ offset: 100000, animated: true });
-      }
-    }, 200);
-    
-    // If replying to a specific message, make it visible after a delay
-    if (replyingTo) {
-      setTimeout(() => {
-        const index = messages.findIndex(msg => msg.id === replyingTo.id);
-        if (index !== -1 && flatListRef.current) {
-          try {
-            flatListRef.current.scrollToIndex({
-              index,
-              animated: true,
-              viewPosition: 0.5, // Position in the middle of the screen
-            });
-          } catch (e) {
-            // Fallback if the message isn't in view
-            flatListRef.current.scrollToOffset({ offset: index * 100, animated: true });
-          }
-        }
-      }, 500);
-    }
   };
   
-  // Enhanced reply handler to ensure visibility
+  // Enhanced reply handler with auto-scrolling removed
   const handleReply = (message: Message) => {
     setReplyingTo(message);
     
     // Focus the input after a short delay
     setTimeout(() => {
       textInputRef.current?.focus();
-      
-      // Scroll to the message being replied to
-      const index = messages.findIndex(msg => msg.id === message.id);
-      if (index !== -1 && flatListRef.current) {
-        try {
-          flatListRef.current.scrollToIndex({
-            index,
-            animated: true,
-            viewPosition: 0.5,
-          });
-        } catch (e) {
-          // Fallback
-          console.log("Error scrolling to message", e);
-        }
-      }
     }, 100);
   };
   
@@ -449,44 +394,6 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
       })
     );
   };
-
-  // Add keyboard listeners to handle scrolling when keyboard appears/disappears
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', (event) => {
-        const keyboardHeight = event.endCoordinates.height;
-        
-        // Use an extremely aggressive overlap to ensure complete connection
-        inputContainerRef.current?.setNativeProps({
-          style: {
-            position: 'absolute',
-            bottom: keyboardHeight - 30, // Much more aggressive overlap
-            left: 0,
-            right: 0,
-          },
-        });
-      });
-      
-      // Keep the rest of the keyboard handling
-      const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
-        inputContainerRef.current?.setNativeProps({
-          style: {
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-          },
-        });
-      });
-      
-      return () => {
-        keyboardWillShowListener.remove();
-        keyboardWillHideListener.remove();
-      };
-    }
-    
-    return () => {};
-  }, []);
 
   // Updated input focus handler
   const handleInputBlur = () => {
@@ -948,229 +855,185 @@ const ChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
     }
   };
 
+  // Simple keyboard listener to scroll when keyboard appears
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        // Use a sequence of attempts to ensure scrolling works
+        [50, 200, 350].forEach(delay => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }, delay);
+        });
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+    };
+  }, []);
+
   // Update container styles for absolute minimal space
   const container: {
     flex: 1,
-    backgroundColor: '#36393F', // Discord dark theme background
+    backgroundColor: '#36393F',
     margin: 0,
     padding: 0,
   } = {
     flex: 1,
-    backgroundColor: '#36393F', // Discord dark theme background
+    backgroundColor: '#36393F',
     margin: 0,
     padding: 0,
   };
   
-  // Re-add the effect to handle replying to messages properly
-  useEffect(() => {
-    if (replyingTo) {
-      // When replying to a message, scroll to ensure it's visible
-      setTimeout(() => {
-        if (flatListRef.current) {
-          const index = messages.findIndex(msg => msg.id === replyingTo.id);
-          if (index !== -1) {
-            flatListRef.current.scrollToIndex({
-              index,
-              animated: true,
-              viewPosition: 0.5, // Center the message
-            });
-          }
-        }
-      }, 100);
-    }
-  }, [replyingTo]);
-
-  // Add an extender view that will fill any tiny gaps
   return (
     <SafeAreaView style={container}>
       <StatusBar barStyle="light-content" />
       {renderHeader()}
       
-      <View style={styles.chatContainer}>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.messagesContainer,
-            { paddingBottom: 100 }
-          ]}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => {
-            flatListRef.current?.scrollToOffset({ offset: 100000, animated: false });
-          }}
-          onLayout={() => {
-            flatListRef.current?.scrollToOffset({ offset: 100000, animated: false });
-          }}
-        />
-        
-        {/* Add a background extender that will fill any gap */}
-        <View style={{
-          position: 'absolute',
-          bottom: -50, // Larger extender
-          left: 0,
-          right: 0,
-          height: 50, // Taller extender
-          backgroundColor: '#36393F', // Match input color
-        }} />
-        
-        {/* Input container with zero padding/margin */}
-        <View 
-          style={[
-            styles.inputWrapper, 
-            { 
-              position: 'absolute', 
-              bottom: 0, 
-              left: 0, 
-              right: 0,
-              margin: 0,
-              padding: 0,
-            }
-          ]} 
-          ref={inputContainerRef}
-        >
-          <View style={[styles.inputContainerWrapper, { 
-            borderTopWidth: 1,
-            borderTopColor: '#202225',
-          }]}>
-            {/* Reply interface */}
-            {replyingTo && (
-              <View style={styles.replyingContainer}>
-                <View style={styles.replyingContent}>
-                  <View style={styles.replyingBar} />
-                  <View style={styles.replyingTextContainer}>
-                    <Text style={styles.replyingToText}>Replying to </Text>
-                    <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <View style={styles.chatContainer}>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={messages.length}
+          />
+          
+          {/* Input container - NOT absolutely positioned */}
+          <View style={styles.inputWrapper}>
+            <View style={[styles.inputContainerWrapper, { 
+              borderTopWidth: 1,
+              borderTopColor: '#202225',
+            }]}>
+              {/* Reply interface */}
+              {replyingTo && (
+                <View style={styles.replyingContainer}>
+                  <View style={styles.replyingContent}>
+                    <View style={styles.replyingBar} />
+                    <View style={styles.replyingTextContainer}>
+                      <Text style={styles.replyingToText}>Replying to </Text>
+                      <Text style={styles.replyingToName}>{replyingTo.senderName}</Text>
+                    </View>
                   </View>
-                </View>
-                <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
-                  {renderIcon('close', 16, '#B9BBBE')}
-                </TouchableOpacity>
-              </View>
-            )}
-            
-            {/* Discord-style input area with minimal padding */}
-            <View style={[styles.discordInputContainer, { paddingVertical: 2 }]}>
-              {/* Left side buttons */}
-              <View style={styles.discordInputLeftButtons}>
-                <TouchableOpacity 
-                  style={styles.discordInputButton}
-                  onPress={handleImagePress}
-                >
-                  {renderIcon('add', 24, '#B9BBBE')}
-                </TouchableOpacity>
-              </View>
-              
-              {/* Input field */}
-              <View style={styles.discordInputFieldContainer}>
-                <TextInput
-                  ref={textInputRef}
-                  style={styles.discordInputField}
-                  placeholder={`Message ${name}`}
-                  placeholderTextColor="#72767D"
-                  value={message}
-                  onChangeText={setMessage}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  keyboardAppearance="dark"
-                  multiline
-                  numberOfLines={Platform.OS === 'ios' ? undefined : 1}
-                  textAlignVertical="center"
-                />
-              </View>
-              
-              {/* Right side buttons */}
-              <View style={styles.discordInputRightButtons}>
-                <TouchableOpacity 
-                  style={styles.discordInputButton}
-                  onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-                >
-                  {renderIcon('emoji-emotions', 24, '#B9BBBE')}
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.discordInputButton}
-                  onPress={handleImagePress}
-                >
-                  {renderIcon('gif', 24, '#B9BBBE')}
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.discordInputButton}
-                  onPress={handleImagePress}
-                >
-                  {renderIcon('image', 24, '#B9BBBE')}
-                </TouchableOpacity>
-                
-                {message.trim() ? (
-                  <TouchableOpacity
-                    style={[styles.discordInputButton, styles.sendButton]}
-                    onPress={sendMessage}
-                  >
-                    {renderIcon('send', 24, '#FFFFFF')}
+                  <TouchableOpacity style={styles.closeReplyButton} onPress={() => setReplyingTo(null)}>
+                    {renderIcon('close', 16, '#B9BBBE')}
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={styles.discordInputButton}>
-                    {renderIcon('mic', 24, '#B9BBBE')}
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            
-            {/* Image picker UI */}
-            {isImagePickerVisible && (
-              <View style={styles.discordAttachmentPicker}>
-                <TouchableOpacity style={styles.attachmentOption}>
-                  <View style={styles.attachmentIconContainer}>
-                    {renderIcon('camera', 24, '#FFFFFF')}
-                  </View>
-                  <Text style={styles.attachmentText}>Camera</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.attachmentOption}>
-                  <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
-                    {renderIcon('photo-library', 24, '#FFFFFF')}
-                  </View>
-                  <Text style={styles.attachmentText}>Gallery</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.attachmentOption}>
-                  <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
-                    {renderIcon('file', 24, '#FFFFFF')}
-                  </View>
-                  <Text style={styles.attachmentText}>File</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            
-            {/* Emoji picker UI */}
-            {showEmojiPicker && (
-              <View style={styles.discordEmojiPicker}>
-                <View style={styles.emojiPickerHeader}>
-                  <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
                 </View>
-                <View style={styles.emojiGrid}>
-                  {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
+              )}
+              
+              {/* Discord-style input area */}
+              <View style={styles.discordInputContainer}>
+                {/* Input field with emoji button inside */}
+                <View style={[styles.discordInputFieldContainer, { flex: 1 }]}>
+                  <View style={styles.inputWithEmojiContainer}>
+                    <TextInput
+                      ref={textInputRef}
+                      style={[styles.discordInputField, { flex: 1 }]}
+                      placeholder={`Message ${name}`}
+                      placeholderTextColor="#72767D"
+                      value={message}
+                      onChangeText={setMessage}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      keyboardAppearance="dark"
+                      multiline
+                      numberOfLines={Platform.OS === 'ios' ? undefined : 1}
+                      textAlignVertical="center"
+                    />
+                    {/* Emoji button inside text field */}
                     <TouchableOpacity 
-                      key={emoji} 
-                      style={styles.emojiItem}
-                      onPress={() => {
-                        setMessage(prev => prev + emoji);
-                        setShowEmojiPicker(false);
-                      }}
+                      style={styles.inlineEmojiButton}
+                      onPress={() => setShowEmojiPicker(!showEmojiPicker)}
                     >
-                      <Text style={styles.emojiText}>{emoji}</Text>
+                      {renderIcon('emoji-emotions', 22, '#B9BBBE')}
                     </TouchableOpacity>
-                  ))}
+                  </View>
+                </View>
+                
+                {/* Right side - only image and send buttons */}
+                <View style={styles.discordInputRightButtons}>
+                  <TouchableOpacity 
+                    style={styles.discordInputButton}
+                    onPress={handleImagePress}
+                  >
+                    {renderIcon('image', 24, '#B9BBBE')}
+                  </TouchableOpacity>
+                  
+                  {message.trim() ? (
+                    <TouchableOpacity
+                      style={[styles.discordInputButton, styles.sendButton]}
+                      onPress={sendMessage}
+                    >
+                      {renderIcon('send', 24, '#FFFFFF')}
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
-            )}
+              
+              {/* Image picker UI */}
+              {isImagePickerVisible && (
+                <View style={styles.discordAttachmentPicker}>
+                  <TouchableOpacity style={styles.attachmentOption}>
+                    <View style={styles.attachmentIconContainer}>
+                      {renderIcon('camera', 24, '#FFFFFF')}
+                    </View>
+                    <Text style={styles.attachmentText}>Camera</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.attachmentOption}>
+                    <View style={[styles.attachmentIconContainer, {backgroundColor: '#5865F2'}]}>
+                      {renderIcon('photo-library', 24, '#FFFFFF')}
+                    </View>
+                    <Text style={styles.attachmentText}>Gallery</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity style={styles.attachmentOption}>
+                    <View style={[styles.attachmentIconContainer, {backgroundColor: '#43B581'}]}>
+                      {renderIcon('file', 24, '#FFFFFF')}
+                    </View>
+                    <Text style={styles.attachmentText}>File</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {/* Emoji picker UI */}
+              {showEmojiPicker && (
+                <View style={styles.discordEmojiPicker}>
+                  <View style={styles.emojiPickerHeader}>
+                    <Text style={styles.emojiPickerTitle}>Frequently Used</Text>
+                  </View>
+                  <View style={styles.emojiGrid}>
+                    {['😊', '👍', '❤️', '🔥', '😂', '🎉', '🙌', '👏', '🤔', '😍', '😎', '🙏', '👀', '💯', '🤣'].map(emoji => (
+                      <TouchableOpacity 
+                        key={emoji} 
+                        style={styles.emojiItem}
+                        onPress={() => {
+                          setMessage(prev => prev + emoji);
+                          setShowEmojiPicker(false);
+                        }}
+                      >
+                        <Text style={styles.emojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -1189,16 +1052,13 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     paddingTop: 16,
-    paddingBottom: 120, // Larger padding to ensure enough space
+    paddingBottom: 16, // Reduced since we don't need to artificially create space
   },
   inputWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 999,
-    elevation: Platform.OS === 'android' ? 10 : 0,
-    backgroundColor: '#36393F', // Match input background to ensure no visual gaps
+    backgroundColor: '#36393F',
+    borderTopWidth: 1,
+    borderTopColor: '#202225',
+    width: '100%',
   },
   inputContainerWrapper: {
     backgroundColor: '#36393F',
@@ -1212,9 +1072,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 2, // Minimal vertical padding
+    paddingVertical: 8,
     backgroundColor: '#36393F',
-    minHeight: 38, // Keep reasonable height but smaller
+    minHeight: 52,
     margin: 0,
   },
   discordInputLeftButtons: {
@@ -1226,21 +1086,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   discordInputButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36, // Medium size (between 34 and 38)
+    height: 36, // Medium size (between 34 and 38)
+    borderRadius: 18, // Half of width/height
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 2,
-    marginBottom: Platform.OS === 'ios' ? 2 : 0, // Adjust button position
+    marginBottom: Platform.OS === 'ios' ? 2 : 0,
   },
   discordInputFieldContainer: {
     flex: 1,
     backgroundColor: '#40444B',
     borderRadius: 8,
     marginHorizontal: 6,
-    paddingHorizontal: 10,
-    minHeight: 32,
+    paddingHorizontal: 12,
+    minHeight: 44,
     maxHeight: 100,
     justifyContent: 'center',
     paddingTop: 0,
@@ -1248,10 +1108,10 @@ const styles = StyleSheet.create({
   },
   discordInputField: {
     color: '#DCDDDE',
-    fontSize: 16,
-    padding: Platform.OS === 'ios' ? 8 : 4, // Add padding for better visibility
+    fontSize: 18,
+    padding: Platform.OS === 'ios' ? 12 : 8,
     margin: 0,
-    lineHeight: 20, // Slightly larger for better readability
+    lineHeight: 24,
     textAlignVertical: 'center',
   },
   sendButton: {
@@ -1886,6 +1746,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 8,
     textAlign: 'center',
+  },
+  inputWithEmojiContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  inlineEmojiButton: {
+    paddingHorizontal: 8,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
