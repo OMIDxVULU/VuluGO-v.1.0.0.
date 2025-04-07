@@ -23,7 +23,7 @@ const LiveScreen = () => {
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [inSpotlightQueue, setInSpotlightQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState(2);
-  const [showSpotlightedUser, setShowSpotlightedUser] = useState(true);
+  const [showSpotlightedUser, setShowSpotlightedUser] = useState(true); // Always show spotlighted user for demonstration
   
   // Timer state for the spotlight countdown
   const [remainingTime, setRemainingTime] = useState(261); // 4:21 in seconds
@@ -38,7 +38,7 @@ const LiveScreen = () => {
       setRemainingTime(prev => {
         if (prev <= 1) {
           clearInterval(timer.current!);
-          setShowSpotlightedUser(false); // Hide spotlighted user when timer ends
+          // setShowSpotlightedUser(false); // Commented out to keep spotlighted user visible for demo
           return 0;
         }
         // Calculate new percentage based on remaining time
@@ -65,8 +65,8 @@ const LiveScreen = () => {
   
   // Circular progress component for spotlight
   const CircularProgress = ({ percentage }: { percentage: number }) => {
-    const size = 90; // Larger to accommodate thicker outline
-    const strokeWidth = 4; // Thicker stroke
+    const size = 56; // Size for circular progress around avatar
+    const strokeWidth = 3; // Slightly thinner stroke for smaller design
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
@@ -85,6 +85,31 @@ const LiveScreen = () => {
         />
       </Svg>
     );
+  };
+  
+  // Online status indicator component for consistent usage
+  const StatusIndicator = ({ status }: { status: 'online' | 'busy' | 'offline' | 'hosting' | 'watching' | 'spotlight' }) => {
+    let backgroundColor = '#4CAF50'; // Default online - green
+    
+    switch (status) {
+      case 'busy':
+        backgroundColor = '#FFA500'; // Orange
+        break;
+      case 'offline':
+        backgroundColor = '#9E9E9E'; // Gray
+        break;
+      case 'hosting':
+        backgroundColor = '#FF4B4B'; // Red
+        break;
+      case 'watching':
+        backgroundColor = '#4B8BFF'; // Blue
+        break;
+      case 'spotlight':
+        backgroundColor = '#34C759'; // Green (spotlight)
+        break;
+    }
+    
+    return <View style={[styles.statusIndicator, { backgroundColor }]} />;
   };
   
   const renderSpotlightModal = () => {
@@ -161,107 +186,124 @@ const LiveScreen = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Spotlight</Text>
-          <TouchableOpacity style={styles.viewAllButton}>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
+          <View style={styles.spotlightCounter}>
+            <Text style={styles.spotlightCountText}>4 friends</Text>
+          </View>
         </View>
         
         <ScrollView 
           horizontal 
-          showsHorizontalScrollIndicator={false} 
+          showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.spotlightScroll}
+          style={styles.horizontalScroll}
         >
-          {/* Your profile - with spotlight options */}
-          <View style={styles.spotlightUserContainer}>
-            <TouchableOpacity 
-              style={styles.spotlightStatusContainer}
-              onPress={() => setSpotlightModalVisible(true)}
-            >
-              <View style={[styles.spotlightAvatarBorder, styles.statusYou]}>
-                <View style={styles.spotlightAvatarInner}>
-                  <Image 
-                    source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
-                    style={styles.spotlightAvatarImage} 
-                  />
-                </View>
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.spotlightUsername}>You</Text>
-            {inSpotlightQueue && (
-              <View style={styles.queueInfo}>
-                <Text style={styles.spotlightStatusText}>Queue: {queuePosition}</Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Spotlighted user with circular progress - only show if there's an active spotlight */}
-          {showSpotlightedUser && (
-            <View style={styles.spotlightUserContainer}>
-              <View style={styles.spotlightStatusContainer}>
-                <CircularProgress percentage={percentage} />
-                <View style={[styles.spotlightAvatarBorder, styles.statusSpotlight]}>
-                  <View style={styles.spotlightAvatarInner}>
-                    <Image 
-                      source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
-                      style={styles.spotlightAvatarImage} 
-                    />
-                  </View>
-                </View>
-              </View>
-              <Text style={styles.spotlightUsername}>Sophia</Text>
-              <View style={styles.timeRemaining}>
-                <Text style={styles.timeRemainingText}>{formatTime(remainingTime)}</Text>
+          {/* Your profile with current status */}
+          <TouchableOpacity 
+            style={styles.spotlightContainer}
+            onPress={() => setSpotlightModalVisible(true)}
+          >
+            <View style={styles.spotlightAvatarWrapper}>
+              <View style={styles.spotlightAvatarPurple}>
+                <Image 
+                  source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+                  style={styles.spotlightAvatar}
+                />
+                <StatusIndicator status="online" />
               </View>
             </View>
-          )}
+            <View style={styles.spotlightInfoWrapper}>
+              <Text style={styles.spotlightName}>Your Profile</Text>
+              <Text style={styles.spotlightStatus}>
+                {inSpotlightQueue ? `Queue: ${queuePosition}` : 'Manage'}
+              </Text>
+            </View>
+          </TouchableOpacity>
           
-          {/* Friend who is hosting - Red outline */}
-          <View style={styles.spotlightUserContainer}>
-            <View style={styles.spotlightStatusContainer}>
-              <View style={[styles.spotlightAvatarBorder, styles.statusHosting]}>
-                <View style={styles.spotlightAvatarInner}>
-                  <Image 
-                    source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
-                    style={styles.spotlightAvatarImage} 
-                  />
-                </View>
+          {/* Spotlighted user with countdown */}
+          <TouchableOpacity 
+            style={[
+              styles.spotlightContainer,
+              { overflow: 'hidden' }
+            ]}
+          >
+            {/* Loading background effect */}
+            <LinearGradient
+              colors={['#34C759', '#2A9E45']}
+              style={[
+                styles.loadingBackground, 
+                { height: `${percentage}%` }
+              ]}
+            />
+            
+            <View style={[styles.spotlightAvatarWrapper, { zIndex: 2 }]}>
+              <View style={styles.spotlightAvatarGreen}>
+                <Image 
+                  source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
+                  style={styles.spotlightAvatar}
+                />
+                <StatusIndicator status="spotlight" />
               </View>
             </View>
-            <Text style={styles.spotlightUsername}>James</Text>
-            <Text style={styles.spotlightStatusText}>Hosting</Text>
-          </View>
+            <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
+              <Text style={[styles.spotlightName, { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
+                Sophia
+              </Text>
+              <Text style={[styles.spotlightStatus, { fontWeight: 'bold', color: '#FFFFFF' }]}>
+                {formatTime(remainingTime)}
+              </Text>
+            </View>
+          </TouchableOpacity>
           
-          {/* Friend who is watching - Blue outline */}
-          <View style={styles.spotlightUserContainer}>
-            <View style={styles.spotlightStatusContainer}>
-              <View style={[styles.spotlightAvatarBorder, styles.statusWatching]}>
-                <View style={styles.spotlightAvatarInner}>
-                  <Image 
-                    source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
-                    style={styles.spotlightAvatarImage} 
-                  />
-                </View>
+          {/* Friend who is hosting with hosting status */}
+          <TouchableOpacity style={styles.spotlightContainer}>
+            <View style={styles.spotlightAvatarWrapper}>
+              <View style={styles.spotlightAvatarRed}>
+                <Image 
+                  source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
+                  style={styles.spotlightAvatar}
+                />
+                <StatusIndicator status="hosting" />
               </View>
             </View>
-            <Text style={styles.spotlightUsername}>Ella</Text>
-            <Text style={styles.spotlightStatusText}>Watching</Text>
-          </View>
+            <View style={styles.spotlightInfoWrapper}>
+              <Text style={styles.spotlightName}>James</Text>
+              <Text style={styles.spotlightStatus}>Hosting</Text>
+            </View>
+          </TouchableOpacity>
           
-          {/* Another Friend who is watching - Blue outline */}
-          <View style={styles.spotlightUserContainer}>
-            <View style={styles.spotlightStatusContainer}>
-              <View style={[styles.spotlightAvatarBorder, styles.statusWatching]}>
-                <View style={styles.spotlightAvatarInner}>
-                  <Image 
-                    source={{ uri: 'https://randomuser.me/api/portraits/women/22.jpg' }} 
-                    style={styles.spotlightAvatarImage} 
-                  />
-                </View>
+          {/* Friend who is watching with watching status */}
+          <TouchableOpacity style={styles.spotlightContainer}>
+            <View style={styles.spotlightAvatarWrapper}>
+              <View style={styles.spotlightAvatarBlue}>
+                <Image 
+                  source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
+                  style={styles.spotlightAvatar}
+                />
+                <StatusIndicator status="watching" />
               </View>
             </View>
-            <Text style={styles.spotlightUsername}>Emma</Text>
-            <Text style={styles.spotlightStatusText}>Watching</Text>
-          </View>
+            <View style={styles.spotlightInfoWrapper}>
+              <Text style={styles.spotlightName}>Ella</Text>
+              <Text style={styles.spotlightStatus}>Watching</Text>
+            </View>
+          </TouchableOpacity>
+          
+          {/* Another friend who is watching but offline */}
+          <TouchableOpacity style={styles.spotlightContainer}>
+            <View style={styles.spotlightAvatarWrapper}>
+              <View style={styles.spotlightAvatarBlue}>
+                <Image 
+                  source={{ uri: 'https://randomuser.me/api/portraits/women/22.jpg' }} 
+                  style={styles.spotlightAvatar}
+                />
+                <StatusIndicator status="busy" />
+              </View>
+            </View>
+            <View style={styles.spotlightInfoWrapper}>
+              <Text style={styles.spotlightName}>Emma</Text>
+              <Text style={styles.spotlightStatus}>Watching</Text>
+            </View>
+          </TouchableOpacity>
         </ScrollView>
         
         {renderSpotlightModal()}
@@ -438,19 +480,21 @@ const LiveScreen = () => {
   };
 
   return (
-    <LinearGradient
-      colors={['#0F0F17', '#151522']}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#121212', '#121212']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <MaterialIcons name="live-tv" size={24} color="#f25899" style={styles.headerIcon} />
+            <MaterialIcons name="live-tv" size={24} color="#FFFFFF" style={styles.headerIcon} />
             <Text style={styles.headerTitle}>Live</Text>
           </View>
-          <TouchableOpacity>
-            <MaterialIcons name="notifications" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row' }}>
+            <TouchableOpacity style={{ marginRight: 16 }}>
+              <MaterialIcons name="search" size={24} color="#FFFFFF" onPress={() => console.log('Search Pressed')} />
+            </TouchableOpacity>
+            <TouchableOpacity>
+              <MaterialIcons name="person-add" size={24} color="#FFFFFF" onPress={() => console.log('Add Friends Pressed')} />
+            </TouchableOpacity>
+          </View>
         </View>
         
         <ScrollView style={styles.scrollView}>
@@ -538,112 +582,134 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingRight: 16,
   },
-  spotlightUserContainer: {
-    marginRight: 16,
-    alignItems: 'center',
+  
+  horizontalScroll: {
+    marginRight: -16,
+    paddingRight: 16,
+    overflow: 'visible',
   },
-  spotlightStatusContainer: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  spotlightAvatarBorder: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
+  
+  spotlightContainer: {
+    height: 100,
+    width: 90,
+    backgroundColor: '#1D1E26',
+    borderRadius: 14,
+    marginRight: 10,
+    padding: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 5,
+    elevation: 6,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  spotlightAvatarInner: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    backgroundColor: '#1C1D23',
+  
+  spotlightAvatarWrapper: {
+    width: 56,
+    height: 56,
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
-  spotlightAvatarImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  spotlightBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(28, 29, 35, 0.8)',
+  
+  spotlightAvatarBlue: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#4B8BFF',
+    overflow: 'visible', // Changed to visible for indicator to overlap
+    position: 'relative',
   },
-  statusSpotlight: {
+  
+  spotlightAvatarRed: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#FF4B4B',
+    overflow: 'visible', // Changed to visible for indicator to overlap
+    position: 'relative',
+  },
+  
+  spotlightAvatarGreen: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
     borderColor: '#34C759',
-    borderWidth: 4,
-    shadowColor: '#34C759',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 8,
+    overflow: 'visible', // Changed to visible for indicator to overlap
+    position: 'relative',
   },
-  statusHosting: {
-    borderColor: '#F23535',
-    borderWidth: 4,
-    shadowColor: '#F23535',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  statusWatching: {
-    borderColor: '#0070FF',
-    borderWidth: 4,
-    shadowColor: '#0070FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  statusRegular: {
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+  
+  spotlightAvatarPurple: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 2,
+    borderColor: '#6E56F7',
+    overflow: 'visible', // Changed to visible for indicator to overlap
+    position: 'relative',
   },
-  spotlightUsername: {
+  
+  spotlightAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 25,
+  },
+  
+  spotlightInfoWrapper: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  
+  spotlightName: {
     color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 2,
   },
-  timeRemaining: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  timeRemainingText: {
-    color: '#FFFFFF',
+  
+  spotlightStatus: {
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 10,
+    textAlign: 'center',
   },
-  getSpotlightButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: 'hidden',
+  
+  // Status indicator that appears on profile avatars
+  statusIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#1D1E26',
+    zIndex: 10,
   },
-  getSpotlightGradient: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+  
+  spotlightCounter: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  
+  spotlightCountText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  
+  circularProgress: {
+    position: 'absolute',
+    top: -3,
+    left: -3,
+    zIndex: 1,
   },
   
   // Tournament Section
@@ -951,14 +1017,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   
-  // Circular progress
-  circularProgress: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    zIndex: 1,
-  },
-  
   // Additional Spotlight styles
   statusYou: {
     borderColor: '#34C759',
@@ -968,11 +1026,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.7,
     shadowRadius: 8,
     elevation: 8,
-  },
-  spotlightStatus: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    textAlign: 'center',
   },
   
   // Queue styles
@@ -1001,6 +1054,16 @@ const styles = StyleSheet.create({
   spotlightStatusText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
+  },
+  
+  loadingBackground: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 14,
+    opacity: 0.6,
+    zIndex: 1,
   },
 });
 
