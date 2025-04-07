@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,143 @@ import ScrollableContentContainer from '../components/ScrollableContentContainer
 const HomeScreen = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Week');
+
+  const renderFriendWatchingLive = () => {
+    return (
+      <TouchableOpacity style={styles.liveStreamContainer}>
+        {/* Left section with 4 avatars in a grid - hosts should be red */}
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/33.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/34.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+2</Text>
+          </View>
+        </View>
+        
+        {/* Center section with stream title and viewers */}
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Live title, test test test test test 123, .....
+          </Text>
+          <Text style={styles.viewersText}>2590 Viewers watching</Text>
+        </View>
+        
+        {/* Right section with broadcaster avatar - friend watching (blue) */}
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicator}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFriendHostingLive = () => {
+    return (
+      <TouchableOpacity style={styles.liveStreamContainer}>
+        {/* Left section with 4 avatars in a grid */}
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/33.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/34.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+2</Text>
+          </View>
+        </View>
+        
+        {/* Center section with stream title and viewers */}
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Alex's Live Stream, join now!
+          </Text>
+          <Text style={styles.viewersText}>1240 Viewers watching</Text>
+        </View>
+        
+        {/* Right section with broadcaster avatar */}
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainerRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFriendListeningMusic = () => {
+    return (
+      <TouchableOpacity style={styles.musicStreamContainer}>
+        {/* Left section with album art and song info */}
+        <View style={styles.musicContentContainer}>
+          <View style={styles.albumArtContainer}>
+            <Image 
+              source={{ uri: 'https://i.scdn.co/image/ab67616d0000b2732c8a1a947c85d3ee03bb5567' }} 
+              style={styles.albumArt}
+            />
+          </View>
+          <View style={styles.songInfoContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>Blinding Lights</Text>
+            <Text style={styles.artistName} numberOfLines={1}>The Weeknd</Text>
+          </View>
+        </View>
+        
+        {/* Right section with friend avatar */}
+        <View style={styles.musicFriendContainer}>
+          <View style={styles.musicAvatarContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/35.jpg' }} 
+              style={styles.musicAvatar}
+            />
+            <View style={styles.musicIndicator}>
+              <FontAwesome5 name="music" size={10} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderEventWidget = () => {
     return (
@@ -53,12 +190,17 @@ const HomeScreen = () => {
   const renderGemsWidget = () => {
     return (
       <Card style={styles.gemsCard}>
-        {/* Header with Gem+ badge and Buy button */}
+        {/* Gem+ Header with Buy button */}
         <View style={styles.gemsCardHeader}>
           <View style={styles.gemTitleContainer}>
-            <Text style={styles.gemTitle}>Gems</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>Gem+ Active</Text>
+            <MaterialCommunityIcons 
+              name="diamond-stone" 
+              size={20} 
+              color="#B768FB" 
+            />
+            <Text style={styles.gemTitle}>Gem+</Text>
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeBadgeText}>ACTIVE</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.buyButton}>
@@ -66,41 +208,53 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Gems Counter Section */}
-        <View style={styles.gemsCounterSection}>
-          <View style={styles.dailyGemsContainer}>
-            <View style={styles.dailyGemsHeader}>
-              <Text style={styles.dailyGemsValue}>200</Text>
-              <Text style={styles.dailyGemsLabel}>gems per day</Text>
+        {/* Content area */}
+        <View style={styles.gemsContent}>
+          {/* Upper section - Daily gems (informational) */}
+          <View style={styles.gemsDailyRow}>
+            <View>
+              <Text style={styles.gemsValueLabel}>Daily Subscription</Text>
+              <View style={styles.gemsValueContainer}>
+                <Text style={styles.dailyGemsValue}>200</Text>
+                <MaterialCommunityIcons 
+                  name="diamond-stone" 
+                  size={14} 
+                  color="rgba(183, 104, 251, 0.7)" 
+                />
+              </View>
             </View>
-            <View style={styles.renewalContainer}>
-              <Text style={styles.renewalLabel}>Renews in 3 days</Text>
+            <View style={styles.renewalBadge}>
+              <Text style={styles.renewalText}>Renews in 3 days</Text>
             </View>
           </View>
-        </View>
-        
-        {/* Available Balance - Highlighted Section */}
-        <LinearGradient
-          colors={['#272931', '#1E1F25']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.balanceSection}
-        >
-          <Text style={styles.balanceSectionTitle}>Available Balance</Text>
           
-          <View style={styles.balanceDisplay}>
-            <LinearGradient
-              colors={['#9C84EF', '#B768FB']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gemIconBg}
-            >
-              <MaterialCommunityIcons name="diamond-stone" size={28} color="#FFFFFF" />
-            </LinearGradient>
-            
-            <Text style={styles.balanceValue}>940</Text>
-          </View>
-        </LinearGradient>
+          {/* Lower section - Available balance (highlighted) */}
+          <LinearGradient
+            colors={['rgba(183, 104, 251, 0.1)', 'rgba(110, 105, 244, 0.1)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.availableBalanceContainer}
+          >
+            <View>
+              <Text style={styles.availableBalanceLabel}>YOUR AVAILABLE BALANCE</Text>
+              <View style={styles.availableBalanceRow}>
+                <Text style={styles.availableBalanceValue}>940</Text>
+                <LinearGradient
+                  colors={['#B768FB', '#6E69F4']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.gemIconBackground}
+                >
+                  <MaterialCommunityIcons 
+                    name="diamond-stone" 
+                    size={20} 
+                    color="#FFFFFF"
+                  />
+                </LinearGradient>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
       </Card>
     );
   };
@@ -124,10 +278,16 @@ const HomeScreen = () => {
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Horizontal Active Chats (Placeholder) */}
-        <View style={styles.horizontalScrollPlaceholder}>
-          <Text style={styles.placeholderText}>Horizontal Active Chats (TODO)</Text>
-        </View>
+        {/* Horizontal scroll for live widgets */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.horizontalWidgetContainer}
+        >
+          {renderFriendWatchingLive()}
+          {renderFriendHostingLive()}
+          {renderFriendListeningMusic()}
+        </ScrollView>
         
         {/* Event Widget */}
         {renderEventWidget()}
@@ -246,21 +406,241 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
   },
-  horizontalScrollPlaceholder: {
-    height: 102, // Approximate height from Figma component
-    backgroundColor: 'rgba(67, 71, 81, 0.5)', // Semi-transparent version of #434751
-    borderRadius: 10,
-    marginBottom: 16, // Space before the next section
+  
+  // Horizontal Widgets Container
+  horizontalWidgetContainer: {
+    marginBottom: 16,
+  },
+  
+  // Live Stream Widget Styles
+  liveStreamContainer: {
+    height: 102,
+    width: 320,
+    backgroundColor: '#1D1E26',
+    borderRadius: 16,
+    marginRight: 12,
+    flexDirection: 'row',
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  avatarGrid: {
+    width: 100,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    borderWidth: 2,
+    borderColor: '#4B8BFF',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  avatarWrapperRed: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    borderWidth: 2,
+    borderColor: '#FF4B4B',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  gridAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22.5,
+  },
+  plusMoreContainer: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(67, 71, 81, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4B8BFF',
+  },
+  plusMoreContainerRed: {
+    borderColor: '#FF4B4B',
+  },
+  plusMoreText: {
+    color: '#4B8BFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  plusMoreTextRed: {
+    color: '#FF4B4B',
+  },
+  streamInfoContainer: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  streamTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  viewersText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+  },
+  broadcasterContainerWrapper: {
+    width: 60,
+    height: 60,
+    marginLeft: 10,
+    alignSelf: 'center',
+  },
+  broadcasterContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#4B8BFF',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  broadcasterContainerRed: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#FF4B4B',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  broadcasterAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+  },
+  liveIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#4B8BFF',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderText: {
-    color: '#B5BAC1',
+  liveIndicatorRed: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FF4B4B',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Music Streaming Widget Styles
+  musicStreamContainer: {
+    height: 102,
+    width: 280,
+    backgroundColor: '#1D1E26',
+    borderRadius: 16,
+    marginRight: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  musicContentContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  albumArtContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  albumArt: {
+    width: '100%',
+    height: '100%',
+  },
+  songInfoContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  songTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  artistName: {
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
   },
-  // Event Widget Styles from LiveScreen
-  tournamentContainer: {
+  musicFriendContainer: {
+    marginLeft: 10,
+  },
+  musicAvatarContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#1DB954', // Spotify green
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  musicAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+  },
+  musicIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#1DB954', // Spotify green
+    width: 24,
+    height: 24,
     borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  musicInfoContainer: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  musicFriendName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  musicStatusText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+  },
+  
+  // Event Widget Styles
+  tournamentContainer: {
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1D1E26',
     shadowColor: '#000',
@@ -343,18 +723,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   
-  // NEW Gems Widget Styles
+  // Completely Redesigned Gems Widget Styles
   gemsCard: {
     backgroundColor: '#1C1D23',
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
+    padding: 0,
   },
   gemsCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -363,94 +745,106 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gemTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginLeft: 6,
     marginRight: 10,
   },
-  statusBadge: {
+  activeBadge: {
     backgroundColor: '#B768FB',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  statusBadgeText: {
+  activeBadgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
   buyButton: {
     backgroundColor: '#6E69F4',
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingVertical: 6,
     paddingHorizontal: 16,
   },
   buyButtonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 12,
   },
   
-  // Gems Counter Section
-  gemsCounterSection: {
+  // Content area
+  gemsContent: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  dailyGemsContainer: {
+  
+  // Daily gems row (more subtle, informational)
+  gemsDailyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 16,
   },
-  dailyGemsHeader: {
-    flexDirection: 'column',
-  },
-  dailyGemsValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  dailyGemsLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  renewalContainer: {
-    backgroundColor: 'rgba(183, 104, 251, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  renewalLabel: {
+  gemsValueLabel: {
     fontSize: 12,
-    color: '#B768FB',
-    fontWeight: 'bold',
-  },
-  
-  // Balance Section (Highlighted)
-  balanceSection: {
-    padding: 16,
-  },
-  balanceSectionTitle: {
-    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  balanceDisplay: {
+  gemsValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  gemIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  dailyGemsValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginRight: 4,
   },
-  balanceValue: {
+  renewalBadge: {
+    backgroundColor: 'rgba(183, 104, 251, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  renewalText: {
+    color: '#B768FB',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  
+  // Available balance (highlighted as most important)
+  availableBalanceContainer: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  availableBalanceLabel: {
+    fontSize: 12,
+    color: '#B768FB',
+    fontWeight: '600',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  availableBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  availableBalanceValue: {
     fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginRight: 10,
+  },
+  gemIconBackground: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   // Existing styles for Announcement and Mentions cards
