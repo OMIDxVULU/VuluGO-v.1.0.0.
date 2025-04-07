@@ -1146,30 +1146,32 @@ const styles = StyleSheet.create({
   // Horizontal Widgets Container
   horizontalWidgetContainer: {
     marginBottom: 16,
+    marginRight: -16, // Negative margin to allow widgets to extend past the screen edge
+    paddingRight: 16, // Add padding to maintain spacing while allowing overflow
+    overflow: 'visible', // Allow content to overflow container
   },
   
   // Live Stream Widget Styles
   liveStreamContainer: {
-    height: 102,
+    height: 110,
     width: 320,
     backgroundColor: '#1D1E26',
     borderRadius: 16,
     marginRight: 12,
     flexDirection: 'row',
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 10,
-    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     transform: [
       { perspective: 1000 },
-      { translateY: 2 }, // Subtle lift effect
+      { translateY: 2 },
     ],
   },
   avatarGrid: {
@@ -1298,12 +1300,12 @@ const styles = StyleSheet.create({
   
   // Music Streaming Widget Styles
   musicStreamContainer: {
-    height: 102,
+    height: 106,
     width: 280,
     backgroundColor: '#1D1E26',
     borderRadius: 16,
     marginRight: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1318,7 +1320,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
     transform: [
       { perspective: 1000 },
-      { translateY: 2 }, // Subtle lift effect
+      { translateY: 2 },
     ],
   },
   musicContentContainer: {
