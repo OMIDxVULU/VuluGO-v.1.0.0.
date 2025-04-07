@@ -1,15 +1,109 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 
 // Use the router for navigation
 const HomeScreen = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Week');
+
+  const renderEventWidget = () => {
+    return (
+      <View style={styles.tournamentContainer}>
+        <View style={styles.eventContent}>
+          <Text style={styles.eventTitle}>Event</Text>
+          
+          <View style={styles.eventProgressTrack}>
+            <View style={styles.eventProgressFill} />
+          </View>
+          
+          <View style={styles.eventInfoGrid}>
+            <View style={styles.eventInfoBox}>
+              <Text style={styles.eventInfoValue}>00:23:06</Text>
+              <Text style={styles.eventInfoLabel}>Time Left</Text>
+            </View>
+            
+            <View style={styles.eventInfoBox}>
+              <View style={styles.prizeContainer}>
+                <View style={styles.eventCoinIcon} />
+                <Text style={styles.eventInfoValue}>1350</Text>
+              </View>
+              <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+            </View>
+            
+            <View style={styles.eventInfoBox}>
+              <Text style={styles.eventInfoValue}>7</Text>
+              <Text style={styles.eventInfoLabel}>Entries</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity style={styles.enterButton}>
+            <Text style={styles.enterButtonText}>Enter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderGemsWidget = () => {
+    return (
+      <Card style={styles.gemsCard}>
+        {/* Header with Gem+ badge and Buy button */}
+        <View style={styles.gemsCardHeader}>
+          <View style={styles.gemTitleContainer}>
+            <Text style={styles.gemTitle}>Gems</Text>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>Gem+ Active</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.buyButton}>
+            <Text style={styles.buyButtonText}>Buy</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Gems Counter Section */}
+        <View style={styles.gemsCounterSection}>
+          <View style={styles.dailyGemsContainer}>
+            <View style={styles.dailyGemsHeader}>
+              <Text style={styles.dailyGemsValue}>200</Text>
+              <Text style={styles.dailyGemsLabel}>gems per day</Text>
+            </View>
+            <View style={styles.renewalContainer}>
+              <Text style={styles.renewalLabel}>Renews in 3 days</Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Available Balance - Highlighted Section */}
+        <LinearGradient
+          colors={['#272931', '#1E1F25']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceSection}
+        >
+          <Text style={styles.balanceSectionTitle}>Available Balance</Text>
+          
+          <View style={styles.balanceDisplay}>
+            <LinearGradient
+              colors={['#9C84EF', '#B768FB']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gemIconBg}
+            >
+              <MaterialCommunityIcons name="diamond-stone" size={28} color="#FFFFFF" />
+            </LinearGradient>
+            
+            <Text style={styles.balanceValue}>940</Text>
+          </View>
+        </LinearGradient>
+      </Card>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -35,90 +129,11 @@ const HomeScreen = () => {
           <Text style={styles.placeholderText}>Horizontal Active Chats (TODO)</Text>
         </View>
         
-        {/* Timer Section */}
-        <Card style={styles.timerCard}>
-          <View style={styles.timerContent}>
-            <View style={styles.timerSection}>
-              <Text style={styles.timerText}>00:23:06</Text>
-              <Text style={styles.timerLabel}>Time Left</Text>
-            </View>
-            
-            <View style={styles.prizeSection}>
-              <View style={styles.prizeWrapper}>
-                <MaterialIcons name="attach-money" size={20} color="#FFD700" />
-                <Text style={styles.prizeText}>1350</Text>
-              </View>
-              <Text style={styles.prizeLabel}>Prize Pool</Text>
-            </View>
-            
-            <View style={styles.entriesSection}>
-              <Text style={styles.entriesText}>7</Text>
-              <Text style={styles.entriesLabel}>Entries</Text>
-            </View>
-            
-            <TouchableOpacity style={styles.enterButton}>
-              <Text style={styles.enterButtonText}>Enter</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
+        {/* Event Widget */}
+        {renderEventWidget()}
         
-        {/* Gem+ Subscription */}
-        <Card style={styles.subscriptionCard}>
-          <View style={styles.subscriptionHeader}>
-            <Text style={styles.subscriptionTitle}>Gem+</Text>
-            <View style={styles.activeIndicator}>
-              <Text style={styles.activeText}>ACTIVE</Text>
-            </View>
-            <TouchableOpacity style={styles.buyButton}>
-              <Text style={styles.buyButtonText}>Buy</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
-        
-        {/* Gems per day */}
-        <Card style={styles.gemsCard}>
-          <View style={styles.gemsPerDayContainer}>
-            <Text style={styles.gemsLabel}>Gems per day</Text>
-            <View style={styles.gemsValueContainer}>
-              <Text style={styles.gemsValue}>171</Text>
-              <MaterialIcons name="diamond" size={18} color="#B768FB" />
-            </View>
-          </View>
-        </Card>
-        
-        {/* Gems collected */}
-        <Card style={styles.gemsCollectedCard}>
-          <View style={styles.gemsCollectedHeader}>
-            <Text style={styles.gemsCollectedTitle}>Gems collected</Text>
-            <MaterialIcons name="diamond" size={16} color="#B768FB" />
-          </View>
-          
-          <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Week' && styles.activeTab]}
-              onPress={() => setActiveTab('Week')}
-            >
-              <Text style={styles.tabText}>Week</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Month' && styles.activeTab]}
-              onPress={() => setActiveTab('Month')}
-            >
-              <Text style={styles.tabText}>Month</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'Year' && styles.activeTab]}
-              onPress={() => setActiveTab('Year')}
-            >
-              <Text style={styles.tabText}>Year</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.gemsStatsContainer}>
-            <Text style={styles.gemsStatsText}>This Week: 1197 gems</Text>
-            <MaterialIcons name="diamond" size={18} color="#B768FB" />
-          </View>
-        </Card>
+        {/* Improved Gems Widget */}
+        {renderGemsWidget()}
         
         {/* Announcements */}
         <Card style={styles.announcementCard}>
@@ -243,91 +258,123 @@ const styles = StyleSheet.create({
     color: '#B5BAC1',
     fontSize: 14,
   },
-  timerCard: {
-    backgroundColor: '#1C1D23',
-    borderRadius: 16,
+  // Event Widget Styles from LiveScreen
+  tournamentContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1D1E26',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
     marginBottom: 16,
   },
-  timerContent: {
+  eventContent: {
+    padding: 12,
+  },
+  eventTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  eventProgressTrack: {
+    height: 3,
+    backgroundColor: '#2D2E38',
+    borderRadius: 1.5,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  eventProgressFill: {
+    height: '100%',
+    width: '25%', // Adjust based on progress
+    backgroundColor: '#FFD700',
+    borderRadius: 1.5,
+  },
+  eventInfoGrid: {
     flexDirection: 'row',
-    padding: 16,
-    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  timerSection: {
+  eventInfoBox: {
+    flex: 1,
+    backgroundColor: '#2D2E38',
+    borderRadius: 10,
+    padding: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 3,
+    minHeight: 60,
   },
-  timerText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  timerLabel: {
-    color: '#8E8E93',
-    fontSize: 12,
-  },
-  prizeSection: {
-    alignItems: 'center',
-  },
-  prizeWrapper: {
+  prizeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  prizeText: {
+  eventCoinIcon: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFD700',
+    marginRight: 3,
+  },
+  eventInfoValue: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
-  prizeLabel: {
-    color: '#8E8E93',
-    fontSize: 12,
-  },
-  entriesSection: {
-    alignItems: 'center',
-  },
-  entriesText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  entriesLabel: {
-    color: '#8E8E93',
-    fontSize: 12,
+  eventInfoLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
   },
   enterButton: {
     backgroundColor: '#FFD700',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderRadius: 100,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   enterButtonText: {
-    color: '#000000',
-    fontWeight: 'bold',
+    color: '#1D1E26',
     fontSize: 14,
+    fontWeight: 'bold',
   },
-  subscriptionCard: {
+  
+  // NEW Gems Widget Styles
+  gemsCard: {
     backgroundColor: '#1C1D23',
     borderRadius: 16,
     marginBottom: 16,
+    overflow: 'hidden',
   },
-  subscriptionHeader: {
+  gemsCardHeader: {
     flexDirection: 'row',
-    padding: 16,
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  subscriptionTitle: {
-    color: '#FFFFFF',
+  gemTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gemTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginRight: 10,
   },
-  activeIndicator: {
+  statusBadge: {
     backgroundColor: '#B768FB',
-    borderRadius: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    paddingHorizontal: 12,
+    borderRadius: 12,
   },
-  activeText: {
+  statusBadgeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
@@ -343,80 +390,70 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  gemsCard: {
-    backgroundColor: '#1C1D23',
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  gemsPerDayContainer: {
-    flexDirection: 'row',
+  
+  // Gems Counter Section
+  gemsCounterSection: {
     padding: 16,
-    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dailyGemsContainer: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  gemsLabel: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  gemsValueContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
-  gemsValue: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 4,
+  dailyGemsHeader: {
+    flexDirection: 'column',
   },
-  gemsCollectedCard: {
-    backgroundColor: '#1C1D23',
-    borderRadius: 16,
-    marginBottom: 16,
+  dailyGemsValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  dailyGemsLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  renewalContainer: {
+    backgroundColor: 'rgba(183, 104, 251, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  renewalLabel: {
+    fontSize: 12,
+    color: '#B768FB',
+    fontWeight: 'bold',
+  },
+  
+  // Balance Section (Highlighted)
+  balanceSection: {
     padding: 16,
   },
-  gemsCollectedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  gemsCollectedTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#2C2D36',
-    borderRadius: 20,
-    marginBottom: 16,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  activeTab: {
-    backgroundColor: '#1C1D23',
-  },
-  tabText: {
-    color: '#FFFFFF',
+  balanceSectionTitle: {
     fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 8,
   },
-  gemsStatsContainer: {
+  balanceDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  gemIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  gemsStatsText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  balanceValue: {
+    fontSize: 36,
     fontWeight: 'bold',
-    marginRight: 8,
+    color: '#FFFFFF',
   },
+  
+  // Existing styles for Announcement and Mentions cards
   announcementCard: {
     backgroundColor: '#1C1D23',
     borderRadius: 16,
