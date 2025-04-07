@@ -149,6 +149,439 @@ const HomeScreen = () => {
     );
   };
 
+  // Additional random widgets
+  const renderRandomFriendWidgets = () => {
+    const randomWidgets = [];
+    
+    // Friend watching with busy status
+    randomWidgets.push(
+      <TouchableOpacity key="random1" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/42.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+3</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Gaming Tournament Finals
+          </Text>
+          <Text style={styles.viewersText}>5230 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/41.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend hosting with offline fake status
+    randomWidgets.push(
+      <TouchableOpacity key="random2" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/52.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/53.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/54.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+5</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Friday Night Party Stream
+          </Text>
+          <Text style={styles.viewersText}>1876 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainerRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/51.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.offlineIndicator}>
+              <Ionicons name="disc-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend listening to music with online status
+    randomWidgets.push(
+      <TouchableOpacity key="random3" style={styles.musicStreamContainer}>
+        <View style={styles.musicContentContainer}>
+          <View style={styles.albumArtContainer}>
+            <Image 
+              source={{ uri: 'https://i.scdn.co/image/ab67616d0000b273e8b066f70c206551210d902b' }} 
+              style={styles.albumArt}
+            />
+          </View>
+          <View style={styles.songInfoContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>Bohemian Rhapsody</Text>
+            <Text style={styles.artistName} numberOfLines={1}>Queen</Text>
+          </View>
+        </View>
+        
+        <View style={styles.musicFriendContainer}>
+          <View style={styles.musicAvatarContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/65.jpg' }} 
+              style={styles.musicAvatar}
+            />
+            <View style={styles.musicIndicator}>
+              <FontAwesome5 name="music" size={10} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend watching with online status
+    randomWidgets.push(
+      <TouchableOpacity key="random4" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/62.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/63.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/64.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+1</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Cooking Class Live
+          </Text>
+          <Text style={styles.viewersText}>942 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/61.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.musicIndicator}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend listening to music with busy status
+    randomWidgets.push(
+      <TouchableOpacity key="random5" style={styles.musicStreamContainer}>
+        <View style={styles.musicContentContainer}>
+          <View style={styles.albumArtContainer}>
+            <Image 
+              source={{ uri: 'https://i.scdn.co/image/ab67616d0000b273fd61ea11e76760c998f5702d' }} 
+              style={styles.albumArt}
+            />
+          </View>
+          <View style={styles.songInfoContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>Bad Guy</Text>
+            <Text style={styles.artistName} numberOfLines={1}>Billie Eilish</Text>
+          </View>
+        </View>
+        
+        <View style={styles.musicFriendContainer}>
+          <View style={styles.musicAvatarContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/75.jpg' }} 
+              style={styles.musicAvatar}
+            />
+            <View style={styles.liveIndicatorRed}>
+              <FontAwesome5 name="music" size={10} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend hosting with busy status
+    randomWidgets.push(
+      <TouchableOpacity key="random6" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/72.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/73.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/74.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+4</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Art Tutorial Session
+          </Text>
+          <Text style={styles.viewersText}>753 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainerRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/71.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend watching with offline status
+    randomWidgets.push(
+      <TouchableOpacity key="random7" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/82.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/83.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/84.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+7</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Tech Talk Live: AI Future
+          </Text>
+          <Text style={styles.viewersText}>3102 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/81.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.offlineIndicator}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend listening to music with offline status
+    randomWidgets.push(
+      <TouchableOpacity key="random8" style={styles.musicStreamContainer}>
+        <View style={styles.musicContentContainer}>
+          <View style={styles.albumArtContainer}>
+            <Image 
+              source={{ uri: 'https://i.scdn.co/image/ab67616d0000b273abdf6b2a0b15e5af9231940d' }} 
+              style={styles.albumArt}
+            />
+          </View>
+          <View style={styles.songInfoContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>Shape of You</Text>
+            <Text style={styles.artistName} numberOfLines={1}>Ed Sheeran</Text>
+          </View>
+        </View>
+        
+        <View style={styles.musicFriendContainer}>
+          <View style={styles.musicAvatarContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/85.jpg' }} 
+              style={styles.musicAvatar}
+            />
+            <View style={styles.offlineIndicator}>
+              <FontAwesome5 name="music" size={10} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend hosting with online status
+    randomWidgets.push(
+      <TouchableOpacity key="random9" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/92.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/93.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/94.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+6</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Travel Vlog: Paris Edition
+          </Text>
+          <Text style={styles.viewersText}>1423 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainerRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/91.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.musicIndicator}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    // Friend watching with busy status
+    randomWidgets.push(
+      <TouchableOpacity key="random10" style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/96.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/97.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/98.jpg' }} 
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+8</Text>
+          </View>
+        </View>
+        
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            Fitness Class: HIIT Workout
+          </Text>
+          <Text style={styles.viewersText}>876 Viewers watching</Text>
+        </View>
+        
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/99.jpg' }} 
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}>
+              <Ionicons name="radio-outline" size={16} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+    
+    return randomWidgets;
+  };
+
   const renderEventWidget = () => {
     return (
       <View style={styles.tournamentContainer}>
@@ -287,6 +720,7 @@ const HomeScreen = () => {
           {renderFriendWatchingLive()}
           {renderFriendHostingLive()}
           {renderFriendListeningMusic()}
+          {renderRandomFriendWidgets()}
         </ScrollView>
         
         {/* Event Widget */}
@@ -420,60 +854,65 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginRight: 12,
     flexDirection: 'row',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
+    alignItems: 'center',
   },
   avatarGrid: {
-    width: 100,
+    width: 96,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignContent: 'center',
+    marginRight: 10,
+    height: 90,
   },
   avatarWrapper: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#4B8BFF',
     overflow: 'hidden',
-    marginBottom: 6,
+    margin: 3,
   },
   avatarWrapperRed: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#FF4B4B',
     overflow: 'hidden',
-    marginBottom: 6,
+    margin: 3,
   },
   gridAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 22.5,
+    borderRadius: 18,
   },
   plusMoreContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(67, 71, 81, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#4B8BFF',
+    margin: 3,
   },
   plusMoreContainerRed: {
     borderColor: '#FF4B4B',
   },
   plusMoreText: {
     color: '#4B8BFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   plusMoreTextRed: {
@@ -481,7 +920,7 @@ const styles = StyleSheet.create({
   },
   streamInfoContainer: {
     flex: 1,
-    marginLeft: 12,
+    marginHorizontal: 8,
     justifyContent: 'center',
   },
   streamTitle: {
@@ -495,55 +934,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   broadcasterContainerWrapper: {
-    width: 60,
-    height: 60,
-    marginLeft: 10,
-    alignSelf: 'center',
+    width: 52,
+    height: 52,
+    marginLeft: 4,
+    justifyContent: 'center',
+    overflow: 'visible',
   },
   broadcasterContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2,
     borderColor: '#4B8BFF',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   broadcasterContainerRed: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2,
     borderColor: '#FF4B4B',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   broadcasterAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 28,
+    borderRadius: 24,
   },
   liveIndicator: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
+    bottom: -6,
+    right: -6,
     backgroundColor: '#4B8BFF',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1D1E26',
+    zIndex: 10,
   },
   liveIndicatorRed: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
+    bottom: -6,
+    right: -6,
     backgroundColor: '#FF4B4B',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1D1E26',
+    zIndex: 10,
   },
   
   // Music Streaming Widget Styles
@@ -553,7 +999,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1D1E26',
     borderRadius: 16,
     marginRight: 12,
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -570,11 +1017,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   albumArtContainer: {
-    width: 60,
-    height: 60,
+    width: 52,
+    height: 52,
     borderRadius: 8,
     overflow: 'hidden',
     marginRight: 12,
+    backgroundColor: '#2D2E38',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   albumArt: {
     width: '100%',
@@ -596,31 +1046,35 @@ const styles = StyleSheet.create({
   },
   musicFriendContainer: {
     marginLeft: 10,
+    overflow: 'visible',
   },
   musicAvatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2,
-    borderColor: '#1DB954', // Spotify green
+    borderColor: '#1DB954',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   musicAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 28,
+    borderRadius: 24,
   },
   musicIndicator: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#1DB954', // Spotify green
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    bottom: -6,
+    right: -6,
+    backgroundColor: '#1DB954',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1D1E26',
+    zIndex: 10,
   },
   musicInfoContainer: {
     flex: 1,
@@ -668,7 +1122,7 @@ const styles = StyleSheet.create({
   },
   eventProgressFill: {
     height: '100%',
-    width: '25%', // Adjust based on progress
+    width: '25%',
     backgroundColor: '#FFD700',
     borderRadius: 1.5,
   },
@@ -922,6 +1376,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 24,
     padding: 16,
+  },
+  // Add offline indicator style
+  offlineIndicator: {
+    position: 'absolute',
+    bottom: -6,
+    right: -6,
+    backgroundColor: '#666666',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1D1E26',
+    zIndex: 10,
   },
 });
 
