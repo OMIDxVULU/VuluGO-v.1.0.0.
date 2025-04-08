@@ -935,21 +935,9 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs }: ChatScreenProps) 
 
   // Add a navigation helper that always goes to DMs
   const navigateToMessages = () => {
-    if (goToDMs) {
-      // Use provided navigation function if available
-      goToDMs();
-    } else {
-      // Use router to navigate to direct-messages as fallback
-      try {
-        // Import and use router from expo-router if available
-        const { router } = require('expo-router');
-        router.push('/(main)/direct-messages');
-      } catch (error) {
-        // If expo-router is not available, just use the provided goBack
-        console.log('Navigation error, falling back to goBack:', error);
-        goBack();
-      }
-    }
+    // Always prioritize the provided goBack function
+    // which now has the logic to handle the 'source' parameter
+    goBack();
   };
 
   // Now update the back button handler to use our new navigation helper

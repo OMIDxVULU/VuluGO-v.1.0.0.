@@ -283,9 +283,8 @@ const LiveScreen = () => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Spotlight</Text>
           <View style={styles.spotlightCounter}>
-            <Text style={styles.spotlightCountText}>4 friends</Text>
+            <Text style={styles.spotlightCountText}>4 online friends</Text>
           </View>
         </View>
         
@@ -452,7 +451,12 @@ const LiveScreen = () => {
         <Text style={styles.sectionTitle}>Text Channels</Text>
         <Pressable 
           style={styles.globalChatButton} 
-          onPress={() => router.push('/chat')}
+          onPress={() => router.push({
+            pathname: '/chat',
+            params: {
+              source: 'live' // Add source parameter to track where user came from
+            }
+          })}
         >
           <View style={styles.chatButtonContent}>
             <MaterialIcons name="chat" size={24} color="#FFFFFF" style={styles.chatIcon} />
