@@ -5,7 +5,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 interface Stream {
   id: number;
@@ -84,6 +84,104 @@ const LiveScreen = () => {
           fill="transparent"
         />
       </Svg>
+    );
+  };
+  
+  // Water animation component that creates natural fluid movement
+  const WaterFlowAnimation = ({ 
+    progress, 
+    colors = ['#34C759', '#206E3E'] 
+  }: { 
+    progress: number;
+    colors?: string[];
+  }) => {
+    // Use multiple phase values for smoother transitions
+    const [phase1, setPhase1] = useState(0);
+    const [phase2, setPhase2] = useState(Math.PI / 4); // Start offset for second wave
+    
+    useEffect(() => {
+      // Use requestAnimationFrame for smoother animation
+      let animationFrame: number;
+      let lastTime = 0;
+      
+      const animate = (time: number) => {
+        if (lastTime === 0) {
+          lastTime = time;
+        }
+        
+        const delta = time - lastTime;
+        const increment = delta * 0.0015; // Smaller increment for smoother motion
+        
+        // Update phases with different speeds for more natural movement
+        setPhase1(prev => (prev + increment) % (2 * Math.PI));
+        setPhase2(prev => (prev + increment * 0.8) % (2 * Math.PI));
+        
+        lastTime = time;
+        animationFrame = requestAnimationFrame(animate);
+      };
+      
+      animationFrame = requestAnimationFrame(animate);
+      
+      return () => {
+        cancelAnimationFrame(animationFrame);
+      };
+    }, []);
+
+    const createWavePath = (phase: number, baseHeight: number, amplitude: number, frequency: number) => {
+      const width = 100;
+      const height = baseHeight;
+      
+      // Start the path below the view to avoid visible gaps
+      let path = `M -5 105`;
+      
+      // Create the wave effect with more points for smoother curve
+      for (let x = -5; x <= width + 5; x += 1) {
+        const y = 100 - height + Math.sin(x / frequency + phase) * amplitude;
+        path += ` L ${x} ${y}`;
+      }
+      
+      // Close the path by extending beyond the visible area
+      path += ` L ${width + 5} 105 L -5 105 Z`;
+      return path;
+    };
+
+    return (
+      <View style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: 14 }]}>
+        <Svg width="100%" height="100%" viewBox="0 0 100 100">
+          <Defs>
+            <SvgLinearGradient id="waterGradient" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors[0]} stopOpacity="0.9" />
+              <Stop offset="1" stopColor={colors[1]} stopOpacity="0.95" />
+            </SvgLinearGradient>
+            <SvgLinearGradient id="waterGradient2" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors[0]} stopOpacity="0.7" />
+              <Stop offset="1" stopColor={colors[1]} stopOpacity="0.8" />
+            </SvgLinearGradient>
+            <SvgLinearGradient id="waterGradient3" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors[0]} stopOpacity="0.5" />
+              <Stop offset="1" stopColor={colors[1]} stopOpacity="0.6" />
+            </SvgLinearGradient>
+          </Defs>
+          
+          {/* Main wave layer */}
+          <Path
+            d={createWavePath(phase1, progress, 3, 12)}
+            fill="url(#waterGradient)"
+          />
+          
+          {/* Second wave layer with different phase */}
+          <Path
+            d={createWavePath(phase2, Math.max(0, progress - 5), 2.5, 8)}
+            fill="url(#waterGradient2)"
+          />
+          
+          {/* Third small ripple layer on top for extra detail */}
+          <Path
+            d={createWavePath(phase1 * 1.5, Math.max(0, progress - 2), 1, 6)}
+            fill="url(#waterGradient3)"
+          />
+        </Svg>
+      </View>
     );
   };
   
@@ -219,20 +317,17 @@ const LiveScreen = () => {
             </View>
           </TouchableOpacity>
           
-          {/* Spotlighted user with countdown */}
+          {/* Spotlighted user with countdown and fluid animation */}
           <TouchableOpacity 
             style={[
               styles.spotlightContainer,
               { overflow: 'hidden' }
             ]}
           >
-            {/* Loading background effect */}
-            <LinearGradient
-              colors={['#34C759', '#2A9E45']}
-              style={[
-                styles.loadingBackground, 
-                { height: `${percentage}%` }
-              ]}
+            {/* Fluid water animation */}
+            <WaterFlowAnimation 
+              progress={percentage} 
+              colors={['#34C759', '#206E3E']} 
             />
             
             <View style={[styles.spotlightAvatarWrapper, { zIndex: 2 }]}>
