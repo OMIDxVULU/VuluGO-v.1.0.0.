@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import * as Haptics from 'expo-haptics';
+import CommonHeader from '../components/CommonHeader';
 
 // Use the router for navigation
 const HomeScreen = () => {
@@ -971,18 +972,21 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Home</Text>
-        <View style={styles.balanceContainer}>
-          <View style={styles.coinIcon}>
-            <MaterialIcons name="attach-money" size={24} color="#FFD700" />
-          </View>
-          <Text style={styles.balanceText}>10 000 000 000 0...</Text>
-          <View style={styles.plusButton}>
-            <MaterialIcons name="add" size={20} color="#FFFFFF" />
-          </View>
-        </View>
-      </View>
+      <CommonHeader 
+        title="Home" 
+        rightIcons={[
+          {
+            name: 'attach-money',
+            color: '#FFD700',
+            onPress: () => console.log('Balance pressed')
+          },
+          {
+            name: 'add',
+            color: '#FFFFFF',
+            onPress: () => console.log('Add pressed')
+          }
+        ]}
+      />
 
       <ScrollableContentContainer
         style={styles.content}

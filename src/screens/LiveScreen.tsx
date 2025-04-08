@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import * as Sensors from 'expo-sensors';
+import CommonHeader from '../components/CommonHeader';
 
 interface Stream {
   id: number;
@@ -581,20 +583,23 @@ const LiveScreen = () => {
   return (
     <LinearGradient colors={['#121212', '#121212']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <MaterialIcons name="live-tv" size={24} color="#FFFFFF" style={styles.headerIcon} />
-            <Text style={styles.headerTitle}>Live</Text>
-          </View>
-          <View style={{ flexDirection: 'row' }}>
-            <TouchableOpacity style={{ marginRight: 16 }}>
-              <MaterialIcons name="search" size={24} color="#FFFFFF" onPress={() => console.log('Search Pressed')} />
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <MaterialIcons name="person-add" size={24} color="#FFFFFF" onPress={() => console.log('Add Friends Pressed')} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <CommonHeader 
+          title="Live"
+          leftIcon={{
+            name: "live-tv",
+            onPress: () => {}
+          }}
+          rightIcons={[
+            {
+              name: "search",
+              onPress: () => console.log('Search Pressed')
+            },
+            {
+              name: "person-add",
+              onPress: () => console.log('Add Friends Pressed')
+            }
+          ]}
+        />
         
         <ScrollView style={styles.scrollView}>
           {renderSpotlightSection()}

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import SVGIcon from '../components/SVGIcon';
+import CommonHeader from '../components/CommonHeader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -186,55 +187,48 @@ const DirectMessagesScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
       <View style={styles.outerContainer}>
-          {/* Custom Header based on Figma */}
-          {/* Removed the extra View for header, applying styles directly */}
-           <Text style={styles.headerTitle}>Messages</Text>
-
-          <View style={styles.mainContentBackground}>
-              {/* Top Bar with Search and Add Friends */}
-              <View style={styles.topBar}>
-                <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-                  {/* Replace Ionicons with SVGIcon */}
-                  <SVGIcon name="visibility" size={17} color="#B5BAC1" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.addFriendsButton} onPress={handleAddFriend}>
-                  {/* Replace Ionicons with SVGIcon */}
-                  <View style={styles.addFriendsIconContainer}>
-                    <SVGIcon name="add" size={20} color="#B5BAC1" />
-                  </View>
-                  <Text style={styles.addFriendsText}>Add Friends</Text>
-                </TouchableOpacity>
+        <CommonHeader title="Messages" />
+        
+        <View style={styles.mainContentBackground}>
+          {/* Top Bar with Search and Add Friends */}
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+              <SVGIcon name="visibility" size={17} color="#B5BAC1" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addFriendsButton} onPress={handleAddFriend}>
+              <View style={styles.addFriendsIconContainer}>
+                <SVGIcon name="add" size={20} color="#B5BAC1" />
               </View>
-
-              {/* TODO: Add Horizontal Active Chats Section here based on Figma component */}
-              {/* This section requires a horizontal FlatList or ScrollView */}
-              <View style={styles.horizontalScrollPlaceholder}>
-                 <Text style={styles.placeholderText}>Horizontal Active Chats (TODO)</Text>
-              </View>
-
-
-              {/* Messages List */}
-              <FlatList
-                data={DUMMY_CHATS}
-                renderItem={renderChatItem}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.chatList}
-                style={styles.flatListStyle} // Ensures list takes up available space
-              />
+              <Text style={styles.addFriendsText}>Add Friends</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* TODO: Add Horizontal Active Chats Section here based on Figma component */}
+          <View style={styles.horizontalScrollPlaceholder}>
+             <Text style={styles.placeholderText}>Horizontal Active Chats (TODO)</Text>
           </View>
 
-          {/* Group Chat Floating Button */}
-          <TouchableOpacity
-            style={styles.groupChatButton}
-            onPress={handleCreateGroup}
-          >
-            {/* Replace Ionicons with SVGIcon */}
-            <View style={styles.groupChatIconContainer}>
-              <SVGIcon name="chat" size={28} color="#FFFFFF" />
-            </View>
-            <Text style={styles.groupChatText}>Group Chat</Text>
-          </TouchableOpacity>
+          {/* Messages List */}
+          <FlatList
+            data={DUMMY_CHATS}
+            renderItem={renderChatItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.chatList}
+            style={styles.flatListStyle} // Ensures list takes up available space
+          />
+        </View>
+
+        {/* Group Chat Floating Button */}
+        <TouchableOpacity
+          style={styles.groupChatButton}
+          onPress={handleCreateGroup}
+        >
+          <View style={styles.groupChatIconContainer}>
+            <SVGIcon name="chat" size={28} color="#FFFFFF" />
+          </View>
+          <Text style={styles.groupChatText}>Group Chat</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -250,24 +244,6 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     // Removed padding, using absolute positioning and margins where needed
-  },
-  // Header Title - applied directly to Text component now
-  headerTitle: {
-    // position: 'absolute', // Removed, let it flow naturally in the safe area top part
-    // left: 24, // Use padding/margin instead if needed, or rely on flex alignment
-    // top: 16, // Adjust based on actual layout needs relative to safe area top
-    marginTop: 16, // Added margin top
-    marginLeft: 24, // Added margin left
-    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'System', // Use System font as fallback
-    fontWeight: '600',
-    fontSize: 25,
-    lineHeight: 30,
-    color: '#FFFFFF',
-    // React Native textShadow is basic
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 2,
-    marginBottom: 8, // Space below title before main content
   },
   mainContentBackground: {
     flex: 1, // Take remaining space

@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
+import CommonHeader from '../components/CommonHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -135,12 +136,21 @@ const ProfileScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <BackButton onPress={() => {}} />
-        <Text style={styles.topBarTitle}>Profile</Text>
-        <MenuButton onPress={handleMenuPress} color="#6C5CE7" />
-      </View>
+      {/* Top Bar with CommonHeader */}
+      <CommonHeader 
+        title="Profile" 
+        leftIcon={{
+          name: "arrow-back",
+          onPress: () => router.back()
+        }}
+        rightIcons={[
+          {
+            name: "menu",
+            onPress: handleMenuPress,
+            color: "#6C5CE7"
+          }
+        ]}
+      />
       
       <ScrollableContentContainer
         showsVerticalScrollIndicator={false}

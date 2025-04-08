@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import CommonHeader from '../components/CommonHeader';
 
 // Define the notification item type
 interface NotificationItem {
@@ -43,7 +44,7 @@ const NotificationsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Notifications</Text>
+      <CommonHeader title="Notifications" />
       
       {notifications.length > 0 ? (
         <FlatList
