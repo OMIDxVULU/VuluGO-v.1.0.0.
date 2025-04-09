@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
-import * as Haptics from 'expo-haptics';
 import CommonHeader from '../components/CommonHeader';
 import ActivityModal from '../components/ActivityModal';
 import PersonGroupIcon from '../components/PersonGroupIcon';
@@ -17,16 +16,8 @@ const HomeScreen = () => {
   const [activeTab, setActiveTab] = useState('Week');
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const lastX = useRef(0);
-  const isDragging = useRef(false);
-  const lastHapticTime = useRef(0);
   const [contentWidth, setContentWidth] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  const shakeAnimation = useRef(new Animated.Value(0)).current;
-  const overscrollAmount = useRef(0);
-  const dragStartTime = useRef(0);
-  const hapticInterval = useRef<NodeJS.Timeout | null>(null);
-  const dragDistance = useRef(0);
   
   // Activity Modal states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
@@ -42,19 +33,6 @@ const HomeScreen = () => {
     friendAvatar: '',
   });
   
-  // Track if we're at the edges for the rubber band effect
-  const isAtLeftEdge = useRef(false);
-  const isAtRightEdge = useRef(false);
-  
-  // Cleanup interval on unmount
-  useEffect(() => {
-    return () => {
-      if (hapticInterval.current) {
-        clearInterval(hapticInterval.current);
-      }
-    };
-  }, []);
-  
   // Function to handle container width measurement
   const handleContainerLayout = (event: LayoutChangeEvent) => {
     setContainerWidth(event.nativeEvent.layout.width);
@@ -65,272 +43,11 @@ const HomeScreen = () => {
     setContentWidth(width);
   };
   
-  // Create the rubber band shake animation
-  const createShakeAnimation = (intensity: number) => {
-    // Reset the animation value
-    shakeAnimation.setValue(0);
-    
-    // Create a sequence of small movements to simulate a shake
-    Animated.sequence([
-      Animated.timing(shakeAnimation, {
-        toValue: intensity,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: -intensity * 0.8,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: intensity * 0.6,
-        duration: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: -intensity * 0.4,
-        duration: 40,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 0,
-        duration: 30,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-  
-  // Function to start haptic feedback during drag
-  const startProgressiveHapticFeedback = () => {
-    // Clear any existing interval
-    if (hapticInterval.current) {
-      clearInterval(hapticInterval.current);
-    }
-    
-    // Previous drag position to detect actual movement
-    let prevPosition = lastX.current;
-    let movementDetected = false;
-    let lastMovementTime = Date.now();
-    
-    // Widget positions tracking
-    const widgetWidth = 320; // Width of widget + margin
-    let lastWidgetBoundary = -1; // Last widget boundary crossed
-    
-    // Set up a new interval for continuous feedback
-    hapticInterval.current = setInterval(() => {
-      if (isDragging.current) {
-        const currentTime = Date.now();
-        const currentPosition = lastX.current;
-        
-        // Calculate current widget boundary and position within widget
-        const currentWidgetIndex = Math.floor(currentPosition / widgetWidth);
-        const positionWithinWidget = currentPosition % widgetWidth;
-        const currentBoundary = currentWidgetIndex * widgetWidth;
-        
-        // Calculate how much the finger has moved since last check
-        const movementDelta = Math.abs(currentPosition - prevPosition);
-        
-        if (movementDelta > 0.5) {
-          // Finger is actively moving
-          movementDetected = true;
-          lastMovementTime = currentTime;
-          
-          // Detect widget boundary crossing for distinct feedback
-          if (lastWidgetBoundary !== currentBoundary && lastWidgetBoundary !== -1) {
-            // We've crossed a widget boundary - provide clear boundary feedback
-            if (Platform.OS === 'ios') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            }
-            lastWidgetBoundary = currentBoundary;
-          } else if (lastWidgetBoundary === -1) {
-            // Initialize boundary on first movement
-            lastWidgetBoundary = currentBoundary;
-          }
-          
-          // Position-aware feedback - vary based on exact position within widget
-          // This creates a feeling of pulling against increasing tension
-          
-          // Center of widget feels smoother (less resistance)
-          // Edges feel "stickier" (more resistance)
-          const centerPoint = widgetWidth / 2;
-          const distanceFromCenter = Math.abs(positionWithinWidget - centerPoint);
-          const normalizedDistanceFromCenter = distanceFromCenter / centerPoint; // 0 at center, 1 at edges
-          
-          // Determine if we should provide haptic feedback
-          // More likely near edges, less likely at center
-          const shouldProvideFeedback = Math.random() < (0.1 + normalizedDistanceFromCenter * 0.4);
-          
-          // Only trigger if feedback probability hit and enough distance moved
-          if (shouldProvideFeedback && movementDelta > 0.8) {
-            // Calculate time between pulses based on position and movement speed
-            // Faster pulls = more frequent haptics
-            const moveSpeed = movementDelta * (1000 / 16); // px per second
-            
-            // Base timing interval - scales with drag speed and position
-            // Edges get more feedback (smaller interval)
-            const intervalScaler = 1 - (normalizedDistanceFromCenter * 0.5);
-            const baseInterval = Math.max(15, 50 * intervalScaler - (moveSpeed / 200));
-            
-            // Only trigger if enough time has passed
-            if (currentTime - lastHapticTime.current > baseInterval) {
-              if (Platform.OS === 'ios') {
-                // Base intensity on position within widget and movement speed
-                let intensity: Haptics.ImpactFeedbackStyle;
-                
-                if (normalizedDistanceFromCenter > 0.8 && moveSpeed > 300) {
-                  // Near edge with fast movement - strongest feedback
-                  intensity = Haptics.ImpactFeedbackStyle.Medium;
-                } else {
-                  intensity = Haptics.ImpactFeedbackStyle.Light;
-                }
-                
-                // Provide haptic feedback
-                Haptics.impactAsync(intensity);
-                lastHapticTime.current = currentTime;
-              }
-            }
-          }
-        } else if (movementDetected && currentTime - lastMovementTime > 100) {
-          // If no movement for 100ms, reset movement detection
-          movementDetected = false;
-        }
-        
-        // Update previous position for next check
-        prevPosition = currentPosition;
-      }
-    }, 5); // Check at extremely high frequency (200Hz) for precise position tracking
-  };
-  
-  // Function to stop haptic feedback
-  const stopHapticFeedback = () => {
-    if (hapticInterval.current) {
-      clearInterval(hapticInterval.current);
-      hapticInterval.current = null;
-    }
-  };
-  
-  // When scroll position changes, apply the rubber band effect and haptic feedback
+  // Simplified scroll handler without haptics or rubber band effects
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { 
-      useNativeDriver: false,
-      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const currentPosition = event.nativeEvent.contentOffset.x;
-        const maxScroll = contentWidth - containerWidth;
-        
-        // Update drag distance based on movement between frames
-        const movementDelta = Math.abs(currentPosition - lastX.current);
-        if (isDragging.current && movementDelta > 0.5) {
-          // Only accumulate distance when actually moving
-          dragDistance.current += movementDelta;
-        }
-        
-        // Calculate rubber band effect when we reach the edges
-        if (currentPosition <= 0) {
-          // We're at the left edge
-          if (!isAtLeftEdge.current) {
-            isAtLeftEdge.current = true;
-            // Trigger haptic feedback when we hit the edge
-            if (Platform.OS === 'ios') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            }
-            // Trigger shake animation
-            createShakeAnimation(3);
-          }
-          
-          // Calculate overscroll amount for increased resistance
-          overscrollAmount.current = -currentPosition;
-        } else if (maxScroll > 0 && currentPosition >= maxScroll) {
-          // We're at the right edge
-          if (!isAtRightEdge.current) {
-            isAtRightEdge.current = true;
-            // Trigger haptic feedback when we hit the edge
-            if (Platform.OS === 'ios') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            }
-            // Trigger shake animation
-            createShakeAnimation(3);
-          }
-          
-          // Calculate overscroll amount for increased resistance
-          overscrollAmount.current = currentPosition - maxScroll;
-        } else {
-          // We're not at an edge
-          isAtLeftEdge.current = false;
-          isAtRightEdge.current = false;
-          overscrollAmount.current = 0;
-        }
-        
-        lastX.current = currentPosition;
-      }
-    }
+    { useNativeDriver: false }
   );
-  
-  // Function to handle when user starts dragging
-  const handleScrollBeginDrag = () => {
-    isDragging.current = true;
-    dragStartTime.current = Date.now();
-    dragDistance.current = 0;
-    lastHapticTime.current = 0; // Reset to trigger initial haptic immediately
-    
-    // Start progressive haptic feedback
-    startProgressiveHapticFeedback();
-  };
-  
-  // Function to handle when user stops dragging
-  const handleScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    isDragging.current = false;
-    
-    // Stop haptic feedback
-    stopHapticFeedback();
-    
-    // Bounce back from overscroll with animation
-    const currentPosition = event.nativeEvent.contentOffset.x;
-    const maxScroll = contentWidth - containerWidth;
-    
-    if (currentPosition < 0 || (maxScroll > 0 && currentPosition > maxScroll)) {
-      let targetPosition;
-      
-      if (currentPosition < 0) {
-        targetPosition = 0;
-      } else {
-        targetPosition = maxScroll;
-      }
-      
-      if (scrollViewRef.current) {
-        // Provide haptic feedback on bounce back
-        if (Platform.OS === 'ios') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        }
-        
-        scrollViewRef.current.scrollTo({ x: targetPosition, animated: true });
-      }
-    }
-  };
-  
-  // Function to make the ScrollView snap to the closest item
-  const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const position = event.nativeEvent.contentOffset.x;
-    const itemWidth = 320; // Approximate width of items including margin
-    const maxScroll = contentWidth - containerWidth;
-    
-    // Don't snap if we're at the edges
-    if (position <= 0 || position >= maxScroll) {
-      return;
-    }
-    
-    const targetPosition = Math.round(position / itemWidth) * itemWidth;
-    
-    // Only scroll if we're not already at the target
-    if (position !== targetPosition && scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ x: targetPosition, animated: true });
-      
-      // Provide haptic feedback on snap
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-    }
-  };
 
   // Handle pressing on an activity widget
   const handleActivityPress = (
@@ -346,11 +63,6 @@ const HomeScreen = () => {
       friendAvatar?: string;
     }
   ) => {
-    // Provide haptic feedback
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    
     // Set selected activity data
     setSelectedActivity({
       type,
@@ -1118,16 +830,13 @@ const HomeScreen = () => {
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Horizontal scroll for live widgets */}
+        {/* Horizontal scroll for live widgets - simplified without haptics/snap effects */}
         <View style={styles.scrollContainer} onLayout={handleContainerLayout}>
-          <Animated.ScrollView 
+          <ScrollView 
             ref={scrollViewRef}
             horizontal 
             showsHorizontalScrollIndicator={false}
             style={styles.horizontalWidgetContainer}
-            contentContainerStyle={{ 
-              transform: [{ translateX: shakeAnimation }]
-            }}
             onLayout={(event) => {
               // Measure the content width once the content is rendered
               const children = React.Children.count(renderFriendWatchingLive()) + 
@@ -1137,22 +846,15 @@ const HomeScreen = () => {
               handleContentLayout(children * 320);
             }}
             onScroll={handleScroll}
-            onScrollBeginDrag={handleScrollBeginDrag}
-            onScrollEndDrag={handleScrollEndDrag}
-            onMomentumScrollEnd={handleScrollEnd}
-            snapToInterval={320} // Approximate width of widget + margin
-            decelerationRate="normal"
-            snapToAlignment="start"
             scrollEventThrottle={16}
             bounces={true}
-            alwaysBounceHorizontal={true}
-            overScrollMode="always"
+            decelerationRate="normal"
           >
             {renderFriendWatchingLive()}
             {renderFriendHostingLive()}
             {renderFriendListeningMusic()}
             {renderRandomFriendWidgets()}
-          </Animated.ScrollView>
+          </ScrollView>
         </View>
         
         {/* Event Widget */}
