@@ -8,6 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import * as Haptics from 'expo-haptics';
 import CommonHeader from '../components/CommonHeader';
+import ActivityModal from '../components/ActivityModal';
+import PersonGroupIcon from '../components/PersonGroupIcon';
 
 // Use the router for navigation
 const HomeScreen = () => {
@@ -25,6 +27,20 @@ const HomeScreen = () => {
   const dragStartTime = useRef(0);
   const hapticInterval = useRef<NodeJS.Timeout | null>(null);
   const dragDistance = useRef(0);
+  
+  // Activity Modal states
+  const [activityModalVisible, setActivityModalVisible] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState({
+    type: 'watching' as 'watching' | 'hosting' | 'listening' | 'tournament',
+    title: '',
+    subtitle: '',
+    hostName: '',
+    hostAvatar: '',
+    viewerCount: 0,
+    avatars: [] as string[],
+    friendName: '',
+    friendAvatar: '',
+  });
   
   // Track if we're at the edges for the rubber band effect
   const isAtLeftEdge = useRef(false);
@@ -316,9 +332,69 @@ const HomeScreen = () => {
     }
   };
 
+  // Handle pressing on an activity widget
+  const handleActivityPress = (
+    type: 'watching' | 'hosting' | 'listening' | 'tournament',
+    data: {
+      title: string;
+      subtitle?: string;
+      hostName?: string;
+      hostAvatar?: string;
+      viewerCount?: number;
+      avatars?: string[];
+      friendName?: string;
+      friendAvatar?: string;
+    }
+  ) => {
+    // Provide haptic feedback
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    // Set selected activity data
+    setSelectedActivity({
+      type,
+      title: data.title,
+      subtitle: data.subtitle || '',
+      hostName: data.hostName || '',
+      hostAvatar: data.hostAvatar || '',
+      viewerCount: data.viewerCount || 0,
+      avatars: data.avatars || [],
+      friendName: data.friendName || '',
+      friendAvatar: data.friendAvatar || '',
+    });
+    
+    // Show modal
+    setActivityModalVisible(true);
+  };
+
+  // Close the activity modal
+  const closeActivityModal = () => {
+    setActivityModalVisible(false);
+  };
+
   const renderFriendWatchingLive = () => {
+    const activityData = {
+      title: 'Live Stream with Friends',
+      hostName: 'Sara',
+      hostAvatar: 'https://randomuser.me/api/portraits/women/32.jpg',
+      viewerCount: 1500,
+      friendName: 'Jessica',
+      friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
+      avatars: [
+        'https://randomuser.me/api/portraits/women/32.jpg',
+        'https://randomuser.me/api/portraits/women/33.jpg',
+        'https://randomuser.me/api/portraits/women/34.jpg',
+        'https://randomuser.me/api/portraits/men/32.jpg',
+        'https://randomuser.me/api/portraits/men/33.jpg',
+      ],
+    };
+
     return (
-      <TouchableOpacity style={styles.liveStreamContainer}>
+      <TouchableOpacity 
+        style={styles.liveStreamContainer}
+        onPress={() => handleActivityPress('watching', activityData)}
+      >
         {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
           <View style={styles.avatarWrapperRed}>
@@ -367,9 +443,26 @@ const HomeScreen = () => {
   };
 
   const renderFriendHostingLive = () => {
+    const activityData = {
+      title: 'Friday Night Live Stream',
+      hostName: 'Michael',
+      hostAvatar: 'https://randomuser.me/api/portraits/men/33.jpg',
+      viewerCount: 1240,
+      friendName: 'Michael',
+      friendAvatar: 'https://randomuser.me/api/portraits/men/33.jpg',
+      avatars: [
+        'https://randomuser.me/api/portraits/men/33.jpg',
+        'https://randomuser.me/api/portraits/women/32.jpg',
+        'https://randomuser.me/api/portraits/women/33.jpg',
+      ],
+    };
+
     return (
-      <TouchableOpacity style={styles.liveStreamContainer}>
-        {/* Left section with 4 avatars in a grid */}
+      <TouchableOpacity 
+        style={styles.liveStreamContainer}
+        onPress={() => handleActivityPress('hosting', activityData)}
+      >
+        {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
           <View style={styles.avatarWrapperRed}>
             <Image 
@@ -417,9 +510,22 @@ const HomeScreen = () => {
   };
 
   const renderFriendListeningMusic = () => {
+    const activityData = {
+      title: 'This Is Imagine Dragons',
+      subtitle: 'Playlist • Spotify',
+      friendName: 'Jamie',
+      friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
+      avatars: [
+        'https://randomuser.me/api/portraits/women/31.jpg',
+      ],
+    };
+    
     return (
-      <TouchableOpacity style={styles.musicStreamContainer}>
-        {/* Left section with album art and song info */}
+      <TouchableOpacity 
+        style={styles.musicStreamContainer}
+        onPress={() => handleActivityPress('listening', activityData)}
+      >
+        {/* Left section with album/playlist art */}
         <View style={styles.musicContentContainer}>
           <View style={styles.albumArtContainer}>
             <Image 
@@ -449,27 +555,47 @@ const HomeScreen = () => {
 
   // Additional random widgets
   const renderRandomFriendWidgets = () => {
+    // Create an array to hold random widgets
     const randomWidgets = [];
     
-    // Friend watching with busy status
+    // Sample data for a random live stream
+    const randomLiveData = {
+      title: 'Special Event Live',
+      hostName: 'David',
+      hostAvatar: 'https://randomuser.me/api/portraits/men/34.jpg',
+      viewerCount: 875,
+      friendName: 'Emma',
+      friendAvatar: 'https://randomuser.me/api/portraits/women/35.jpg',
+      avatars: [
+        'https://randomuser.me/api/portraits/men/34.jpg',
+        'https://randomuser.me/api/portraits/women/35.jpg',
+        'https://randomuser.me/api/portraits/men/36.jpg',
+      ],
+    };
+    
+    // Add a random live stream widget
     randomWidgets.push(
-      <TouchableOpacity key="random1" style={styles.liveStreamContainer}>
+      <TouchableOpacity 
+        key="random1" 
+        style={styles.liveStreamContainer}
+        onPress={() => handleActivityPress('watching', randomLiveData)}
+      >
         <View style={styles.avatarGrid}>
           <View style={styles.avatarWrapperRed}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/42.jpg' }} 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/34.jpg' }} 
               style={styles.gridAvatar}
             />
           </View>
           <View style={styles.avatarWrapperRed}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
+              source={{ uri: 'https://randomuser.me/api/portraits/women/35.jpg' }} 
               style={styles.gridAvatar}
             />
           </View>
           <View style={styles.avatarWrapperRed}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/36.jpg' }} 
               style={styles.gridAvatar}
             />
           </View>
@@ -480,15 +606,15 @@ const HomeScreen = () => {
         
         <View style={styles.streamInfoContainer}>
           <Text style={styles.streamTitle} numberOfLines={2}>
-            Gaming Tournament Finals
+            Special Event Live
           </Text>
-          <Text style={styles.viewersText}>5230 Viewers watching</Text>
+          <Text style={styles.viewersText}>875 Viewers watching</Text>
         </View>
         
         <View style={styles.broadcasterContainerWrapper}>
           <View style={styles.broadcasterContainer}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/men/41.jpg' }} 
+              source={{ uri: 'https://randomuser.me/api/portraits/men/34.jpg' }} 
               style={styles.broadcasterAvatar}
             />
             <View style={styles.liveIndicatorRed}></View>
@@ -1095,6 +1221,23 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </Card>
       </ScrollableContentContainer>
+      
+      {/* Activity Modal */}
+      <ActivityModal
+        visible={activityModalVisible}
+        onClose={closeActivityModal}
+        activityType={selectedActivity.type}
+        title={selectedActivity.title}
+        subtitle={selectedActivity.subtitle}
+        hostName={selectedActivity.hostName}
+        hostAvatar={selectedActivity.hostAvatar}
+        viewerCount={selectedActivity.viewerCount}
+        avatars={selectedActivity.avatars}
+        friendName={selectedActivity.friendName}
+        friendAvatar={selectedActivity.friendAvatar}
+        fuelRequired={15}
+        fuelAvailable={20}
+      />
     </SafeAreaView>
   );
 };

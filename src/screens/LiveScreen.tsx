@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, TextInput, Pressable, Modal } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, TextInput, Pressable, Modal, Platform } from 'react-native';
 import { Text, Avatar, Button, Badge, ProgressBar } from 'react-native-paper';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import * as Sensors from 'expo-sensors';
 import CommonHeader from '../components/CommonHeader';
+import ActivityModal from '../components/ActivityModal';
 
 interface Stream {
   id: number;
@@ -26,6 +27,20 @@ const LiveScreen = () => {
   const [inSpotlightQueue, setInSpotlightQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState(2);
   const [showSpotlightedUser, setShowSpotlightedUser] = useState(true); // Always show spotlighted user for demonstration
+  
+  // Activity Modal states
+  const [activityModalVisible, setActivityModalVisible] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState({
+    type: 'watching' as 'watching' | 'hosting' | 'listening' | 'tournament',
+    title: '',
+    subtitle: '',
+    hostName: '',
+    hostAvatar: '',
+    viewerCount: 0,
+    avatars: [] as string[],
+    friendName: '',
+    friendAvatar: '',
+  });
   
   // Timer state for the spotlight countdown
   const [remainingTime, setRemainingTime] = useState(261); // 4:21 in seconds
@@ -63,6 +78,52 @@ const LiveScreen = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Handle pressing on an activity widget
+  const handleActivityPress = (
+    type: 'watching' | 'hosting' | 'listening' | 'tournament',
+    data: {
+      title: string;
+      subtitle?: string;
+      hostName?: string;
+      hostAvatar?: string;
+      viewerCount?: number;
+      avatars?: string[];
+      friendName?: string;
+      friendAvatar?: string;
+    }
+  ) => {
+    // Provide haptic feedback if available
+    if (Platform.OS === 'ios' && require('expo-haptics')) {
+      try {
+        const Haptics = require('expo-haptics');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log('Haptics not available');
+      }
+    }
+    
+    // Set selected activity data
+    setSelectedActivity({
+      type,
+      title: data.title,
+      subtitle: data.subtitle || '',
+      hostName: data.hostName || '',
+      hostAvatar: data.hostAvatar || '',
+      viewerCount: data.viewerCount || 0,
+      avatars: data.avatars || [],
+      friendName: data.friendName || '',
+      friendAvatar: data.friendAvatar || '',
+    });
+    
+    // Show modal
+    setActivityModalVisible(true);
+  };
+
+  // Close the activity modal
+  const closeActivityModal = () => {
+    setActivityModalVisible(false);
   };
   
   // Circular progress component for spotlight
@@ -527,7 +588,25 @@ const LiveScreen = () => {
         
         <ScrollView>
           {liveStreams.map(stream => (
-            <View key={stream.id} style={styles.streamCard}>
+            <TouchableOpacity
+              key={stream.id}
+              style={styles.streamCard}
+              onPress={() => handleActivityPress('watching', {
+                title: stream.title,
+                hostName: stream.host,
+                hostAvatar: stream.avatar,
+                viewerCount: stream.views,
+                friendName: 'Your Friend',
+                friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
+                avatars: [
+                  stream.avatar,
+                  // Add some random avatars as additional viewers
+                  'https://randomuser.me/api/portraits/women/32.jpg',
+                  'https://randomuser.me/api/portraits/men/32.jpg',
+                  'https://randomuser.me/api/portraits/women/33.jpg',
+                ]
+              })}
+            >
               <View style={styles.streamThumbnailContainer}>
                 <View style={[
                   styles.rankBadge, 
@@ -573,7 +652,7 @@ const LiveScreen = () => {
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
@@ -621,6 +700,26 @@ const LiveScreen = () => {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      
+      {/* Activity Modal */}
+      <ActivityModal
+        visible={activityModalVisible}
+        onClose={closeActivityModal}
+        activityType={selectedActivity.type}
+        title={selectedActivity.title}
+        subtitle={selectedActivity.subtitle}
+        hostName={selectedActivity.hostName}
+        hostAvatar={selectedActivity.hostAvatar}
+        viewerCount={selectedActivity.viewerCount}
+        avatars={selectedActivity.avatars}
+        friendName={selectedActivity.friendName}
+        friendAvatar={selectedActivity.friendAvatar}
+        fuelRequired={25} // Higher fuel requirement for live streams
+        fuelAvailable={18} // Example where user doesn't have enough fuel
+      />
+      
+      {/* Spotlight Modal */}
+      {renderSpotlightModal()}
     </LinearGradient>
   );
 };
