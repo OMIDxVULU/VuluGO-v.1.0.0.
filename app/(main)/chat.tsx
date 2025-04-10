@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, BackHandler, Text, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack, useNavigation, useFocusEffect } from 'expo-router';
 import ChatScreen from '../../src/screens/ChatScreen';
-import SidebarMenu from '../../src/components/SidebarMenu';
 
 export default function Chat() {
   const router = useRouter();
@@ -135,9 +134,6 @@ export default function Chat() {
         goToDMs={goToDMs}
         source={source}
       />
-      
-      {/* Use empty callback to avoid re-renders */}
-      <SidebarMenu onMenuStateChange={() => {}} />
     </View>
   );
 }

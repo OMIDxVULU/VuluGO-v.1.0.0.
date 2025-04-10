@@ -1,18 +1,8 @@
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
+import React, { useState, useEffect, useRef, createContext, useContext, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, PanResponder, Easing, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
-import { IconButton, Text } from 'react-native-paper';
-// @ts-ignore
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RootStackParamList } from '../navigation/MainNavigator';
-// Import custom icon components
-import MessagesIcon from './icons/MessagesIcon';
-import LiveIcon from './icons/LiveIcon';
-import MusicIcon from './icons/MusicIcon';
-import RanksIcon from './icons/RanksIcon';
-import MiningIcon from './icons/MiningIcon';
-import ShopIcon from './icons/ShopIcon';
+import { IconButton } from 'react-native-paper';
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
@@ -44,66 +34,31 @@ interface MenuPositionContextType {
   setIsExpanded: (expanded: boolean) => void;
 }
 
-const MenuPositionContext = createContext<MenuPositionContextType>({
-  position: MAGNET_POSITIONS[2], // Default to Middle Left
-  updatePosition: () => {},
-  isExpanded: true,
-  setIsExpanded: () => {},
-});
+const DEFAULT_POSITION = MAGNET_POSITIONS[3]; // Middle right is the default
+
+const MenuPositionContext = createContext<MenuPositionContextType | null>(null);
 
 // Global provider component that should wrap the entire app
 export const MenuPositionProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  const [position, setPosition] = useState(MAGNET_POSITIONS[2]);
+  // Use in-memory state only - no AsyncStorage
+  const [position, setPosition] = useState<{x: number, y: number}>(DEFAULT_POSITION);
   const [isExpanded, setIsExpanded] = useState(true);
   
-  useEffect(() => {
-    // Load saved position and state on initial render
-    const loadSavedData = async () => {
-      try {
-        const savedPosition = await AsyncStorage.getItem('menuButtonPosition');
-        if (savedPosition) {
-          setPosition(JSON.parse(savedPosition));
-        }
-        
-        const savedExpandedState = await AsyncStorage.getItem('menuExpandedState');
-        if (savedExpandedState) {
-          setIsExpanded(JSON.parse(savedExpandedState));
-        }
-      } catch (error: unknown) {
-        console.log('Error loading menu data:', error);
-      }
-    };
-    
-    loadSavedData();
-  }, []);
-  
-  const updatePosition = (newPosition: {x: number, y: number}) => {
-    setPosition(newPosition);
-    // Save to AsyncStorage
-    AsyncStorage.setItem('menuButtonPosition', JSON.stringify(newPosition))
-      .catch((error: unknown) => console.log('Error saving menu position:', error));
-  };
-  
-  const updateExpandedState = (expanded: boolean) => {
-    setIsExpanded(expanded);
-    // Save to AsyncStorage
-    AsyncStorage.setItem('menuExpandedState', JSON.stringify(expanded))
-      .catch((error: unknown) => console.log('Error saving menu expanded state:', error));
-  };
-  
+  // Simple provider with direct state updates
   return (
-    <MenuPositionContext.Provider value={{ 
-      position, 
-      updatePosition, 
-      isExpanded, 
-      setIsExpanded: updateExpandedState 
-    }}>
+    <MenuPositionContext.Provider 
+      value={{
+        position,
+        updatePosition: setPosition,
+        isExpanded,
+        setIsExpanded
+      }}
+    >
       {children}
     </MenuPositionContext.Provider>
   );
 };
 
-// Hook to access the menu position context
 export const useMenuPosition = () => useContext(MenuPositionContext);
 
 const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
@@ -113,99 +68,112 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   // Get both position and expanded state from context
   const menuPositionContext = useContext(MenuPositionContext);
   
-  // Button position from context
-  const buttonPosition = menuPositionContext ? menuPositionContext.position : MAGNET_POSITIONS[3];
-  const setButtonPosition = menuPositionContext ? menuPositionContext.updatePosition : 
-    (pos: {x: number, y: number}) => {
-      AsyncStorage.setItem('menuButtonPosition', JSON.stringify(pos))
-        .catch((error: unknown) => console.log('Error saving menu position:', error));
-    };
+  // Use simple refs instead of state
+  const isExpandedRef = useRef(menuPositionContext?.isExpanded || false);
   
-  // Menu expanded state from context
-  const isExpanded = menuPositionContext ? menuPositionContext.isExpanded : true;
-  const setIsExpanded = menuPositionContext ? menuPositionContext.setIsExpanded :
-    (expanded: boolean) => {
-      AsyncStorage.setItem('menuExpandedState', JSON.stringify(expanded))
-        .catch((error: unknown) => console.log('Error saving menu expanded state:', error));
-    };
+  // References
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const buttonRef = useRef<View>(null);
+  const isDraggingRef = useRef(false);
   
-  // Animation values
-  const slideAnim = useRef(new Animated.Value(isExpanded ? 65 : 0)).current;
-  const buttonScale = useRef(new Animated.Value(1)).current;
+  // Create a ref to store initial position for drag
+  const initialPositionRef = useRef({ x: 0, y: 0 });
   
-  const [isDragging, setIsDragging] = useState(false);
-  
-  // References for drag calculations
-  const touchOffset = useRef({ x: 0, y: 0 });
-  
-  // Menu items with custom icon components
-  const menuItems = [
-    { 
-      id: '1', 
-      name: 'Messages', 
-      route: 'directmessages', 
-      badge: '5',
-      description: 'Chat with friends',
-      icon: (color: string, active: boolean) => <MessagesIcon color={color} size={24} active={active} />
-    },
-    { 
-      id: '2', 
-      name: 'Live', 
-      route: 'live', 
-      badge: '3',
-      description: 'Watch livestreams',
-      icon: (color: string, active: boolean) => <LiveIcon color={color} size={24} active={active} />
-    },
-    { 
-      id: '3', 
-      name: 'Music', 
-      route: 'music',
-      description: 'Listen to music',
-      icon: (color: string, active: boolean) => <MusicIcon color={color} size={24} active={active} />
-    },
-    { 
-      id: '4', 
-      name: 'Ranks', 
-      route: 'leaderboard',
-      description: 'View leaderboard',
-      icon: (color: string, active: boolean) => <RanksIcon color={color} size={24} active={active} />
-    },
-    { 
-      id: '5', 
-      name: 'Mining', 
-      route: 'mining',
-      description: 'Mine gold',
-      icon: (color: string, active: boolean) => <MiningIcon color={color} size={24} active={active} />
-    },
-    { 
-      id: '6', 
-      name: 'Shop', 
-      route: 'shop',
-      description: 'Buy items',
-      icon: (color: string, active: boolean) => <ShopIcon color={color} size={24} active={active} />
+  // Set isExpanded from context on mount
+  useEffect(() => {
+    if (menuPositionContext) {
+      isExpandedRef.current = menuPositionContext.isExpanded;
+      slideAnim.setValue(menuPositionContext.isExpanded ? 65 : 0);
     }
+  }, []);
+  
+  // Determine active menu item based on current route
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  // Define menu items
+  const menuItems = [
+    {
+      id: 'home',
+      route: 'index',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="home" size={24} color={color} />,
+      label: 'Home',
+    },
+    {
+      id: 'live',
+      route: 'live',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="live-tv" size={24} color={color} />,
+      label: 'Live',
+      badge: 2,
+    },
+    {
+      id: 'chat',
+      route: 'directmessages',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="chat" size={24} color={color} />,
+      label: 'Messages',
+      badge: 5,
+    },
+    {
+      id: 'notifications',
+      route: 'notifications',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="notifications" size={24} color={color} />,
+      label: 'Notifications',
+      badge: 3,
+    },
+    {
+      id: 'profile',
+      route: 'profile',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="person" size={24} color={color} />,
+      label: 'Profile',
+    },
+    {
+      id: 'music',
+      route: 'music',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="music-note" size={24} color={color} />,
+      label: 'Music',
+    },
+    {
+      id: 'shop',
+      route: 'shop',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="shopping-cart" size={24} color={color} />,
+      label: 'Shop',
+      badge: 1,
+    },
+    {
+      id: 'leaderboard',
+      route: 'leaderboard',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="leaderboard" size={24} color={color} />,
+      label: 'Leaderboard',
+    },
+    {
+      id: 'account',
+      route: 'account',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="settings" size={24} color={color} />,
+      label: 'Settings',
+    },
   ];
   
-  // Get total notifications
-  const getTotalNotifications = () => {
-    return menuItems.reduce((total, item) => {
-      return total + (item.badge ? parseInt(item.badge) : 0);
-    }, 0);
+  // Calculate total notifications with useMemo instead of state + useEffect
+  const totalNotifications = useMemo(() => {
+    return menuItems.reduce((acc, item) => acc + (item.badge || 0), 0);
+  }, [menuItems]);
+  
+  // Set active index based on current route
+  useEffect(() => {
+    const index = getActiveIndex();
+    setActiveIndex(index);
+  }, [pathname]);
+  
+  // Get active index based on current route
+  const getActiveIndex = () => {
+    if (!pathname) return 0;
+    
+    const index = menuItems.findIndex(item => {
+      return pathname.includes(item.route);
+    });
+    
+    return index >= 0 ? index : 0;
   };
   
-  const totalNotifications = getTotalNotifications();
-
-  // Check which menu item is active based on current route
-  const getActiveIndex = () => {
-    if (!pathname) return -1;
-    
-    const routeName = pathname.split('/').pop();
-    const index = menuItems.findIndex(item => item.route === routeName);
-    return index;
-  };
-
-  const activeIndex = getActiveIndex();
-
   // Find the closest magnet position
   const getClosestMagnetPosition = (x: number, y: number) => {
     let closestPosition = MAGNET_POSITIONS[0];
@@ -234,100 +202,172 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     };
   };
 
-  // Pan responder for dragging
+  // Pan responder for dragging the button
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       
-      onPanResponderGrant: (evt) => {
-        // Store where in the button the user touched
-        touchOffset.current = {
-          x: evt.nativeEvent.locationX || 0,
-          y: evt.nativeEvent.locationY || 0
-        };
+      // Store initial position when drag starts
+      onPanResponderGrant: (evt, gestureState) => {
+        isDraggingRef.current = true;
         
         // Scale up the button for visual feedback
-        Animated.spring(buttonScale, {
-          toValue: 1.15,
-          useNativeDriver: true,
-          friction: 7
-        }).start();
-        
-        setIsDragging(true);
+        if (buttonRef.current) {
+          buttonRef.current.setNativeProps({
+            style: {
+              transform: [{ scale: 1.1 }]
+            }
+          });
+        }
       },
       
-      onPanResponderMove: (evt) => {
-        // Calculate position so the touch point remains under the finger
-        const newX = evt.nativeEvent.pageX - touchOffset.current.x;
-        const newY = evt.nativeEvent.pageY - touchOffset.current.y;
+      onPanResponderMove: (evt, gestureState) => {
+        if (!buttonRef.current) return;
+        
+        // Get absolute position from gesture (pageX/Y includes the touch position)
+        const touchX = evt.nativeEvent.pageX;
+        const touchY = evt.nativeEvent.pageY;
+        
+        // Calculate button position (centered on touch)
+        const buttonX = touchX - (BUTTON_SIZE / 2);
+        const buttonY = touchY - (BUTTON_SIZE / 2);
         
         // Apply boundary constraints
-        const boundedPosition = keepWithinBoundaries(newX, newY);
+        const bounded = keepWithinBoundaries(buttonX, buttonY);
         
-        // Update button position immediately through context
-        setButtonPosition(boundedPosition);
+        // Update button position
+        buttonRef.current.setNativeProps({
+          style: {
+            left: bounded.x,
+            top: bounded.y
+          }
+        });
       },
       
-      onPanResponderRelease: (evt) => {
-        // Get the final position
-        const finalX = evt.nativeEvent.pageX - touchOffset.current.x;
-        const finalY = evt.nativeEvent.pageY - touchOffset.current.y;
+      onPanResponderRelease: (evt, gestureState) => {
+        if (!buttonRef.current) return;
+        
+        // Get final touch position
+        const touchX = evt.nativeEvent.pageX;
+        const touchY = evt.nativeEvent.pageY;
+        
+        // Calculate button position (centered on touch)
+        const buttonX = touchX - (BUTTON_SIZE / 2);
+        const buttonY = touchY - (BUTTON_SIZE / 2);
         
         // Apply boundary constraints
-        const boundedPosition = keepWithinBoundaries(finalX, finalY);
+        const bounded = keepWithinBoundaries(buttonX, buttonY);
         
         // Find the closest magnetic position
-        const closestPosition = getClosestMagnetPosition(
-          boundedPosition.x, 
-          boundedPosition.y
-        );
+        const targetPosition = getClosestMagnetPosition(bounded.x, bounded.y);
         
-        // Scale down the button for visual feedback
-        Animated.spring(buttonScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 5
-        }).start();
+        // Scale back down
+        buttonRef.current.setNativeProps({
+          style: {
+            transform: [{ scale: 1.0 }]
+          }
+        });
         
-        // Update button position to snap to closest position through context
-        setButtonPosition(closestPosition);
+        // Animate to the target position
+        let startTime = Date.now();
+        const duration = 300;
         
-        setIsDragging(false);
+        const animateToTarget = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Ease out cubic function: 1 - (1 - progress)^3
+          const easedProgress = 1 - Math.pow(1 - progress, 3);
+          
+          // Calculate intermediate position
+          const x = bounded.x + (targetPosition.x - bounded.x) * easedProgress;
+          const y = bounded.y + (targetPosition.y - bounded.y) * easedProgress;
+          
+          // Update button position
+          if (buttonRef.current) {
+            buttonRef.current.setNativeProps({
+              style: { left: x, top: y }
+            });
+          }
+          
+          if (progress < 1) {
+            requestAnimationFrame(animateToTarget);
+          } else {
+            // Final position update
+            if (buttonRef.current) {
+              buttonRef.current.setNativeProps({
+                style: {
+                  left: targetPosition.x,
+                  top: targetPosition.y
+                }
+              });
+            }
+            
+            // Update context with final position
+            if (menuPositionContext) {
+              menuPositionContext.updatePosition(targetPosition);
+            }
+            
+            isDraggingRef.current = false;
+          }
+        };
+        
+        // Start animation
+        requestAnimationFrame(animateToTarget);
       }
     })
   ).current;
 
-  // Animate sidebar width when isExpanded changes
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: isExpanded ? 65 : 0,
-      duration: 300,
-      useNativeDriver: false, // For width animation
-      easing: (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
-    }).start();
+  // Toggle expand/collapse
+  const toggleExpand = () => {
+    if (isDraggingRef.current || !menuPositionContext) return;
     
-    // Animate button scale for visual feedback
-    Animated.spring(buttonScale, {
-      toValue: isExpanded ? 0 : 1,
-      useNativeDriver: true,
-      friction: 5,
-      tension: 40
+    const newIsExpanded = !isExpandedRef.current;
+    isExpandedRef.current = newIsExpanded;
+    
+    // Update context
+    menuPositionContext.setIsExpanded(newIsExpanded);
+    
+    // Animate sidebar width
+    Animated.timing(slideAnim, {
+      toValue: newIsExpanded ? 65 : 0,
+      duration: 300,
+      useNativeDriver: false,
+      easing: (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
     }).start();
     
     // Notify parent if callback exists
     if (onMenuStateChange) {
-      onMenuStateChange(isExpanded);
+      onMenuStateChange(newIsExpanded);
     }
-  }, [isExpanded, slideAnim, buttonScale, onMenuStateChange]);
-
-  // Handle expand/collapse toggle
-  const toggleExpand = () => {
-    if (isDragging) return; // Don't toggle during drag
-    
-    const newState = !isExpanded;
-    setIsExpanded(newState);
   };
+  
+  // When context isExpanded changes
+  useEffect(() => {
+    if (menuPositionContext) {
+      // Only update the ref and animate if the value has actually changed
+      if (isExpandedRef.current !== menuPositionContext.isExpanded) {
+        isExpandedRef.current = menuPositionContext.isExpanded;
+        
+        // Animate sidebar width
+        Animated.timing(slideAnim, {
+          toValue: menuPositionContext.isExpanded ? 65 : 0,
+          duration: 300,
+          useNativeDriver: false,
+          easing: (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
+        }).start();
+        
+        // Notify parent if callback exists
+        if (onMenuStateChange) {
+          onMenuStateChange(menuPositionContext.isExpanded);
+        }
+      }
+    }
+  }, [menuPositionContext?.isExpanded, onMenuStateChange]);
+
+  // Get current expanded state
+  const isExpanded = menuPositionContext?.isExpanded || false;
 
   return (
     <View style={styles.sidebarContainer}>
@@ -394,37 +434,39 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       
       {/* Draggable toggle button (only visible when menu is collapsed) */}
       {!isExpanded && (
-        <Animated.View
+        <View
+          ref={buttonRef}
           style={[
             styles.floatingToggleContainer,
             {
-              left: buttonPosition.x,
-              top: buttonPosition.y,
-              transform: [{ scale: buttonScale }]
+              left: menuPositionContext?.position.x || DEFAULT_POSITION.x,
+              top: menuPositionContext?.position.y || DEFAULT_POSITION.y,
             }
           ]}
           {...panResponder.panHandlers}
         >
           <TouchableOpacity
-            onPress={!isDragging ? toggleExpand : undefined}
+            onPress={!isDraggingRef.current ? toggleExpand : undefined}
             activeOpacity={0.7}
             style={styles.floatingButtonTouchable}
           >
-            <IconButton
-              icon="chevron-right"
-              iconColor="white"
-              size={24}
-              style={styles.toggleButton}
-              mode="contained"
-              containerColor="#6E69F4"
-            />
-            {totalNotifications > 0 && !isDragging && (
+            <View style={styles.iconButtonWrapper}>
+              <IconButton
+                icon="chevron-right"
+                iconColor="white"
+                size={24}
+                style={styles.toggleButton}
+                mode="contained"
+                containerColor="#6E69F4"
+              />
+            </View>
+            {totalNotifications > 0 && (
               <View style={styles.toggleNotificationBadge}>
                 <Text style={styles.toggleNotificationText}>{totalNotifications}</Text>
               </View>
             )}
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       )}
     </View>
   );
@@ -589,6 +631,11 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     margin: 0,
+    padding: 0,
+  },
+  iconButtonWrapper: {
+    borderRadius: 16,
+    overflow: 'visible',
   },
   toggleNotificationBadge: {
     position: 'absolute',
