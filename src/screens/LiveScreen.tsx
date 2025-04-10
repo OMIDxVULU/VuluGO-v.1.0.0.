@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView, TextInput, Pressable, Modal, Platform } from 'react-native';
 import { Text, Avatar, Button, Badge, ProgressBar } from 'react-native-paper';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -47,6 +47,14 @@ const LiveScreen = () => {
   const [percentage, setPercentage] = useState(65);
   const initialTime = useRef(261); // 4:21 in seconds (initial value)
   const timer = useRef<NodeJS.Timeout | null>(null);
+  
+  // Continuous animation phase refs (moved outside the component to persist)
+  const animationPhaseRef = useRef({
+    phase1: 0,
+    phase2: Math.PI / 4,
+    phase3: Math.PI * 1.5,
+    lastTimestamp: 0
+  });
 
   // Start the countdown animation when component mounts
   useEffect(() => {
@@ -150,7 +158,7 @@ const LiveScreen = () => {
     );
   };
   
-  // Water animation component that creates natural fluid movement
+  // Water animation component with pure imperative animation (no React state updates)
   const WaterFlowAnimation = ({ 
     progress, 
     colors = ['#34C759', '#206E3E'] 
@@ -158,47 +166,27 @@ const LiveScreen = () => {
     progress: number;
     colors?: string[];
   }) => {
-    // Use multiple phase values for smoother transitions
-    const [phase1, setPhase1] = useState(0);
-    const [phase2, setPhase2] = useState(Math.PI / 4); // Start offset for second wave
+    // Create refs for SVG paths that will be directly manipulated (using correct types)
+    const path1Ref = useRef<any>(null);
+    const path2Ref = useRef<any>(null);
+    const path3Ref = useRef<any>(null);
     
-    useEffect(() => {
-      // Use requestAnimationFrame for smoother animation
-      let animationFrame: number;
-      let lastTime = 0;
-      
-      const animate = (time: number) => {
-        if (lastTime === 0) {
-          lastTime = time;
-        }
-        
-        const delta = time - lastTime;
-        const increment = delta * 0.0015; // Smaller increment for smoother motion
-        
-        // Update phases with different speeds for more natural movement
-        setPhase1(prev => (prev + increment) % (2 * Math.PI));
-        setPhase2(prev => (prev + increment * 0.8) % (2 * Math.PI));
-        
-        lastTime = time;
-        animationFrame = requestAnimationFrame(animate);
-      };
-      
-      animationFrame = requestAnimationFrame(animate);
-      
-      return () => {
-        cancelAnimationFrame(animationFrame);
-      };
-    }, []);
-
-    const createWavePath = (phase: number, baseHeight: number, amplitude: number, frequency: number) => {
+    // Create animation frame ref
+    const animFrameRef = useRef<number | null>(null);
+    
+    // Use the external animation phase ref to maintain continuous animation
+    const phaseRef = animationPhaseRef.current;
+    
+    // Create wave path using pure JS (not React state)
+    const createWavePath = useCallback((phase: number, baseHeight: number, amplitude: number, frequency: number): string => {
       const width = 100;
       const height = baseHeight;
       
       // Start the path below the view to avoid visible gaps
       let path = `M -5 105`;
       
-      // Create the wave effect with more points for smoother curve
-      for (let x = -5; x <= width + 5; x += 1) {
+      // Create the wave effect with lots of points for ultra-smooth curve
+      for (let x = -5; x <= width + 5; x += 0.2) { // More points for smoother curve
         const y = 100 - height + Math.sin(x / frequency + phase) * amplitude;
         path += ` L ${x} ${y}`;
       }
@@ -206,7 +194,61 @@ const LiveScreen = () => {
       // Close the path by extending beyond the visible area
       path += ` L ${width + 5} 105 L -5 105 Z`;
       return path;
-    };
+    }, []);
+    
+    // This effect sets up the animation loop and directly manipulates the DOM
+    useEffect(() => {
+      // Initial animation timestamp reference
+      let lastTimestamp = 0;
+      
+      // Animation function that updates SVG paths directly without React re-renders
+      const animate = (timestamp: number) => {
+        if (!lastTimestamp) {
+          lastTimestamp = timestamp;
+        }
+        
+        // Calculate time delta (smoother animation)
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        lastTimestamp = timestamp;
+        
+        // Update phases with continuous movement (never resetting)
+        // Use very small increments for smooth movement
+        phaseRef.phase1 = (phaseRef.phase1 + deltaTime * 0.3) % (2 * Math.PI);
+        phaseRef.phase2 = (phaseRef.phase2 + deltaTime * 0.2) % (2 * Math.PI);
+        phaseRef.phase3 = (phaseRef.phase3 + deltaTime * 0.25) % (2 * Math.PI);
+        
+        // Directly update the SVG path attributes without React state
+        // Using setNativeProps for direct DOM manipulation without re-renders
+        if (path1Ref.current) {
+          path1Ref.current.setNativeProps({
+            d: createWavePath(phaseRef.phase1, progress, 3, 12)
+          });
+        }
+        if (path2Ref.current) {
+          path2Ref.current.setNativeProps({
+            d: createWavePath(phaseRef.phase2, Math.max(0, progress - 5), 2.5, 8)
+          });
+        }
+        if (path3Ref.current) {
+          path3Ref.current.setNativeProps({
+            d: createWavePath(phaseRef.phase3, Math.max(0, progress - 2), 1, 6)
+          });
+        }
+        
+        // Continue animation loop
+        animFrameRef.current = requestAnimationFrame(animate);
+      };
+      
+      // Start animation
+      animFrameRef.current = requestAnimationFrame(animate);
+      
+      // Cleanup animation frame on unmount
+      return () => {
+        if (animFrameRef.current) {
+          cancelAnimationFrame(animFrameRef.current);
+        }
+      };
+    }, [progress, createWavePath]);
 
     return (
       <View style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: 14 }]}>
@@ -226,21 +268,24 @@ const LiveScreen = () => {
             </SvgLinearGradient>
           </Defs>
           
-          {/* Main wave layer */}
+          {/* Main wave layer - with direct setNativeProps for manipulation */}
           <Path
-            d={createWavePath(phase1, progress, 3, 12)}
+            ref={path1Ref}
+            d="M -5 105 L 100 105 L -5 105 Z" // Initial empty path
             fill="url(#waterGradient)"
           />
           
-          {/* Second wave layer with different phase */}
+          {/* Second wave layer - with direct setNativeProps for manipulation */}
           <Path
-            d={createWavePath(phase2, Math.max(0, progress - 5), 2.5, 8)}
+            ref={path2Ref}
+            d="M -5 105 L 100 105 L -5 105 Z" // Initial empty path
             fill="url(#waterGradient2)"
           />
           
-          {/* Third small ripple layer on top for extra detail */}
+          {/* Third wave layer - with direct setNativeProps for manipulation */}
           <Path
-            d={createWavePath(phase1 * 1.5, Math.max(0, progress - 2), 1, 6)}
+            ref={path3Ref}
+            d="M -5 105 L 100 105 L -5 105 Z" // Initial empty path 
             fill="url(#waterGradient3)"
           />
         </Svg>
