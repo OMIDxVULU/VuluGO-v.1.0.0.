@@ -16,14 +16,14 @@ const expandedWidth = 70; // Smaller width of expanded sidebar
 const collapsedWidth = 0; // Width of collapsed sidebar
 const BUTTON_SIZE = 50; // Button width/height
 
-// Define six magnetic positions
+// Define six magnetic positions with different pull strengths
 const MAGNET_POSITIONS = [
-  { x: 10, y: SAFE_TOP + 16 },                           // Top Left
-  { x: width - BUTTON_SIZE - 10, y: SAFE_TOP + 16 },     // Top Right
-  { x: 10, y: Math.floor(height/2 - BUTTON_SIZE/2) },    // Middle Left
-  { x: width - BUTTON_SIZE - 10, y: Math.floor(height/2 - BUTTON_SIZE/2) }, // Middle Right
-  { x: 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10 }, // Bottom Left
-  { x: width - BUTTON_SIZE - 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10 } // Bottom Right
+  { x: 10, y: SAFE_TOP + 16, pullStrength: 0.8 },                           // Top Left
+  { x: width - BUTTON_SIZE - 10, y: SAFE_TOP + 16, pullStrength: 0.8 },     // Top Right
+  { x: 10, y: Math.floor(height/2 - BUTTON_SIZE/2), pullStrength: 0.8 },    // Middle Left
+  { x: width - BUTTON_SIZE - 10, y: Math.floor(height/2 - BUTTON_SIZE/2), pullStrength: 1.0 }, // Middle Right (stronger)
+  { x: 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10, pullStrength: 0.8 }, // Bottom Left
+  { x: width - BUTTON_SIZE - 10, y: height - SAFE_BOTTOM - BUTTON_SIZE - 10, pullStrength: 0.8 } // Bottom Right
 ];
 
 // Create a global context to store the menu button position and expanded state
@@ -76,8 +76,8 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   const buttonRef = useRef<View>(null);
   const isDraggingRef = useRef(false);
   
-  // Create a ref to store initial position for drag
-  const initialPositionRef = useRef({ x: 0, y: 0 });
+  // Create a ref to store initial position for drag with time information
+  const initialPositionRef = useRef<{ x: number; y: number; time?: number }>({ x: 0, y: 0 });
   
   // Set isExpanded from context on mount
   useEffect(() => {
@@ -174,24 +174,58 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     return index >= 0 ? index : 0;
   };
   
-  // Find the closest magnet position
-  const getClosestMagnetPosition = (x: number, y: number) => {
-    let closestPosition = MAGNET_POSITIONS[0];
-    let minDistance = Number.MAX_VALUE;
+  // Find the best magnetic position based on position, velocity and direction
+  const getBestMagnetPosition = (x: number, y: number, vx: number, vy: number) => {
+    // If velocity is high enough, prefer the magnet in the direction of movement
+    const velocity = Math.sqrt(vx * vx + vy * vy);
+    const isThrow = velocity > 0.5; // Consider it a "throw" if velocity is above threshold
+    
+    let bestPosition = MAGNET_POSITIONS[0];
+    let minScore = Number.MAX_VALUE;
     
     MAGNET_POSITIONS.forEach(position => {
+      // Calculate distance score
       const distance = Math.sqrt(
         Math.pow(position.x - x, 2) + 
         Math.pow(position.y - y, 2)
       );
       
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestPosition = position;
+      // Base score is distance
+      let score = distance / position.pullStrength;
+      
+      if (isThrow) {
+        // For throws, factor in direction
+        // Calculate the dot product to determine if we're moving toward this position
+        // (simplified - just check if we're moving in the general direction)
+        const dirX = position.x - x;
+        const dirY = position.y - y;
+        const dirLength = Math.sqrt(dirX * dirX + dirY * dirY);
+        
+        // Normalize direction vector
+        const normDirX = dirX / dirLength;
+        const normDirY = dirY / dirLength;
+        
+        // Normalize velocity vector
+        const normVx = vx / velocity;
+        const normVy = vy / velocity;
+        
+        // Dot product tells us how aligned the vectors are (-1 to 1)
+        // 1 means perfectly aligned, -1 means opposite directions
+        const dotProduct = (normDirX * normVx) + (normDirY * normVy);
+        
+        // Adjust score based on direction alignment
+        // If we're moving toward this magnet, reduce score (make it more attractive)
+        // If we're moving away, increase score (make it less attractive)
+        score = score * (1.0 - dotProduct);
+      }
+      
+      if (score < minScore) {
+        minScore = score;
+        bestPosition = position;
       }
     });
     
-    return closestPosition;
+    return bestPosition;
   };
   
   // Keep position within screen boundaries
@@ -208,9 +242,16 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       
-      // Store initial position when drag starts
+      // Store initial position and time when drag starts
       onPanResponderGrant: (evt, gestureState) => {
         isDraggingRef.current = true;
+        
+        // Track last positions and times for velocity calculation
+        initialPositionRef.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY,
+          time: Date.now()
+        };
         
         // Scale up the button for visual feedback
         if (buttonRef.current) {
@@ -225,7 +266,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       onPanResponderMove: (evt, gestureState) => {
         if (!buttonRef.current) return;
         
-        // Get absolute position from gesture (pageX/Y includes the touch position)
+        // Get absolute position from gesture
         const touchX = evt.nativeEvent.pageX;
         const touchY = evt.nativeEvent.pageY;
         
@@ -236,13 +277,20 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         // Apply boundary constraints
         const bounded = keepWithinBoundaries(buttonX, buttonY);
         
-        // Update button position
+        // Update button position - follow finger exactly during drag
         buttonRef.current.setNativeProps({
           style: {
             left: bounded.x,
             top: bounded.y
           }
         });
+        
+        // Update position and time for velocity calculation
+        initialPositionRef.current = {
+          x: touchX,
+          y: touchY,
+          time: Date.now()
+        };
       },
       
       onPanResponderRelease: (evt, gestureState) => {
@@ -259,8 +307,16 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         // Apply boundary constraints
         const bounded = keepWithinBoundaries(buttonX, buttonY);
         
-        // Find the closest magnetic position
-        const targetPosition = getClosestMagnetPosition(bounded.x, bounded.y);
+        // Calculate velocity for throw physics
+        // We'll use gestureState.vx and gestureState.vy which are in points/ms
+        
+        // Find the best magnetic position based on position, velocity and direction
+        const targetPosition = getBestMagnetPosition(
+          bounded.x, 
+          bounded.y, 
+          gestureState.vx, 
+          gestureState.vy
+        );
         
         // Scale back down
         buttonRef.current.setNativeProps({
