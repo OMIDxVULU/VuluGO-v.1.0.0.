@@ -345,9 +345,10 @@ const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
 };
 
 const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScreenProps) => {
-  // State for error handling
-  const [renderError, setRenderError] = useState(false);
+  // Use the imported router
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [renderError, setRenderError] = useState(false);
+  const [isCloseFriend, setIsCloseFriend] = useState(false);
   
   // Create animations for the swipe back gesture
   const [backgroundOpacity] = useState(new Animated.Value(0));
@@ -439,7 +440,7 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScree
       router.push('/(main)/notifications');
     } else if (goToDMs) {
       goToDMs();
-            } else {
+    } else {
       goBack();
     }
   }, [source, goBack, goToDMs, router]);
@@ -549,23 +550,30 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScree
       scrollToBottom();
     }, 100);
   };
-    
-    return (
+
+  // Toggle close friend status
+  const handleToggleCloseFriend = () => {
+    setIsCloseFriend(prev => !prev);
+    // Here you would typically update this in your backend or local storage
+    // For now, we'll just toggle the state
+  };
+
+  return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1D1E26" />
       
       {/* Background for swipe gesture */}
-            <Animated.View
-              style={[
+      <Animated.View
+        style={[
           styles.navigationBackground,
           { opacity: backgroundOpacity }
         ]}
       >
         <MaterialIcons name="arrow-back" size={30} color="#FFF" style={styles.backIcon} />
-            </Animated.View>
+      </Animated.View>
       
       {/* Swipeable Screen Content */}
-    <Animated.View 
+      <Animated.View 
         style={[styles.screenContent, screenTransform]} 
         {...panResponder.panHandlers}
       >
@@ -574,9 +582,11 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScree
           name={name}
           avatar={avatar}
           status="online"
+          isCloseFriend={isCloseFriend}
           onBack={handleNavigation}
           onProfile={() => {}}
           onOptions={() => {}}
+          onToggleCloseFriend={handleToggleCloseFriend}
         />
         
         {/* Live Chat Preview - if needed */}
@@ -590,15 +600,15 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScree
             <Text style={styles.errorText}>Something went wrong</Text>
             <TouchableOpacity onPress={handleNavigation} style={styles.errorButton}>
               <Text style={styles.errorButtonText}>Return to Messages</Text>
-                        </TouchableOpacity>
-                      </View>
+            </TouchableOpacity>
+          </View>
         ) : (
           safeRenderMessages()
         )}
         
         {/* Message Input Bar */}
         <ChatFooter onSendMessage={handleSendMessage} />
-    </Animated.View>
+      </Animated.View>
     </View>
   );
 };

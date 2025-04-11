@@ -15,7 +15,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CommonHeader from '../components/CommonHeader';
 
@@ -35,20 +35,19 @@ interface ChatPreview {
   isTyping?: boolean; // Whether the user is typing
   isPinned?: boolean; // Whether the chat is pinned
   isMuted?: boolean; // Whether the chat is muted
+  isCloseFriend?: boolean; // Whether the user is a close friend
 }
 
 // Updated Sample data based on Figma structure
 const DUMMY_CHATS: ChatPreview[] = [
   {
     id: '1',
-    name: 'Sophia',
-    lastMessage: 'Luna: Help me!',
-    timestamp: '44m',
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
+    name: 'Sophia Anderson',
+    lastMessage: "Sure, let me know when you're free!",
+    timestamp: '5m',
+    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
     status: 'online',
-    level: 48,
-    unreadCount: 3,
-    isPinned: true,
+    isCloseFriend: true,
   },
   {
     id: '2',
@@ -323,6 +322,9 @@ const DirectMessagesScreen = () => {
         <View style={styles.chatItemInfo}>
           <View style={styles.chatItemNameRow}>
             <Text style={styles.chatItemName}>{item.name}</Text>
+            {item.isCloseFriend && (
+              <AntDesign name="star" size={14} color="#FFD700" style={styles.starIcon} />
+            )}
             {item.level && (
               <View style={styles.chatItemLevelContainer}>
                 <MaterialIcons name="local-fire-department" size={14} color="#FF9500" />
@@ -753,6 +755,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  starIcon: {
+    marginLeft: 6,
   },
 });
 

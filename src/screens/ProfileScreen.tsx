@@ -654,19 +654,37 @@ const ProfileScreen = () => {
             
             {/* Toggle for Close Friends Only - Only shown for Mood statuses */}
             {statusCategory === STATUS_CATEGORIES.MOOD && (
-              <View style={styles.closeFriendsToggle}>
-                <Text style={styles.closeFriendsText}>Visible to close friends only</Text>
+              <View style={styles.closeFriendsSection}>
+                <View style={styles.closeFriendsToggle}>
+                  <Text style={styles.closeFriendsText}>Visible to close friends only</Text>
+                  <TouchableOpacity 
+                    style={[
+                      styles.toggleButton,
+                      closefriendsOnly && styles.toggleButtonActive
+                    ]}
+                    onPress={() => setClosefriendsOnly(!closefriendsOnly)}
+                  >
+                    <View style={[
+                      styles.toggleCircle,
+                      closefriendsOnly && styles.toggleCircleActive
+                    ]} />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Manage Close Friends Button */}
                 <TouchableOpacity 
-                  style={[
-                    styles.toggleButton,
-                    closefriendsOnly && styles.toggleButtonActive
-                  ]}
-                  onPress={() => setClosefriendsOnly(!closefriendsOnly)}
+                  style={styles.manageFriendsButton}
+                  onPress={() => {
+                    console.log("Navigating to Close Friends screen");
+                    hideStatusMenu();
+                    router.push({
+                      pathname: '/(main)/close-friends',
+                      params: { source: '/(main)/profile' }
+                    });
+                  }}
                 >
-                  <View style={[
-                    styles.toggleCircle,
-                    closefriendsOnly && styles.toggleCircleActive
-                  ]} />
+                  <Text style={styles.manageFriendsText}>Manage Close Friends</Text>
+                  <Feather name="chevron-right" size={16} color="#6E69F4" />
                 </TouchableOpacity>
               </View>
             )}
@@ -1487,15 +1505,18 @@ const styles = StyleSheet.create({
   categoryButtonTextActive: {
     color: '#FFFFFF',
   },
+  closeFriendsSection: {
+    marginBottom: 15,
+  },
   closeFriendsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
     backgroundColor: '#292B31',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
     borderRadius: 12,
+    marginBottom: 10,
   },
   closeFriendsText: {
     color: '#FFFFFF',
@@ -1520,6 +1541,20 @@ const styles = StyleSheet.create({
   },
   toggleCircleActive: {
     marginLeft: 'auto',
+  },
+  manageFriendsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#292B31',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  manageFriendsText: {
+    color: '#6E69F4',
+    fontSize: 14,
+    fontWeight: '500',
   },
   moodGrid: {
     flexDirection: 'row',

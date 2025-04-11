@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,9 +8,11 @@ export interface ChatHeaderProps {
   name: string;
   avatar: string;
   status: 'online' | 'offline' | 'busy' | 'idle';
+  isCloseFriend?: boolean;
   onBack: () => void;
   onProfile: () => void;
   onOptions: () => void;
+  onToggleCloseFriend?: () => void;
 }
 
 /**
@@ -19,10 +21,12 @@ export interface ChatHeaderProps {
 const ChatHeader = ({ 
   name, 
   avatar, 
-  status, 
+  status,
+  isCloseFriend = false,
   onBack, 
   onProfile, 
-  onOptions 
+  onOptions,
+  onToggleCloseFriend
 }: ChatHeaderProps) => {
   const insets = useSafeAreaInsets();
   
@@ -88,7 +92,22 @@ const ChatHeader = ({
           </View>
           
           <View style={styles.nameStatusContainer}>
-            <Text style={styles.nameText} numberOfLines={1}>{name}</Text>
+            <View style={styles.nameContainer}>
+              <Text style={styles.nameText} numberOfLines={1}>{name}</Text>
+              {onToggleCloseFriend && (
+                <TouchableOpacity 
+                  style={styles.starButton} 
+                  onPress={onToggleCloseFriend}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <AntDesign 
+                    name={isCloseFriend ? "star" : "staro"} 
+                    size={16} 
+                    color={isCloseFriend ? "#FFD700" : "#9BA1A6"} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.statusContainer}>
               <View 
                 style={[
@@ -175,11 +194,15 @@ const styles = StyleSheet.create({
   nameStatusContainer: {
     flex: 1
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   nameText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 2
   },
   statusContainer: {
     flexDirection: 'row',
@@ -207,7 +230,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.06)',
     marginTop: 4
-  }
+  },
+  starButton: {
+    marginLeft: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default ChatHeader; 
