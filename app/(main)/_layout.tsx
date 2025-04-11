@@ -93,8 +93,9 @@ const Layout = () => {
           <Tabs.Screen name="directmessages" options={{ href: null }} />
           <Tabs.Screen name="live" options={{ href: null }} />
           <Tabs.Screen name="music" options={{ href: null }} />
+          <Tabs.Screen name="goldminer" options={{ href: null }} />
+          <Tabs.Screen name="slots" options={{ href: null }} />
           <Tabs.Screen name="leaderboard" options={{ href: null }} />
-          <Tabs.Screen name="mining" options={{ href: null }} />
           <Tabs.Screen name="shop" options={{ href: null }} />
           <Tabs.Screen name="account" options={{ href: null }} />
           <Tabs.Screen 

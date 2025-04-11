@@ -93,10 +93,11 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   // Define menu items
   const menuItems = [
     {
-      id: 'home',
-      route: 'index',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="home" size={24} color={color} />,
-      label: 'Home',
+      id: 'chat',
+      route: 'directmessages',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="chat" size={24} color={color} />,
+      label: 'Messages',
+      badge: 5,
     },
     {
       id: 'live',
@@ -106,37 +107,22 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       badge: 2,
     },
     {
-      id: 'chat',
-      route: 'directmessages',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="chat" size={24} color={color} />,
-      label: 'Messages',
-      badge: 5,
-    },
-    {
-      id: 'notifications',
-      route: 'notifications',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="notifications" size={24} color={color} />,
-      label: 'Notifications',
-      badge: 3,
-    },
-    {
-      id: 'profile',
-      route: 'profile',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="person" size={24} color={color} />,
-      label: 'Profile',
-    },
-    {
       id: 'music',
       route: 'music',
       icon: (color: string, isActive: boolean) => <MaterialIcons name="music-note" size={24} color={color} />,
       label: 'Music',
     },
     {
-      id: 'shop',
-      route: 'shop',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="shopping-cart" size={24} color={color} />,
-      label: 'Shop',
-      badge: 1,
+      id: 'goldminer',
+      route: 'goldminer',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="hardware" size={24} color={color} />,
+      label: 'Gold Miner',
+    },
+    {
+      id: 'slots',
+      route: 'slots',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="casino" size={24} color={color} />,
+      label: 'Slots',
     },
     {
       id: 'leaderboard',
@@ -145,10 +131,11 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       label: 'Leaderboard',
     },
     {
-      id: 'account',
-      route: 'account',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="settings" size={24} color={color} />,
-      label: 'Settings',
+      id: 'shop',
+      route: 'shop',
+      icon: (color: string, isActive: boolean) => <MaterialIcons name="shopping-cart" size={24} color={color} />,
+      label: 'Shop',
+      badge: 1,
     },
   ];
   
@@ -553,10 +540,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     // Position in the middle of the screen vertically
-    top: Math.floor(height/2 - 210), // Centered vertically with space for buttons
+    top: Math.floor(height/2 - 240), // Centered vertically with more space for buttons
     // Auto-fit height based on content instead of full screen
     height: 'auto', // Will be sized based on content
-    maxHeight: 420, // Maximum height for the menu
+    maxHeight: 480, // Increased maximum height for the menu to fit all buttons
     backgroundColor: '#1C1D23', // Slightly lighter than the main background
     zIndex: 10,
     borderRightWidth: 1,
@@ -594,7 +581,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingVertical: 12,
     paddingHorizontal: 10,
-    gap: 12, // Reduce vertical spacing between items
+    gap: 8, // Reduced vertical spacing between items to fit more items
   },
   sidebarIcon: {
     width: 40, // Smaller width
