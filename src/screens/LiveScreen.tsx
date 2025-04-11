@@ -26,7 +26,20 @@ const LiveScreen = () => {
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [inSpotlightQueue, setInSpotlightQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState(2);
-  const [showSpotlightedUser, setShowSpotlightedUser] = useState(true); // Always show spotlighted user for demonstration
+  const [showSpotlightedUser, setShowSpotlightedUser] = useState(true); // Show spotlighted user initially
+  
+  // New spotlight queue state
+  const [spotlightQueue, setSpotlightQueue] = useState<{name: string, avatar: string, duration: number}[]>([
+    { name: 'Michael', avatar: 'https://randomuser.me/api/portraits/men/75.jpg', duration: 180 },
+    { name: 'Jessica', avatar: 'https://randomuser.me/api/portraits/women/85.jpg', duration: 120 }
+  ]);
+  
+  // Current spotlighted user
+  const [currentSpotlight, setCurrentSpotlight] = useState({
+    name: 'Sophia',
+    avatar: 'https://randomuser.me/api/portraits/women/32.jpg',
+    duration: 261 // 4:21 in seconds
+  });
   
   // Activity Modal states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
@@ -43,9 +56,9 @@ const LiveScreen = () => {
   });
   
   // Timer state for the spotlight countdown
-  const [remainingTime, setRemainingTime] = useState(261); // 4:21 in seconds
-  const [percentage, setPercentage] = useState(65);
-  const initialTime = useRef(261); // 4:21 in seconds (initial value)
+  const [remainingTime, setRemainingTime] = useState(currentSpotlight.duration);
+  const [percentage, setPercentage] = useState(100);
+  const initialTime = useRef(currentSpotlight.duration);
   const timer = useRef<NodeJS.Timeout | null>(null);
   
   // Continuous animation phase refs (moved outside the component to persist)
@@ -56,18 +69,54 @@ const LiveScreen = () => {
     lastTimestamp: 0
   });
 
-  // Start the countdown animation when component mounts
+  // Move to next spotlighted user
+  const moveToNextSpotlightUser = useCallback(() => {
+    // If there are users in queue, move to next one
+    if (spotlightQueue.length > 0) {
+      // Get the next user in queue
+      const nextUser = spotlightQueue[0];
+      
+      // Update current spotlight
+      setCurrentSpotlight(nextUser);
+      
+      // Reset timer
+      initialTime.current = nextUser.duration;
+      setRemainingTime(nextUser.duration);
+      setPercentage(100);
+      
+      // Remove user from queue
+      setSpotlightQueue(prev => prev.slice(1));
+      
+      // Update queue positions for users in spotlight queue
+      if (inSpotlightQueue) {
+        setQueuePosition(prev => Math.max(1, prev - 1));
+      }
+    } else {
+      // No users in queue, hide spotlight
+      setShowSpotlightedUser(false);
+    }
+  }, [spotlightQueue, inSpotlightQueue]);
+
+  // Start the countdown animation when component mounts or when currentSpotlight changes
   useEffect(() => {
+    // Clear existing timer if it exists
+    if (timer.current) {
+      clearInterval(timer.current);
+    }
+    
     // Start the timer
     timer.current = setInterval(() => {
       setRemainingTime(prev => {
         if (prev <= 1) {
           clearInterval(timer.current!);
-          // setShowSpotlightedUser(false); // Commented out to keep spotlighted user visible for demo
+          
+          // Move to next user in queue
+          moveToNextSpotlightUser();
           return 0;
         }
+        
         // Calculate new percentage based on remaining time
-        const newPercentage = ((prev - 1) / initialTime.current) * 100;
+        const newPercentage = (prev - 1) / initialTime.current * 100;
         setPercentage(newPercentage);
         return prev - 1;
       });
@@ -79,7 +128,26 @@ const LiveScreen = () => {
         clearInterval(timer.current);
       }
     };
-  }, []);
+  }, [currentSpotlight, moveToNextSpotlightUser]);
+  
+  // Join spotlight queue function
+  const joinSpotlightQueue = (duration: number) => {
+    // Add current user to queue with proper information
+    const yourSpotlight = {
+      name: 'Your Profile',
+      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+      duration
+    };
+    
+    // Add user to queue
+    setSpotlightQueue(prev => [...prev, yourSpotlight]);
+    setInSpotlightQueue(true);
+    setQueuePosition(spotlightQueue.length + 1);
+    setSpotlightModalVisible(false);
+  };
+  
+  // Check if the current spotlighted user is you
+  const isCurrentUserSpotlighted = currentSpotlight.name === 'Your Profile';
   
   // Format seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -318,6 +386,31 @@ const LiveScreen = () => {
     return <View style={[styles.statusIndicator, { backgroundColor }]} />;
   };
   
+  // Demo data for showcasing the animation
+  const demoSpotlights = [
+    {
+      name: 'Sophia',
+      avatar: 'https://randomuser.me/api/portraits/women/32.jpg',
+      progress: 65,
+      time: '03:12',
+      isUser: false
+    },
+    {
+      name: 'Your Profile',
+      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+      progress: 40,
+      time: '01:45',
+      isUser: true
+    },
+    {
+      name: 'Michael',
+      avatar: 'https://randomuser.me/api/portraits/men/75.jpg',
+      progress: 85,
+      time: '04:30',
+      isUser: false
+    }
+  ];
+
   const renderSpotlightModal = () => {
     return (
       <Modal
@@ -344,10 +437,7 @@ const LiveScreen = () => {
             
             <TouchableOpacity 
               style={styles.durationOption} 
-              onPress={() => {
-                setInSpotlightQueue(true);
-                setSpotlightModalVisible(false);
-              }}
+              onPress={() => joinSpotlightQueue(120)} // 2 minutes
             >
               <Text style={styles.durationOptionTime}>2 minutes</Text>
               <Text style={styles.durationOptionCoins}>Cost: 100 coins</Text>
@@ -355,10 +445,7 @@ const LiveScreen = () => {
             
             <TouchableOpacity 
               style={styles.durationOption}
-              onPress={() => {
-                setInSpotlightQueue(true);
-                setSpotlightModalVisible(false);
-              }}
+              onPress={() => joinSpotlightQueue(300)} // 5 minutes
             >
               <Text style={styles.durationOptionTime}>5 minutes</Text>
               <Text style={styles.durationOptionCoins}>Cost: 200 coins</Text>
@@ -366,10 +453,7 @@ const LiveScreen = () => {
             
             <TouchableOpacity 
               style={styles.durationOption}
-              onPress={() => {
-                setInSpotlightQueue(true);
-                setSpotlightModalVisible(false);
-              }}
+              onPress={() => joinSpotlightQueue(600)} // 10 minutes
             >
               <Text style={styles.durationOptionTime}>10 minutes</Text>
               <Text style={styles.durationOptionCoins}>Cost: 350 coins</Text>
@@ -386,11 +470,12 @@ const LiveScreen = () => {
       </Modal>
     );
   };
-  
+
   const renderSpotlightSection = () => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, {marginBottom: 0}]}>Spotlight</Text>
           <View style={styles.spotlightCounter}>
             <Text style={styles.spotlightCountText}>4 online friends</Text>
           </View>
@@ -402,59 +487,82 @@ const LiveScreen = () => {
           contentContainerStyle={styles.spotlightScroll}
           style={styles.horizontalScroll}
         >
-          {/* Your profile with current status */}
-          <TouchableOpacity 
-            style={styles.spotlightContainer}
-            onPress={() => setSpotlightModalVisible(true)}
-          >
-            <View style={styles.spotlightAvatarWrapper}>
-              <View style={styles.spotlightAvatarPurple}>
-                <Image 
-                  source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
-                  style={styles.spotlightAvatar}
-                />
-                <StatusIndicator status="online" />
-              </View>
-            </View>
-            <View style={styles.spotlightInfoWrapper}>
-              <Text style={styles.spotlightName}>Your Profile</Text>
-              <Text style={styles.spotlightStatus}>
-                {inSpotlightQueue ? `Queue: ${queuePosition}` : 'Manage'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          
-          {/* Spotlighted user with countdown and fluid animation */}
+          {/* Your profile with manager - now with animation when spotlighted */}
           <TouchableOpacity 
             style={[
               styles.spotlightContainer,
               { overflow: 'hidden' }
             ]}
+            onPress={() => setSpotlightModalVisible(true)}
           >
-            {/* Fluid water animation */}
-            <WaterFlowAnimation 
-              progress={percentage} 
-              colors={['#34C759', '#206E3E']} 
-            />
+            {/* Fluid water animation - only shown when user is spotlighted */}
+            {isCurrentUserSpotlighted && (
+              <WaterFlowAnimation 
+                progress={percentage} 
+                colors={['#34C759', '#206E3E']} 
+              />
+            )}
             
             <View style={[styles.spotlightAvatarWrapper, { zIndex: 2 }]}>
-              <View style={styles.spotlightAvatarGreen}>
+              <View style={[
+                isCurrentUserSpotlighted ? styles.spotlightAvatarGreen : styles.spotlightAvatarPurple
+              ]}>
                 <Image 
-                  source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
+                  source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
                   style={styles.spotlightAvatar}
                 />
-                <StatusIndicator status="spotlight" />
+                <StatusIndicator status={isCurrentUserSpotlighted ? "spotlight" : "online"} />
               </View>
             </View>
             <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
-              <Text style={[styles.spotlightName, { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
-                Sophia
+              <Text style={[
+                styles.spotlightName, 
+                isCurrentUserSpotlighted ? { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}
+              ]}>
+                Your Profile
               </Text>
-              <Text style={[styles.spotlightStatus, { fontWeight: 'bold', color: '#FFFFFF' }]}>
-                {formatTime(remainingTime)}
+              <Text style={[
+                styles.spotlightStatus, 
+                isCurrentUserSpotlighted ? { fontWeight: 'bold', color: '#FFFFFF' } : {}
+              ]}>
+                {isCurrentUserSpotlighted ? formatTime(remainingTime) : inSpotlightQueue ? `Queue: ${queuePosition}` : 'Manage'}
               </Text>
             </View>
           </TouchableOpacity>
+          
+          {/* Spotlighted user with countdown and fluid animation - only shown if not current user */}
+          {showSpotlightedUser && !isCurrentUserSpotlighted && (
+            <TouchableOpacity 
+              style={[
+                styles.spotlightContainer,
+                { overflow: 'hidden' }
+              ]}
+            >
+              {/* Fluid water animation */}
+              <WaterFlowAnimation 
+                progress={percentage} 
+                colors={['#34C759', '#206E3E']} 
+              />
+              
+              <View style={[styles.spotlightAvatarWrapper, { zIndex: 2 }]}>
+                <View style={styles.spotlightAvatarGreen}>
+                  <Image 
+                    source={{ uri: currentSpotlight.avatar }} 
+                    style={styles.spotlightAvatar}
+                  />
+                  <StatusIndicator status="spotlight" />
+                </View>
+              </View>
+              <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
+                <Text style={[styles.spotlightName, { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>
+                  {currentSpotlight.name}
+                </Text>
+                <Text style={[styles.spotlightStatus, { fontWeight: 'bold', color: '#FFFFFF' }]}>
+                  {formatTime(remainingTime)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
           
           {/* Friend who is hosting with hosting status */}
           <TouchableOpacity style={styles.spotlightContainer}>
@@ -486,23 +594,6 @@ const LiveScreen = () => {
             </View>
             <View style={styles.spotlightInfoWrapper}>
               <Text style={styles.spotlightName}>Ella</Text>
-              <Text style={styles.spotlightStatus}>Watching</Text>
-            </View>
-          </TouchableOpacity>
-          
-          {/* Another friend who is watching but offline */}
-          <TouchableOpacity style={styles.spotlightContainer}>
-            <View style={styles.spotlightAvatarWrapper}>
-              <View style={styles.spotlightAvatarBlue}>
-                <Image 
-                  source={{ uri: 'https://randomuser.me/api/portraits/women/22.jpg' }} 
-                  style={styles.spotlightAvatar}
-                />
-                <StatusIndicator status="busy" />
-              </View>
-            </View>
-            <View style={styles.spotlightInfoWrapper}>
-              <Text style={styles.spotlightName}>Emma</Text>
               <Text style={styles.spotlightStatus}>Watching</Text>
             </View>
           </TouchableOpacity>
