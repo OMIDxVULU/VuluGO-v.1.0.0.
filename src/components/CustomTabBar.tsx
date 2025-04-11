@@ -1,10 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import HomeIcon from './HomeIcon';
-import NotificationIcon from './NotificationIcon';
+import { HomeIcon, NotificationIcon, PersonIcon } from './icons/AppIcons';
 
 const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -24,6 +22,44 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
   const visibleRoutes = state.routes.filter(route => allowedRoutes.includes(route.name));
   const visibleRouteIndices = visibleRoutes.map(route => state.routes.findIndex(r => r.key === route.key));
   
+  const getIconComponent = (routeName: string, isFocused: boolean, badge: number | undefined) => {
+    const color = isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)";
+    const size = 22;
+
+    switch (routeName) {
+      case 'index':
+        return (
+          <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
+            <HomeIcon color={color} size={size} active={isFocused} />
+          </View>
+        );
+      case 'notifications':
+        return (
+          <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
+            <NotificationIcon color={color} size={size} active={isFocused} />
+            {badge && (
+              <View style={styles.notificationsBadge}>
+                <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+              </View>
+            )}
+          </View>
+        );
+      case 'profile':
+        return (
+          <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
+            <PersonIcon color={color} size={size} active={isFocused} />
+            {badge && (
+              <View style={styles.notificationsBadge}>
+                <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+              </View>
+            )}
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+  
   return (
     <View style={styles.container}>
       <View style={styles.bottomBarContent}>
@@ -36,80 +72,7 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
           if (route.name === 'profile') label = 'Profile';
           
           const isFocused = state.index === index;
-          
-          // Get badge count if specified in options
-          const badge = options.tabBarBadge ? options.tabBarBadge : null;
-          
-          // Get icon component based on route name
-          let iconComponent;
-          
-          if (route.name === 'index') {
-            iconComponent = (
-              <View style={styles.tabItemContainer}>
-                <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <HomeIcon 
-                    color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
-                    size={22} 
-                    active={isFocused}
-                  />
-                </View>
-                <Text 
-                  numberOfLines={1} 
-                  ellipsizeMode="tail" 
-                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          } else if (route.name === 'notifications') {
-            iconComponent = (
-              <View style={styles.tabItemContainer}>
-                <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <NotificationIcon 
-                    color={isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)"} 
-                    size={22} 
-                    active={isFocused}
-                  />
-                  {badge && (
-                    <View style={styles.notificationsBadge}>
-                      <Text style={styles.notificationsBadgeValue}>{badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text 
-                  numberOfLines={1} 
-                  ellipsizeMode="tail" 
-                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          } else if (route.name === 'profile') {
-            iconComponent = (
-              <View style={styles.tabItemContainer}>
-                <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-                  <View style={styles.profileImage}>
-                    <MaterialIcons name="person" size={18} color="#FFFFFF" />
-                  </View>
-                  <View style={styles.profileStatus} />
-                  {badge && (
-                    <View style={styles.notificationsBadge}>
-                      <Text style={styles.notificationsBadgeValue}>{badge}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text 
-                  numberOfLines={1} 
-                  ellipsizeMode="tail" 
-                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
-                >
-                  {label}
-                </Text>
-              </View>
-            );
-          }
+          const badge = typeof options.tabBarBadge === 'number' ? options.tabBarBadge : undefined;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -133,7 +96,16 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
               style={styles.tabButton}
               activeOpacity={0.7}
             >
-              {iconComponent}
+              <View style={styles.tabItemContainer}>
+                {getIconComponent(route.name, isFocused, badge)}
+                <Text 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail" 
+                  style={[styles.tabBarLabel, isFocused ? styles.tabBarLabelActive : styles.tabBarLabelInactive]}
+                >
+                  {label}
+                </Text>
+              </View>
             </TouchableOpacity>
           );
         })}

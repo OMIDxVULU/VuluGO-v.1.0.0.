@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, P
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { IconButton } from 'react-native-paper';
+import { ChatIcon, LiveIcon, MusicIcon, GoldMinerIcon, SlotsIcon, LeaderboardIcon, ShopIcon } from './icons/SidebarIcons';
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
@@ -95,45 +96,45 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     {
       id: 'chat',
       route: 'directmessages',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="chat" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <ChatIcon color={color} active={isActive} />,
       label: 'Messages',
       badge: 5,
     },
     {
       id: 'live',
       route: 'live',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="live-tv" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <LiveIcon color={color} active={isActive} />,
       label: 'Live',
       badge: 2,
     },
     {
       id: 'music',
       route: 'music',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="music-note" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <MusicIcon color={color} active={isActive} />,
       label: 'Music',
     },
     {
       id: 'goldminer',
       route: 'goldminer',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="hardware" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <GoldMinerIcon color={color} active={isActive} />,
       label: 'Gold Miner',
     },
     {
       id: 'slots',
       route: 'slots',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="casino" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <SlotsIcon color={color} active={isActive} />,
       label: 'Slots',
     },
     {
       id: 'leaderboard',
       route: 'leaderboard',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="leaderboard" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <LeaderboardIcon color={color} active={isActive} />,
       label: 'Leaderboard',
     },
     {
       id: 'shop',
       route: 'shop',
-      icon: (color: string, isActive: boolean) => <MaterialIcons name="shopping-cart" size={24} color={color} />,
+      icon: (color: string, isActive: boolean) => <ShopIcon color={color} active={isActive} />,
       label: 'Shop',
       badge: 1,
     },

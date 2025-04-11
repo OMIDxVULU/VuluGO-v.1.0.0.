@@ -1,38 +1,39 @@
 {
   "expo": {
-    "name": "VULU GO",
+    "name": "VuluGO",
     "slug": "vulugonew",
-    "version": "1.0.0",
+    "version": "0.0.2",
     "orientation": "portrait",
-    "scheme": "vulugonew",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#131318"
-    },
-    "plugins": [
-      "expo-router"
-    ],
-    "experiments": {
-      "typedRoutes": true
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1C1D23"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "newArchEnabled": true,
-      "bundleIdentifier": "com.anonymous.vulugonew"
+      "bundleIdentifier": "com.vulugonew.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#131318"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1C1D23"
       },
-      "newArchEnabled": true
+      "package": "com.vulugonew.app"
     },
     "web": {
-      "bundler": "metro",
-      "output": "static"
+      "favicon": "./assets/favicon.png"
     },
-    "newArchEnabled": true
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "vulugonew",
+    "experiments": {
+      "tsconfigPaths": true
+    }
   }
 }

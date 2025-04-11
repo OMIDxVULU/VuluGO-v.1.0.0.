@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { BackIcon, MenuIcon, MoreVertIcon } from './icons/AppIcons';
 
 interface CommonHeaderProps {
   title: string;
@@ -16,6 +16,19 @@ interface CommonHeaderProps {
   }>;
 }
 
+const getIconComponent = (name: string, color: string = "#FFFFFF") => {
+  switch (name) {
+    case 'arrow-back':
+      return <BackIcon color={color} size={24} />;
+    case 'menu':
+      return <MenuIcon color={color} size={24} />;
+    case 'more-vert':
+      return <MoreVertIcon color={color} size={24} />;
+    default:
+      return null;
+  }
+};
+
 /**
  * CommonHeader component for consistent header styling across screens
  */
@@ -28,11 +41,7 @@ const CommonHeader = ({ title, leftIcon, rightIcons = [] }: CommonHeaderProps) =
             style={styles.iconButton} 
             onPress={leftIcon.onPress}
           >
-            <MaterialIcons 
-              name={leftIcon.name as any} 
-              size={24} 
-              color={leftIcon.color || "#FFFFFF"} 
-            />
+            {getIconComponent(leftIcon.name, leftIcon.color)}
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>{title}</Text>
@@ -45,11 +54,7 @@ const CommonHeader = ({ title, leftIcon, rightIcons = [] }: CommonHeaderProps) =
             style={styles.iconButton} 
             onPress={icon.onPress}
           >
-            <MaterialIcons 
-              name={icon.name as any} 
-              size={24} 
-              color={icon.color || "#FFFFFF"} 
-            />
+            {getIconComponent(icon.name, icon.color)}
           </TouchableOpacity>
         ))}
       </View>
@@ -79,6 +84,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginLeft: 12,
   },
   iconButton: {
     marginHorizontal: 8,
