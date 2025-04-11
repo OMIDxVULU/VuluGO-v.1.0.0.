@@ -28,9 +28,26 @@ const { width } = Dimensions.get('window');
 
 // Define available status types
 const STATUS_TYPES = {
+  // Basic status types
   ONLINE: 'online',
   BUSY: 'busy',
-  OFFLINE: 'offline'
+  OFFLINE: 'offline',
+  
+  // Mood status types
+  HAPPY: 'happy',
+  SAD: 'sad',
+  ANGRY: 'angry',
+  HUNGRY: 'hungry',
+  SLEEPY: 'sleepy',
+  EXCITED: 'excited',
+  BORED: 'bored',
+  LOVE: 'love',
+};
+
+// Status category grouping
+const STATUS_CATEGORIES = {
+  DEFAULT: 'Default',
+  MOOD: 'Mood'
 };
 
 const ProfileScreen = () => {
@@ -39,6 +56,8 @@ const ProfileScreen = () => {
   const [showBioExpanded, setShowBioExpanded] = useState(false);
   const [userStatus, setUserStatus] = useState(STATUS_TYPES.ONLINE);
   const [showStatusSelector, setShowStatusSelector] = useState(false);
+  const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
+  const [closefriendsOnly, setClosefriendsOnly] = useState(false);
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
   
@@ -84,33 +103,104 @@ const ProfileScreen = () => {
   // Get status data based on current status
   const getStatusData = () => {
     switch(userStatus) {
+      // Default statuses
       case STATUS_TYPES.ONLINE:
         return {
           color: '#7ADA72', // Green
           text: 'Online',
           subtext: 'Active Now',
-          glowColor: 'rgba(122, 218, 114, 0.3)'
+          glowColor: 'rgba(122, 218, 114, 0.3)',
+          icon: null
         };
       case STATUS_TYPES.BUSY:
         return {
           color: '#E57373', // Red
           text: 'Busy',
           subtext: 'Do Not Disturb',
-          glowColor: 'rgba(229, 115, 115, 0.3)'
+          glowColor: 'rgba(229, 115, 115, 0.3)',
+          icon: <Feather name="slash" size={18} color="#FFFFFF" />
         };
       case STATUS_TYPES.OFFLINE:
         return {
           color: '#35383F', // Dark gray/black
           text: 'Offline',
           subtext: 'Invisible to Others',
-          glowColor: 'rgba(53, 56, 63, 0.3)'
+          glowColor: 'rgba(53, 56, 63, 0.3)',
+          icon: <Feather name="eye-off" size={16} color="#FFFFFF" />
+        };
+        
+      // Mood statuses
+      case STATUS_TYPES.HAPPY:
+        return {
+          color: '#FFD700', // Gold
+          text: 'Happy',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(255, 215, 0, 0.3)',
+          icon: <MaterialCommunityIcons name="emoticon-happy-outline" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.SAD:
+        return {
+          color: '#5C9ACE', // Blue
+          text: 'Sad',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(92, 154, 206, 0.3)',
+          icon: <MaterialCommunityIcons name="emoticon-sad-outline" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.ANGRY:
+        return {
+          color: '#FF6B3D', // Orange Red
+          text: 'Angry',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(255, 107, 61, 0.3)',
+          icon: <MaterialCommunityIcons name="emoticon-angry-outline" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.HUNGRY:
+        return {
+          color: '#FF9966', // Orange
+          text: 'Hungry',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(255, 153, 102, 0.3)',
+          icon: <MaterialCommunityIcons name="food-fork-drink" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.SLEEPY:
+        return {
+          color: '#8E77B5', // Purple
+          text: 'Sleepy',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(142, 119, 181, 0.3)',
+          icon: <MaterialCommunityIcons name="sleep" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.EXCITED:
+        return {
+          color: '#FF5CAD', // Pink
+          text: 'Excited',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(255, 92, 173, 0.3)',
+          icon: <MaterialCommunityIcons name="emoticon-excited-outline" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.BORED:
+        return {
+          color: '#9E9E9E', // Gray
+          text: 'Bored',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(158, 158, 158, 0.3)',
+          icon: <MaterialCommunityIcons name="emoticon-neutral-outline" size={18} color="#FFFFFF" />
+        };
+      case STATUS_TYPES.LOVE:
+        return {
+          color: '#F06292', // Pink
+          text: 'In Love',
+          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
+          glowColor: 'rgba(240, 98, 146, 0.3)',
+          icon: <MaterialCommunityIcons name="heart-outline" size={18} color="#FFFFFF" />
         };
       default:
         return {
           color: '#7ADA72',
           text: 'Online',
           subtext: 'Active Now',
-          glowColor: 'rgba(122, 218, 114, 0.3)'
+          glowColor: 'rgba(122, 218, 114, 0.3)',
+          icon: null
         };
     }
   };
@@ -161,7 +251,7 @@ const ProfileScreen = () => {
           <TouchableOpacity 
             style={[
               styles.onlineStatusContainer,
-              { width: userStatus === STATUS_TYPES.BUSY ? 170 : userStatus === STATUS_TYPES.OFFLINE ? 180 : 140 }
+              { width: 'auto', minWidth: 140, maxWidth: 210 }
             ]}
             onPress={showStatusMenu}
             activeOpacity={0.7}
@@ -179,16 +269,7 @@ const ProfileScreen = () => {
                   { backgroundColor: statusData.color }
                 ]}
               >
-                {userStatus === STATUS_TYPES.BUSY && (
-                  <View style={styles.busyIndicator}>
-                    <Feather name="slash" size={18} color="#FFFFFF" />
-                  </View>
-                )}
-                {userStatus === STATUS_TYPES.OFFLINE && (
-                  <View style={styles.offlineIndicator}>
-                    <Feather name="eye-off" size={16} color="#FFFFFF" />
-                  </View>
-                )}
+                {statusData.icon}
               </View>
             </View>
             <View>
@@ -559,59 +640,236 @@ const ProfileScreen = () => {
             <View style={styles.statusSelectorHandle} />
             <Text style={styles.statusSelectorTitle}>Set Status</Text>
             
-            <TouchableOpacity 
-              style={styles.statusOption}
-              onPress={() => changeStatus(STATUS_TYPES.ONLINE)}
-            >
-              <View style={[styles.statusOptionIcon, { backgroundColor: '#7ADA72' }]}>
-                <View style={styles.statusOptionIconInner} />
-              </View>
-              <View style={styles.statusOptionTextContainer}>
-                <Text style={styles.statusOptionTitle}>Online</Text>
-                <Text style={styles.statusOptionSubtitle}>Active Now</Text>
-              </View>
-              {userStatus === STATUS_TYPES.ONLINE && (
-                <View style={styles.statusOptionSelected}>
-                  <AntDesign name="check" size={16} color="#FFFFFF" />
-                </View>
-              )}
-            </TouchableOpacity>
+            {/* Category Selector */}
+            <View style={styles.categorySelector}>
+              <TouchableOpacity 
+                style={[
+                  styles.categoryButton, 
+                  statusCategory === STATUS_CATEGORIES.DEFAULT && styles.categoryButtonActive
+                ]}
+                onPress={() => setStatusCategory(STATUS_CATEGORIES.DEFAULT)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  statusCategory === STATUS_CATEGORIES.DEFAULT && styles.categoryButtonTextActive
+                ]}>Default</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.categoryButton, 
+                  statusCategory === STATUS_CATEGORIES.MOOD && styles.categoryButtonActive
+                ]}
+                onPress={() => setStatusCategory(STATUS_CATEGORIES.MOOD)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  statusCategory === STATUS_CATEGORIES.MOOD && styles.categoryButtonTextActive
+                ]}>Mood</Text>
+              </TouchableOpacity>
+            </View>
             
-            <TouchableOpacity 
-              style={styles.statusOption}
-              onPress={() => changeStatus(STATUS_TYPES.BUSY)}
-            >
-              <View style={[styles.statusOptionIcon, { backgroundColor: '#E57373' }]}>
-                <Feather name="slash" size={18} color="#FFFFFF" />
+            {/* Toggle for Close Friends Only - Only shown for Mood statuses */}
+            {statusCategory === STATUS_CATEGORIES.MOOD && (
+              <View style={styles.closeFriendsToggle}>
+                <Text style={styles.closeFriendsText}>Visible to close friends only</Text>
+                <TouchableOpacity 
+                  style={[
+                    styles.toggleButton,
+                    closefriendsOnly && styles.toggleButtonActive
+                  ]}
+                  onPress={() => setClosefriendsOnly(!closefriendsOnly)}
+                >
+                  <View style={[
+                    styles.toggleCircle,
+                    closefriendsOnly && styles.toggleCircleActive
+                  ]} />
+                </TouchableOpacity>
               </View>
-              <View style={styles.statusOptionTextContainer}>
-                <Text style={styles.statusOptionTitle}>Busy</Text>
-                <Text style={styles.statusOptionSubtitle}>Do Not Disturb</Text>
-              </View>
-              {userStatus === STATUS_TYPES.BUSY && (
-                <View style={styles.statusOptionSelected}>
-                  <AntDesign name="check" size={16} color="#FFFFFF" />
-                </View>
-              )}
-            </TouchableOpacity>
+            )}
             
-            <TouchableOpacity 
-              style={styles.statusOption}
-              onPress={() => changeStatus(STATUS_TYPES.OFFLINE)}
-            >
-              <View style={[styles.statusOptionIcon, { backgroundColor: '#35383F' }]}>
-                <Feather name="eye-off" size={16} color="#FFFFFF" />
+            {/* Default Status Options */}
+            {statusCategory === STATUS_CATEGORIES.DEFAULT && (
+              <>
+                <TouchableOpacity 
+                  style={styles.statusOption}
+                  onPress={() => changeStatus(STATUS_TYPES.ONLINE)}
+                >
+                  <View style={[styles.statusOptionIcon, { backgroundColor: '#7ADA72' }]}>
+                    <View style={styles.statusOptionIconInner} />
+                  </View>
+                  <View style={styles.statusOptionTextContainer}>
+                    <Text style={styles.statusOptionTitle}>Online</Text>
+                    <Text style={styles.statusOptionSubtitle}>Active Now</Text>
+                  </View>
+                  {userStatus === STATUS_TYPES.ONLINE && (
+                    <View style={styles.statusOptionSelected}>
+                      <AntDesign name="check" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.statusOption}
+                  onPress={() => changeStatus(STATUS_TYPES.BUSY)}
+                >
+                  <View style={[styles.statusOptionIcon, { backgroundColor: '#E57373' }]}>
+                    <Feather name="slash" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.statusOptionTextContainer}>
+                    <Text style={styles.statusOptionTitle}>Busy</Text>
+                    <Text style={styles.statusOptionSubtitle}>Do Not Disturb</Text>
+                  </View>
+                  {userStatus === STATUS_TYPES.BUSY && (
+                    <View style={styles.statusOptionSelected}>
+                      <AntDesign name="check" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.statusOption}
+                  onPress={() => changeStatus(STATUS_TYPES.OFFLINE)}
+                >
+                  <View style={[styles.statusOptionIcon, { backgroundColor: '#35383F' }]}>
+                    <Feather name="eye-off" size={16} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.statusOptionTextContainer}>
+                    <Text style={styles.statusOptionTitle}>Offline</Text>
+                    <Text style={styles.statusOptionSubtitle}>Invisible to Others</Text>
+                  </View>
+                  {userStatus === STATUS_TYPES.OFFLINE && (
+                    <View style={styles.statusOptionSelected}>
+                      <AntDesign name="check" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+            
+            {/* Mood Status Options in a Grid Layout */}
+            {statusCategory === STATUS_CATEGORIES.MOOD && (
+              <View style={styles.moodGrid}>
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.HAPPY)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#FFD700' }]}>
+                    <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Happy</Text>
+                  {userStatus === STATUS_TYPES.HAPPY && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.SAD)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#5C9ACE' }]}>
+                    <MaterialCommunityIcons name="emoticon-sad-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Sad</Text>
+                  {userStatus === STATUS_TYPES.SAD && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.ANGRY)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#FF6B3D' }]}>
+                    <MaterialCommunityIcons name="emoticon-angry-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Angry</Text>
+                  {userStatus === STATUS_TYPES.ANGRY && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.HUNGRY)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#FF9966' }]}>
+                    <MaterialCommunityIcons name="food-fork-drink" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Hungry</Text>
+                  {userStatus === STATUS_TYPES.HUNGRY && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.SLEEPY)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#8E77B5' }]}>
+                    <MaterialCommunityIcons name="sleep" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Sleepy</Text>
+                  {userStatus === STATUS_TYPES.SLEEPY && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.EXCITED)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#FF5CAD' }]}>
+                    <MaterialCommunityIcons name="emoticon-excited-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Excited</Text>
+                  {userStatus === STATUS_TYPES.EXCITED && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.BORED)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#9E9E9E' }]}>
+                    <MaterialCommunityIcons name="emoticon-neutral-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>Bored</Text>
+                  {userStatus === STATUS_TYPES.BORED && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.moodItem}
+                  onPress={() => changeStatus(STATUS_TYPES.LOVE)}
+                >
+                  <View style={[styles.moodIcon, { backgroundColor: '#F06292' }]}>
+                    <MaterialCommunityIcons name="heart-outline" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.moodText}>In Love</Text>
+                  {userStatus === STATUS_TYPES.LOVE && (
+                    <View style={styles.moodSelected}>
+                      <AntDesign name="check" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
-              <View style={styles.statusOptionTextContainer}>
-                <Text style={styles.statusOptionTitle}>Offline</Text>
-                <Text style={styles.statusOptionSubtitle}>Invisible to Others</Text>
-              </View>
-              {userStatus === STATUS_TYPES.OFFLINE && (
-                <View style={styles.statusOptionSelected}>
-                  <AntDesign name="check" size={16} color="#FFFFFF" />
-                </View>
-              )}
-            </TouchableOpacity>
+            )}
           </Animated.View>
         </TouchableOpacity>
       </Modal>
@@ -1246,6 +1504,102 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     backgroundColor: '#5865F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: '#292B31',
+    padding: 4,
+  },
+  categoryButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  categoryButtonActive: {
+    backgroundColor: '#6E69F4',
+  },
+  categoryButtonText: {
+    color: '#AAAAAA',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  categoryButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  closeFriendsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    backgroundColor: '#292B31',
+    borderRadius: 12,
+  },
+  closeFriendsText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  toggleButton: {
+    width: 44,
+    height: 24,
+    backgroundColor: '#3E4148',
+    borderRadius: 12,
+    padding: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#6E69F4',
+  },
+  toggleCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  toggleCircleActive: {
+    marginLeft: 'auto',
+  },
+  moodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  moodItem: {
+    width: '31%', // approx 3 items per row with spacing
+    backgroundColor: '#292B31',
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  moodIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  moodText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  moodSelected: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#6E69F4',
     justifyContent: 'center',
     alignItems: 'center',
   },
