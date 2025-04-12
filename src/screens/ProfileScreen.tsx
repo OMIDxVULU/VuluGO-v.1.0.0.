@@ -343,7 +343,10 @@ const ProfileScreen = () => {
             {/* Direct profile photo with frame */}
             <Image 
               source={{ uri: profileImage }} 
-              style={styles.profileImage}
+              style={[
+                styles.profileImage,
+                { borderColor: statusData.color }
+              ]}
               resizeMode="cover"
             />
             
@@ -410,7 +413,7 @@ const ProfileScreen = () => {
             
             {/* Profile Photo Display - Shows same image as profile square */}
             <TouchableOpacity style={styles.photoItemContainer}>
-              <View style={styles.profilePhotoContainer}>
+              <View style={[styles.profilePhotoContainer, { borderColor: statusData.color }]}>
                 <Image 
                   source={{ uri: profileImage }} 
                   style={styles.profilePhotoItem}
@@ -1351,6 +1354,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 12,
     backgroundColor: '#1E1F25',
+    borderWidth: 2,
+    borderColor: '#7ADA72', // Default value, will be overridden
   },
   profilePhotoItem: {
     width: '100%',
