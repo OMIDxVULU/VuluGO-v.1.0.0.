@@ -51,7 +51,6 @@ const STATUS_CATEGORIES = {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('photos');
   const [showBioExpanded, setShowBioExpanded] = useState(false);
   const [userStatus, setUserStatus] = useState(STATUS_TYPES.ONLINE);
   const [showStatusSelector, setShowStatusSelector] = useState(false);
@@ -59,10 +58,6 @@ const ProfileScreen = () => {
   const [closefriendsOnly, setClosefriendsOnly] = useState(false);
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
-  
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-  };
   
   const toggleBioExpanded = () => {
     setShowBioExpanded(!showBioExpanded);
@@ -225,9 +220,56 @@ const ProfileScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header with title */}
+      {/* Header with title only - top most element */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
+      </View>
+      
+      {/* Game-style currency top bar - moved under the header */}
+      <View style={styles.gameTopBar}>
+        {/* Diamonds currency */}
+        <View style={styles.currencyContainer}>
+          <LinearGradient
+            colors={['#7872F4', '#5865F2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.currencyPill}
+          >
+            <View style={styles.diamondIconContainer}>
+              <LinearGradient
+                colors={['#9C84EF', '#F47FFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.diamondIcon}
+              >
+                <MaterialCommunityIcons name="diamond-stone" size={18} color="#FFFFFF" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.currencyAmount}>200,012</Text>
+          </LinearGradient>
+        </View>
+        
+        {/* Gold currency */}
+        <View style={styles.currencyContainer}>
+          <LinearGradient
+            colors={['#8B7000', '#614C00']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.currencyPill}
+          >
+            <View style={styles.goldIconContainer}>
+              <LinearGradient
+                colors={['#FFD700', '#FFA500']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.goldIcon}
+              >
+                <FontAwesome name="circle" size={16} color="#FFFFFF" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.currencyAmount}>43,978</Text>
+          </LinearGradient>
+        </View>
       </View>
       
       <ScrollableContentContainer
@@ -296,106 +338,79 @@ const ProfileScreen = () => {
             </View>
             
             <Text style={styles.profileCardName}>Sophia Jack</Text>
-            <View style={styles.profileBadgeContainer}>
-              <LinearGradient
-                colors={['#5865F2', '#4164B1']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileBadge}
-              >
-                <Text style={styles.profileBadgeText}>Premium</Text>
-              </LinearGradient>
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileBadge}
-              >
-                <Text style={styles.profileBadgeText}>Verified</Text>
-              </LinearGradient>
-            </View>
-            
-            <Text style={styles.profileUsername}>@Sophia93</Text>
+            <Text style={[styles.profileUsername, {marginBottom: 0}]}>@Sophia93</Text>
           </LinearGradient>
         </View>
         
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          {['Photos', 'Activity', 'Friends'].map((tab) => (
-            <TouchableOpacity 
-              key={tab}
-              onPress={() => handleTabChange(tab.toLowerCase())}
-              style={[
-                styles.tab,
-                activeTab === tab.toLowerCase() && styles.activeTab
-              ]}
-            >
-              <Text style={[
-                styles.tabText,
-                activeTab === tab.toLowerCase() && styles.activeTabText
-              ]}>
-                {tab}
-              </Text>
-              {activeTab === tab.toLowerCase() && (
-                <View style={styles.activeTabIndicator} />
-              )}
-            </TouchableOpacity>
-          ))}
+        {/* Profile Views Counter */}
+        <View style={styles.viewsCounterContainer}>
+          <LinearGradient
+            colors={['#4B77BE', '#2E5294']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.viewsCounter}
+          >
+            <View style={styles.viewsIconBox}>
+              <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
+            </View>
+            <View style={styles.viewsTextContainer}>
+              <Text style={styles.viewsLabel}>Profile Views</Text>
+              <Text style={styles.viewsValue}>3,456</Text>
+            </View>
+          </LinearGradient>
         </View>
         
-        {/* Photos Tab Content */}
-        {activeTab === 'photos' && (
-          <View style={styles.photoSection}>
-            {/* Photos Section Header */}
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Photos (3)</Text>
-              <TouchableOpacity>
-                <LinearGradient
-                  colors={['#7872F4', '#5865F2']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.previewButton}
-                >
-                  <Text style={styles.previewButtonText}>Preview</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Photos Grid */}
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.photosContainer}
-              contentContainerStyle={styles.photosContent}
-            >
-              <TouchableOpacity>
-                <LinearGradient
-                  colors={['#6E69F4', '#9C84EF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.addPhotoButton}
-                >
-                  <View style={styles.addPhotoIconContainer}>
-                    <AntDesign name="plus" size={32} color="#FFFFFF" />
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-              
-              {[32, 33, 34].map((id) => (
-                <TouchableOpacity key={id} style={styles.photoItemContainer}>
-                  <Image 
-                    source={{ uri: `https://randomuser.me/api/portraits/women/${id}.jpg` }} 
-                    style={styles.photoItem}
-                  />
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.7)']}
-                    style={styles.photoGradient}
-                  />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        {/* Photos Section */}
+        <View style={styles.photoSection}>
+          {/* Photos Section Header */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Your Photos (3)</Text>
+            <TouchableOpacity>
+              <LinearGradient
+                colors={['#7872F4', '#5865F2']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.previewButton}
+              >
+                <Text style={styles.previewButtonText}>Preview</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-        )}
+          
+          {/* Photos Grid */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.photosContainer}
+            contentContainerStyle={styles.photosContent}
+          >
+            <TouchableOpacity>
+              <LinearGradient
+                colors={['#6E69F4', '#9C84EF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.addPhotoButton}
+              >
+                <View style={styles.addPhotoIconContainer}>
+                  <AntDesign name="plus" size={32} color="#FFFFFF" />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            {[32, 33, 34].map((id) => (
+              <TouchableOpacity key={id} style={styles.photoItemContainer}>
+                <Image 
+                  source={{ uri: `https://randomuser.me/api/portraits/women/${id}.jpg` }} 
+                  style={styles.photoItem}
+                />
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                  style={styles.photoGradient}
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
         
         {/* Gem+ Section */}
         <View style={styles.gemSection}>
@@ -436,78 +451,6 @@ const ProfileScreen = () => {
               </LinearGradient>
             </TouchableOpacity>
           </LinearGradient>
-        </View>
-        
-        {/* Profile Views & Currency Section */}
-        <View style={styles.statsSection}>
-          <LinearGradient
-            colors={['#5865F2', '#4164B1']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.profileViewsContainer}
-          >
-            <View style={styles.profileViewsContent}>
-              <Ionicons name="eye-outline" size={20} color="#FFFFFF" style={styles.viewsIcon} />
-              <Text style={styles.profileViewsText}>Profile Views</Text>
-            </View>
-            <View style={styles.viewsCountContainer}>
-              <Text style={styles.viewsCount}>3456</Text>
-            </View>
-          </LinearGradient>
-          
-          <View style={styles.currencySection}>
-            {/* Diamond currency */}
-            <LinearGradient
-              colors={['#32353B', '#2B2E33']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.currencyRow}
-            >
-              <LinearGradient
-                colors={['#9C84EF', '#F47FFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.currencyIconContainer}
-              >
-                <MaterialCommunityIcons name="diamond-stone" size={16} color="#FFFFFF" />
-              </LinearGradient>
-              <Text style={styles.currencyValue}>200 012</Text>
-              <LinearGradient
-                colors={['#6E69F4', '#5865F2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.addCurrencyButton}
-              >
-                <AntDesign name="plus" size={14} color="#FFFFFF" />
-              </LinearGradient>
-            </LinearGradient>
-            
-            {/* Gold currency */}
-            <LinearGradient
-              colors={['#32353B', '#2B2E33']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.currencyRow}
-            >
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.currencyIconContainer}
-              >
-                <FontAwesome name="circle" size={14} color="#FFFFFF" />
-              </LinearGradient>
-              <Text style={styles.currencyValue}>43 978</Text>
-              <LinearGradient
-                colors={['#6E69F4', '#5865F2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.addCurrencyButton}
-              >
-                <AntDesign name="plus" size={14} color="#FFFFFF" />
-              </LinearGradient>
-            </LinearGradient>
-          </View>
         </View>
         
         {/* Profile Info Section */}
@@ -885,11 +828,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#131318',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -897,6 +838,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,
@@ -1005,61 +947,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 8,
   },
-  profileBadgeContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  profileBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  profileBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   profileUsername: {
     color: '#A8B3BD',
     fontSize: 16,
     fontWeight: '400',
     marginRight: 8,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 12,
-    marginBottom: 15,
-    backgroundColor: 'rgba(30, 31, 37, 0.5)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    position: 'relative',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: 'rgba(156, 132, 239, 0.2)',
-  },
-  tabText: {
-    color: '#9597A3',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  activeTabIndicator: {
-    position: 'absolute',
-    bottom: 4,
-    width: 20,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#9C84EF',
   },
   photoSection: {
     paddingTop: 10,
@@ -1189,77 +1081,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  statsSection: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    backgroundColor: '#1C1D23',
+  statsAndCurrencySection: {
+    marginHorizontal: 12,
+    marginVertical: 15,
   },
-  profileViewsContainer: {
-    height: 48,
-    borderRadius: 12,
+  statsContainer: {
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 10,
     flexDirection: 'row',
-    overflow: 'hidden',
-    marginBottom: 15,
+    justifyContent: 'space-between',
   },
-  profileViewsContent: {
+  statItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    paddingHorizontal: 5,
   },
-  viewsIcon: {
-    marginRight: 10,
+  statIconContainer: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  profileViewsText: {
+  statContent: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  statValue: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '500',
-  },
-  viewsCountContainer: {
-    width: 60,
-    height: 48,
-    backgroundColor: '#4164B1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  viewsCount: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  currencySection: {
-    gap: 12,
-  },
-  currencyRow: {
-    height: 28,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  currencyIconContainer: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  currencyValue: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 11,
     fontWeight: '700',
-    textAlign: 'center',
   },
-  addCurrencyButton: {
-    width: 22,
-    height: 24,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
+  statLabel: {
+    color: '#A8B3BD',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  addButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 5,
   },
   profileInfoSection: {
     paddingHorizontal: 15,
@@ -1593,6 +1459,94 @@ const styles = StyleSheet.create({
     backgroundColor: '#6E69F4',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  gameTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#15151C',
+  },
+  currencyContainer: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  currencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingRight: 12,
+    paddingLeft: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  diamondIconContainer: {
+    marginRight: 6,
+  },
+  diamondIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goldIconContainer: {
+    marginRight: 6,
+  },
+  goldIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyAmount: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  viewsCounterContainer: {
+    marginHorizontal: 12,
+    marginBottom: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  viewsCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+  },
+  viewsIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  viewsTextContainer: {
+    flex: 1,
+  },
+  viewsLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  viewsValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
   },
 });
 
