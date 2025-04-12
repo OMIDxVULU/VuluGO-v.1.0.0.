@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
+import { useUserProfile } from '../context/UserProfileContext';
 
 const { width } = Dimensions.get('window');
 
@@ -51,11 +52,10 @@ const STATUS_CATEGORIES = {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const [userStatus, setUserStatus] = useState(STATUS_TYPES.ONLINE);
+  const { profileImage, setProfileImage, userStatus, setUserStatus, statusColor, setStatusColor } = useUserProfile();
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
   const [closefriendsOnly, setClosefriendsOnly] = useState(false);
-  const [profileImage, setProfileImage] = useState('https://randomuser.me/api/portraits/women/33.jpg');
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
   
@@ -102,12 +102,17 @@ const ProfileScreen = () => {
   // Function to change status and close menu
   const changeStatus = (newStatus: string) => {
     setUserStatus(newStatus);
+    
+    // Update status color based on the new status
+    const statusData = getStatusData(newStatus);
+    setStatusColor(statusData.color);
+    
     hideStatusMenu();
   };
 
   // Get status data based on current status
-  const getStatusData = () => {
-    switch(userStatus) {
+  const getStatusData = (status: string = userStatus) => {
+    switch(status) {
       // Default statuses
       case STATUS_TYPES.ONLINE:
         return {

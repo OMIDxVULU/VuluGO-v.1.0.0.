@@ -5,8 +5,10 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { Provider as PaperProvider, MD3DarkTheme } from 'react-native-paper';
 import { MenuPositionProvider } from '../src/components/SidebarMenu';
-import { View, ActivityIndicator, Platform, Text } from 'react-native';
+import { View, ActivityIndicator, Platform, Text, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts } from 'expo-font';
+import { UserProfileProvider } from '../src/context/UserProfileContext';
 
 // Create a custom Material theme
 const paperTheme = {
@@ -64,6 +66,10 @@ export default function RootLayout() {
   // Always set fontsLoaded to false on iOS simulator to skip font loading completely
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
+  const [loaded] = useFonts({
+    // Add any custom fonts here if needed
+  });
+
   useEffect(() => {
     // Just set the app as ready immediately - skip all font loading attempts
     setIsReady(true);
@@ -79,21 +85,35 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppContext.Provider value={{ fontsLoaded }}>
-        <MenuPositionProvider>
-          <SafeAreaProvider>
-            <PaperProvider theme={paperTheme}>
-              <StatusBar style="light" />
-              <Stack screenOptions={{ 
-                headerShown: false, 
-                gestureEnabled: true // Explicitly enable swipe gesture
-              }}>
-                <Stack.Screen name="(main)" />
-              </Stack>
-            </PaperProvider>
-          </SafeAreaProvider>
-        </MenuPositionProvider>
-      </AppContext.Provider>
+      <UserProfileProvider>
+        <AppContext.Provider value={{ fontsLoaded }}>
+          <MenuPositionProvider>
+            <SafeAreaProvider>
+              <PaperProvider theme={paperTheme}>
+                <StatusBar style="light" />
+                <Stack screenOptions={{ 
+                  headerShown: false, 
+                  gestureEnabled: true, // Explicitly enable swipe gesture
+                  contentStyle: { backgroundColor: '#131318' },
+                  animation: Platform.OS === 'ios' ? 'default' : 'fade',
+                }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="signup" />
+                  <Stack.Screen name="(main)" />
+                </Stack>
+              </PaperProvider>
+            </SafeAreaProvider>
+          </MenuPositionProvider>
+        </AppContext.Provider>
+      </UserProfileProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#131318',
+  },
+});

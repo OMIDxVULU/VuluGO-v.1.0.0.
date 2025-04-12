@@ -1,10 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeIcon, NotificationIcon, PersonIcon } from './icons/AppIcons';
 
-const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+interface CustomTabBarProps extends BottomTabBarProps {
+  profileImage?: string;
+  userStatus?: string;
+  statusColor?: string;
+}
+
+const CustomTabBar: React.FC<CustomTabBarProps> = ({ 
+  state, 
+  descriptors, 
+  navigation, 
+  profileImage,
+  userStatus,
+  statusColor = '#7ADA72' // Default to online green color
+}) => {
   const insets = useSafeAreaInsets();
   
   // Get options for the *currently active* route
@@ -47,7 +60,22 @@ const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigat
       case 'profile':
         return (
           <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
-            <PersonIcon color={color} size={size} active={isFocused} />
+            {profileImage ? (
+              <View 
+                style={[
+                  styles.profileImageContainer, 
+                  userStatus && { borderColor: statusColor }
+                ]}
+              >
+                <Image 
+                  source={{ uri: profileImage }} 
+                  style={styles.profileImage} 
+                  resizeMode="cover"
+                />
+              </View>
+            ) : (
+              <PersonIcon color={color} size={size} active={isFocused} />
+            )}
             {badge && (
               <View style={styles.notificationsBadge}>
                 <Text style={styles.notificationsBadgeValue}>{badge}</Text>
@@ -192,26 +220,20 @@ const styles = StyleSheet.create({
   tabBarLabelInactive: {
     color: '#8F8F8F',
   },
-  profileImage: {
+  profileImageContainer: {
     width: 30,
     height: 30,
-    borderRadius: 15,
-    backgroundColor: '#5865F2',
-    borderWidth: 2,
-    borderColor: '#1C1D23',
+    borderRadius: 6,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  profileStatus: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    right: 8,
-    bottom: 8,
-    backgroundColor: '#7ADA72',
     borderWidth: 2,
-    borderColor: '#1C1D23',
-    borderRadius: 6,
+    borderColor: '#7ADA72',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
   },
   notificationsBadge: {
     position: 'absolute',

@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import CustomTabBar from '../../src/components/CustomTabBar';
 import SidebarMenu from '../../src/components/SidebarMenu';
+import { useUserProfile } from '../../src/context/UserProfileContext';
 
 /**
  * Main Layout
@@ -19,6 +20,8 @@ import SidebarMenu from '../../src/components/SidebarMenu';
  * and can only be accessed via the sidebar menu or buttons on the home screen.
  */
 const Layout = () => {
+  const { profileImage, userStatus, statusColor } = useUserProfile();
+
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
@@ -56,7 +59,14 @@ const Layout = () => {
               marginBottom: 5,
             },
           }}
-          tabBar={(props) => <CustomTabBar {...props} />}
+          tabBar={(props) => (
+            <CustomTabBar 
+              {...props} 
+              profileImage={profileImage} 
+              userStatus={userStatus} 
+              statusColor={statusColor} 
+            />
+          )}
         >
           {/* ONLY THESE 3 BUTTONS WILL SHOW IN THE NAVBAR */}
           <Tabs.Screen 
