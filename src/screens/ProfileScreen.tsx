@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -23,6 +23,7 @@ import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { useUserProfile } from '../context/UserProfileContext';
+import ProfileViewersSection from '../components/ProfileViewers';
 
 const { width } = Dimensions.get('window');
 
@@ -52,13 +53,42 @@ const STATUS_CATEGORIES = {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const { profileImage, setProfileImage, userStatus, setUserStatus, statusColor, setStatusColor } = useUserProfile();
+  const { 
+    profileImage, 
+    setProfileImage, 
+    userStatus, 
+    setUserStatus, 
+    statusColor, 
+    setStatusColor,
+    totalViews,
+    dailyViews,
+    resetDailyViews,
+    incrementViews,
+    hasGemPlus,
+    setHasGemPlus
+  } = useUserProfile();
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
   const [closefriendsOnly, setClosefriendsOnly] = useState(false);
+  const [showProfileViewers, setShowProfileViewers] = useState(false);
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
   
+  // Increment views when the profile is opened
+  useEffect(() => {
+    incrementViews();
+    
+    // Simulate periodic views coming in (every 10-30 seconds)
+    const viewsInterval = setInterval(() => {
+      // Random chance to get a view (30% chance)
+      if (Math.random() < 0.3) {
+        incrementViews();
+      }
+    }, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(viewsInterval);
+  }, []);
+
   const navigateToAccount = () => {
     router.push('/(main)/account');
   };
@@ -232,6 +262,17 @@ const ProfileScreen = () => {
     Alert.alert('Menu', 'Menu options will be displayed here');
   };
 
+  // Toggle Gem+ status for demo purposes
+  const toggleGemPlus = () => {
+    setHasGemPlus(!hasGemPlus);
+  };
+
+  // Function to open ProfileViewers and reset daily counter
+  const openProfileViewers = () => {
+    resetDailyViews();
+    setShowProfileViewers(true);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -333,32 +374,33 @@ const ProfileScreen = () => {
         </View>
         
         {/* Profile Info Card */}
-        <View style={styles.profileCard}>
+        <View style={styles.profileInfoCard}>
           <LinearGradient
-            colors={['rgba(156, 132, 239, 0.3)', 'rgba(244, 127, 255, 0.2)']}
+            colors={['#6E69F4', '#C549BC']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.profileCardGradient}
+            style={styles.profileInfoCardGradient}
           >
-            {/* Direct profile photo with frame */}
-            <Image 
-              source={{ uri: profileImage }} 
-              style={[
-                styles.profileImage,
-                { borderColor: statusData.color }
-              ]}
-              resizeMode="cover"
-            />
-            
-            <Text style={styles.profileCardName}>Sophia Jack</Text>
-            <Text style={[styles.profileUsername, {marginBottom: 0}]}>@Sophia93</Text>
+            <View style={styles.profileInfoContainer}>
+              <Image 
+                source={{ uri: profileImage }} 
+                style={styles.profileImage} 
+              />
+              <View style={styles.profileInfoTextContainer}>
+                <Text style={styles.profileName}>Sophia Jack</Text>
+                <Text style={styles.profileUsername}>@Sophia93</Text>
+              </View>
+            </View>
           </LinearGradient>
         </View>
         
-        {/* Profile Views Counter */}
-        <View style={styles.viewsCounterContainer}>
+        {/* Profile Views Counter - Single Clean Component */}
+        <TouchableOpacity 
+          style={styles.viewsCounterContainer}
+          onPress={openProfileViewers}
+        >
           <LinearGradient
-            colors={['#4B77BE', '#2E5294']}
+            colors={['#6E69F4', '#5865F2']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.viewsCounter}
@@ -367,11 +409,14 @@ const ProfileScreen = () => {
               <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
             </View>
             <View style={styles.viewsTextContainer}>
-              <Text style={styles.viewsLabel}>Profile Views</Text>
-              <Text style={styles.viewsValue}>3,456</Text>
+              <Text style={styles.viewsLabel}>Today's Profile Views</Text>
+              <Text style={styles.viewsValue}>{dailyViews}</Text>
+            </View>
+            <View style={styles.viewersArrowContainer}>
+              <Feather name="chevron-right" size={20} color="#FFFFFF" />
             </View>
           </LinearGradient>
-        </View>
+        </TouchableOpacity>
         
         {/* Photos Section */}
         <View style={styles.photoSection}>
@@ -783,6 +828,24 @@ const ProfileScreen = () => {
           </Animated.View>
         </View>
       </Modal>
+      
+      {/* Profile Viewers Modal */}
+      <Modal
+        visible={showProfileViewers}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          setShowProfileViewers(false);
+        }}
+      >
+        <ProfileViewersSection 
+          title="Profile Viewers" 
+          subtitle="See who's viewing your profile"
+          onClose={() => {
+            setShowProfileViewers(false);
+          }} 
+        />
+      </Modal>
     </View>
   );
 };
@@ -874,14 +937,17 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
   },
-  profileCard: {
+  profileInfoCard: {
     margin: 12,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  profileCardGradient: {
+  profileInfoCardGradient: {
     paddingVertical: 24,
     paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  profileInfoContainer: {
     alignItems: 'center',
   },
   profileImage: {
@@ -892,7 +958,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'rgba(156, 132, 239, 1)',
   },
-  profileCardName: {
+  profileInfoTextContainer: {
+    alignItems: 'center',
+  },
+  profileName: {
     fontSize: 24,
     fontWeight: '700',
     color: '#FFFFFF',
@@ -903,6 +972,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '400',
     marginRight: 8,
+  },
+  viewsIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  viewsCount: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 5,
   },
   photoSection: {
     paddingTop: 10,
@@ -1032,6 +1114,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  viewersArrowContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   viewsCounterContainer: {
     marginHorizontal: 12,
     marginBottom: 15,
@@ -1061,6 +1151,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '500',
+  },
+  viewsTapHint: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontStyle: 'italic',
   },
   viewsValue: {
     color: '#FFFFFF',
