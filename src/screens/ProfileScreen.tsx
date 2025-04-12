@@ -51,20 +51,31 @@ const STATUS_CATEGORIES = {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const [showBioExpanded, setShowBioExpanded] = useState(false);
   const [userStatus, setUserStatus] = useState(STATUS_TYPES.ONLINE);
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
   const [closefriendsOnly, setClosefriendsOnly] = useState(false);
+  const [profileImage, setProfileImage] = useState('https://randomuser.me/api/portraits/women/33.jpg');
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
   
-  const toggleBioExpanded = () => {
-    setShowBioExpanded(!showBioExpanded);
-  };
-
   const navigateToAccount = () => {
     router.push('/(main)/account');
+  };
+
+  // Function to handle uploading a new photo
+  const handleAddPhoto = () => {
+    // In a real app, this would open the device's image picker
+    // For demo purposes, we'll just simulate adding a new random profile image
+    const newPhotoId = Math.floor(Math.random() * 70) + 1;
+    const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
+    
+    // The first photo you upload automatically becomes your profile picture
+    // This updates both the profile square at the top and the first photo in the gallery
+    setProfileImage(newProfileImage);
+    
+    // Here you would typically upload the image to your backend
+    console.log('Profile photo updated');
   };
 
   // Function to show status selector with animation
@@ -324,18 +335,12 @@ const ProfileScreen = () => {
             end={{ x: 1, y: 1 }}
             style={styles.profileCardGradient}
           >
-            <View style={styles.profileImageContainer}>
-              <Image 
-                source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }}
-                style={styles.profileImage}
-              />
-              <LinearGradient
-                colors={['rgba(156, 132, 239, 1)', 'rgba(244, 127, 255, 1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileImageBorder}
-              />
-            </View>
+            {/* Direct profile photo with frame */}
+            <Image 
+              source={{ uri: profileImage }} 
+              style={styles.profileImage}
+              resizeMode="cover"
+            />
             
             <Text style={styles.profileCardName}>Sophia Jack</Text>
             <Text style={[styles.profileUsername, {marginBottom: 0}]}>@Sophia93</Text>
@@ -384,7 +389,8 @@ const ProfileScreen = () => {
             style={styles.photosContainer}
             contentContainerStyle={styles.photosContent}
           >
-            <TouchableOpacity>
+            {/* Add Photo Button - First photo becomes your profile picture */}
+            <TouchableOpacity onPress={handleAddPhoto}>
               <LinearGradient
                 colors={['#6E69F4', '#9C84EF']}
                 start={{ x: 0, y: 0 }}
@@ -397,7 +403,23 @@ const ProfileScreen = () => {
               </LinearGradient>
             </TouchableOpacity>
             
-            {[32, 33, 34].map((id) => (
+            {/* Profile Photo Display - Shows same image as profile square */}
+            <TouchableOpacity style={styles.photoItemContainer}>
+              <View style={styles.profilePhotoContainer}>
+                <Image 
+                  source={{ uri: profileImage }} 
+                  style={styles.profilePhotoItem}
+                  resizeMode="cover"
+                />
+              </View>
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)']}
+                style={styles.photoGradient}
+              />
+            </TouchableOpacity>
+            
+            {/* Other photos */}
+            {[34, 32].map((id) => (
               <TouchableOpacity key={id} style={styles.photoItemContainer}>
                 <Image 
                   source={{ uri: `https://randomuser.me/api/portraits/women/${id}.jpg` }} 
@@ -450,71 +472,6 @@ const ProfileScreen = () => {
                 <Text style={styles.buyText}>Buy</Text>
               </LinearGradient>
             </TouchableOpacity>
-          </LinearGradient>
-        </View>
-        
-        {/* Profile Info Section */}
-        <View style={styles.profileInfoSection}>
-          <LinearGradient
-            colors={['#1C1D23', '#15151A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.profileInfoContainer}
-          >
-            <View style={styles.profileInfoHeader}>
-              <Text style={styles.profileName}>Sophia Jack</Text>
-              <TouchableOpacity style={styles.editProfileButton}>
-                <Feather name="edit-2" size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.usernameRow}>
-              <Text style={styles.profileUsername}>Sophia93</Text>
-              <View style={styles.profileVerifiedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color="#7ADA72" />
-              </View>
-            </View>
-            
-            <Text style={styles.fieldLabel}>Display Name</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                value="Sophia Jack"
-                placeholderTextColor="#FFFFFF"
-              />
-              <TouchableOpacity style={styles.clearButton}>
-                <AntDesign name="close" size={12} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.bioHeader}>
-              <Text style={styles.fieldLabel}>Bio</Text>
-              <TouchableOpacity 
-                onPress={toggleBioExpanded}
-                style={styles.expandButton}
-              >
-                <Text style={styles.expandButtonText}>
-                  {showBioExpanded ? 'Collapse' : 'Expand'}
-                </Text>
-                <Feather 
-                  name={showBioExpanded ? "chevron-up" : "chevron-down"} 
-                  size={14} 
-                  color="#9597A3" 
-                />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={[
-              styles.bioInputContainer,
-              showBioExpanded && styles.bioInputContainerExpanded
-            ]}>
-              <TextInput
-                style={styles.bioInput}
-                placeholder="Write about your self"
-                placeholderTextColor="#B8B8B8"
-                multiline
-              />
-            </View>
           </LinearGradient>
         </View>
         
@@ -919,27 +876,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  profileImageContainer: {
-    position: 'relative',
+  profileImage: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 12,
     marginBottom: 15,
-  },
-  profileImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-  },
-  profileImageBorder: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-    right: -5,
-    bottom: -5,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 3,
+    borderColor: 'rgba(156, 132, 239, 1)',
   },
   profileCardName: {
     fontSize: 24,
@@ -1081,156 +1024,93 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  statsAndCurrencySection: {
+  viewsCounterContainer: {
     marginHorizontal: 12,
-    marginVertical: 15,
+    marginBottom: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  statsContainer: {
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    flex: 1,
+  viewsCounter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 12,
   },
-  statIconContainer: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  viewsIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 15,
   },
-  statContent: {
-    marginLeft: 8,
+  viewsTextContainer: {
     flex: 1,
   },
-  statValue: {
+  viewsLabel: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '700',
-  },
-  statLabel: {
-    color: '#A8B3BD',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  addButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 5,
-  },
-  profileInfoSection: {
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: '#1C1D23',
-    marginTop: 10,
-  },
-  profileInfoContainer: {
-    borderRadius: 15,
-    padding: 20,
-  },
-  profileInfoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  profileName: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  editProfileButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  usernameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  profileVerifiedBadge: {
-    backgroundColor: 'rgba(122, 218, 114, 0.1)',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fieldLabel: {
-    color: '#A8B3BD',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  inputContainer: {
-    height: 54,
-    backgroundColor: 'rgba(28, 29, 35, 0.7)',
-    borderRadius: 10,
-    marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-  },
-  input: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    paddingVertical: 12,
-  },
-  clearButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bioHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  expandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  expandButtonText: {
-    color: '#9597A3',
-    fontSize: 12,
     fontWeight: '500',
   },
-  bioInputContainer: {
-    height: 100,
-    backgroundColor: 'rgba(28, 29, 35, 0.7)',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingTop: 15,
+  viewsValue: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
   },
-  bioInputContainerExpanded: {
-    height: 150,
+  gameTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#15151C',
   },
-  bioInput: {
+  currencyContainer: {
     flex: 1,
-    color: '#B8B8B8',
-    fontSize: 14,
-    fontWeight: '400',
-    textAlignVertical: 'top',
+    paddingHorizontal: 4,
+  },
+  currencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingRight: 12,
+    paddingLeft: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  diamondIconContainer: {
+    marginRight: 6,
+  },
+  diamondIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goldIconContainer: {
+    marginRight: 6,
+  },
+  goldIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyAmount: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   friendsSection: {
     flexDirection: 'row',
@@ -1460,93 +1340,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  gameTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#15151C',
-  },
-  currencyContainer: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  currencyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingRight: 12,
-    paddingLeft: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  diamondIconContainer: {
-    marginRight: 6,
-  },
-  diamondIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goldIconContainer: {
-    marginRight: 6,
-  },
-  goldIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  currencyAmount: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },
-  viewsCounterContainer: {
-    marginHorizontal: 12,
-    marginBottom: 15,
-    borderRadius: 12,
+  profilePhotoContainer: {
+    width: 83,
+    height: 126,
     overflow: 'hidden',
-  },
-  viewsCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
     borderRadius: 12,
+    backgroundColor: '#1E1F25',
   },
-  viewsIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  viewsTextContainer: {
-    flex: 1,
-  },
-  viewsLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  viewsValue: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
+  profilePhotoItem: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
   },
 });
 
