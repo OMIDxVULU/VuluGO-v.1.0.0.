@@ -13,6 +13,9 @@ import {
   Modal,
   Alert,
   ScrollView,
+  PanResponder,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -71,8 +74,23 @@ const ProfileScreen = () => {
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
   const [closefriendsOnly, setClosefriendsOnly] = useState(false);
   const [showProfileViewers, setShowProfileViewers] = useState(false);
+  const [showProfilePreview, setShowProfilePreview] = useState(false);
+  const [previewCurrentPage, setPreviewCurrentPage] = useState(0);
+  const [previewTotalPages, setPreviewTotalPages] = useState(3); // 2 images + 1 bio page
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
+  const profileScaleAnim = useRef(new Animated.Value(1)).current;
+  const headerOpacityAnim = useRef(new Animated.Value(1)).current;
+  
+  // Improve the PanResponder implementation to ensure all elements are draggable
+  const panY = useRef(new Animated.Value(0)).current;
+  const [isDismissing, setIsDismissing] = useState(false);
+  
+  // Add new state for the photo selection modal
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+  
+  // Add animation ref for photo options modal
+  const photoOptionsAnim = useRef(new Animated.Value(0)).current;
   
   // Increment views when the profile is opened
   useEffect(() => {
@@ -93,20 +111,72 @@ const ProfileScreen = () => {
     router.push('/(main)/account');
   };
 
-  // Function to handle uploading a new photo
+  // Update function to show photo options with animation
   const handleAddPhoto = () => {
-    // In a real app, this would open the device's image picker
-    // For demo purposes, we'll just simulate adding a new random profile image
-    const newPhotoId = Math.floor(Math.random() * 70) + 1;
-    const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
-    
-    // The first photo you upload automatically becomes your profile picture
-    // This updates both the profile square at the top and the first photo in the gallery
-    setProfileImage(newProfileImage);
-    
-    // Here you would typically upload the image to your backend
-    console.log('Profile photo updated');
+    setShowPhotoOptions(true);
+    Animated.timing(photoOptionsAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   };
+
+  // Function to hide photo options with animation
+  const hidePhotoOptions = () => {
+    Animated.timing(photoOptionsAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPhotoOptions(false);
+    });
+  };
+
+  // Update the take photo/upload photo handlers to use the hide function
+  const handleTakePhoto = () => {
+    // In a real app, this would open the camera
+    Alert.alert('Camera', 'Opening camera for selfie...');
+    
+    hidePhotoOptions();
+    
+    // For demo purposes, simulate taking a photo with a delay
+    setTimeout(() => {
+      const newPhotoId = Math.floor(Math.random() * 70) + 1;
+      const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
+      setProfileImage(newProfileImage);
+      
+      // Show success message
+      Alert.alert('Success', 'Your new selfie has been added to your profile!');
+    }, 1500);
+  };
+
+  const handleUploadPhoto = () => {
+    // In a real app, this would open the photo gallery
+    Alert.alert('Photo Gallery', 'Opening photo gallery...');
+    
+    hidePhotoOptions();
+    
+    // For demo purposes, simulate selecting a photo with a delay
+    setTimeout(() => {
+      const newPhotoId = Math.floor(Math.random() * 70) + 1;
+      const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
+      setProfileImage(newProfileImage);
+      
+      // Show success message
+      Alert.alert('Success', 'Your selected photo has been added to your profile!');
+    }, 1500);
+  };
+
+  // Calculate photo options animations
+  const photoOptionsTranslateY = photoOptionsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [600, 0],
+  });
+
+  const photoOptionsOpacity = photoOptionsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   // Function to show status selector with animation
   const showStatusMenu = () => {
@@ -248,12 +318,12 @@ const ProfileScreen = () => {
   const statusData = getStatusData();
 
   // Status selector animation calculations
-  const translateY = statusSelectorAnim.interpolate({
+  const statusSelectorTranslateY = statusSelectorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [300, 0],
+    outputRange: [600, 0],
   });
 
-  const opacity = statusSelectorAnim.interpolate({
+  const statusSelectorOpacity = statusSelectorAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
@@ -273,14 +343,147 @@ const ProfileScreen = () => {
     setShowProfileViewers(true);
   };
 
+  // Function to handle preview navigation
+  const navigatePreview = (direction: 'next' | 'prev') => {
+    if (direction === 'next') {
+      if (previewCurrentPage < previewTotalPages - 1) {
+        setPreviewCurrentPage(previewCurrentPage + 1);
+      } else {
+        // If on last page and going forward, circle back to first page
+        setPreviewCurrentPage(0);
+      }
+    } else {
+      if (previewCurrentPage > 0) {
+        setPreviewCurrentPage(previewCurrentPage - 1);
+      } else {
+        // If on first page and going back, circle to last page
+        setPreviewCurrentPage(previewTotalPages - 1);
+      }
+    }
+  };
+
+  // Function to reset preview when opening
+  const openPreview = () => {
+    panY.setValue(0);
+    setPreviewCurrentPage(0);
+    setShowProfilePreview(true);
+  };
+
+  // Add scroll handler for animations
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: new Animated.Value(0) } } }],
+    {
+      useNativeDriver: false,
+      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const scrollY = event.nativeEvent.contentOffset.y;
+        // Scale profile image down slightly when scrolling
+        if (scrollY > 0) {
+          Animated.spring(profileScaleAnim, {
+            toValue: 0.95,
+            tension: 100,
+            friction: 5,
+            useNativeDriver: true,
+          }).start();
+          // Fade header
+          Animated.timing(headerOpacityAnim, {
+            toValue: 0.8,
+            duration: 150,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          Animated.spring(profileScaleAnim, {
+            toValue: 1,
+            tension: 100,
+            friction: 5,
+            useNativeDriver: true,
+          }).start();
+          // Restore header
+          Animated.timing(headerOpacityAnim, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    }
+  );
+
+  // Update dismiss function to prevent flash
+  const dismissPreview = () => {
+    if (isDismissing) return; // Prevent multiple calls
+    
+    setIsDismissing(true);
+    
+    // Run animation
+    Animated.timing(panY, {
+      toValue: -1500,
+      duration: 350,
+      useNativeDriver: true,
+    }).start(() => {
+      // Only hide the modal after animation completes
+      setShowProfilePreview(false);
+      // Reset state after hiding
+      setTimeout(() => {
+        panY.setValue(0);
+        setIsDismissing(false);
+      }, 200);
+    });
+  };
+
+  // Update PanResponder to use the new dismiss function
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
+      },
+      onPanResponderGrant: () => {
+        panY.extractOffset();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 50) {
+          panY.setValue(50);
+        } else {
+          panY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        panY.flattenOffset();
+        
+        if (gestureState.dy < -60 || gestureState.vy < -0.5) {
+          dismissPreview();
+        } else {
+          Animated.spring(panY, {
+            toValue: 0,
+            tension: 40,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        panY.flattenOffset();
+        Animated.spring(panY, {
+          toValue: 0,
+          tension: 40,
+          friction: 5,
+          useNativeDriver: true,
+        }).start();
+      }
+    })
+  ).current;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* Header with title only - top most element */}
-      <View style={styles.header}>
+      {/* Animated Header with title */}
+      <Animated.View style={[
+        styles.header,
+        { opacity: headerOpacityAnim }
+      ]}>
         <Text style={styles.headerTitle}>Profile</Text>
-      </View>
+      </Animated.View>
       
       {/* Game-style currency top bar - moved under the header */}
       <View style={styles.gameTopBar}>
@@ -329,9 +532,11 @@ const ProfileScreen = () => {
         </View>
       </View>
       
-      <ScrollableContentContainer
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Status Section */}
         <View style={styles.statusSection}>
@@ -373,7 +578,7 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Profile Info Card */}
+        {/* Enhanced Profile Info Card */}
         <View style={styles.profileInfoCard}>
           <LinearGradient
             colors={['#6E69F4', '#C549BC']}
@@ -381,16 +586,28 @@ const ProfileScreen = () => {
             end={{ x: 1, y: 1 }}
             style={styles.profileInfoCardGradient}
           >
-            <View style={styles.profileInfoContainer}>
-              <Image 
-                source={{ uri: profileImage }} 
-                style={styles.profileImage} 
-              />
+            <Animated.View style={[
+              styles.profileInfoContainer,
+              { transform: [{ scale: profileScaleAnim }] }
+            ]}>
+              <TouchableOpacity 
+                activeOpacity={0.9}
+                onPress={openPreview}
+                style={styles.profileImageTouchable}
+              >
+                <Image 
+                  source={{ uri: profileImage }} 
+                  style={styles.profileImage} 
+                />
+                <View style={styles.profileImageOverlay}>
+                  <Feather name="eye" size={24} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
               <View style={styles.profileInfoTextContainer}>
                 <Text style={styles.profileName}>Sophia Jack</Text>
                 <Text style={styles.profileUsername}>@Sophia93</Text>
               </View>
-            </View>
+            </Animated.View>
           </LinearGradient>
         </View>
         
@@ -423,7 +640,7 @@ const ProfileScreen = () => {
           {/* Photos Section Header */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Your Photos (3)</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={openPreview}>
               <LinearGradient
                 colors={['#7872F4', '#5865F2']}
                 start={{ x: 0, y: 0 }}
@@ -488,69 +705,72 @@ const ProfileScreen = () => {
         </View>
         
         {/* Gem+ Section */}
-        <View style={styles.gemSection}>
-          <LinearGradient
-            colors={['#272931', '#1E1F25']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gemIconContainer}
-          >
+        <View style={styles.sectionContainer}>
+          <View style={styles.gemSection}>
             <LinearGradient
-              colors={['#9C84EF', '#F47FFF']}
+              colors={['rgba(110, 105, 244, 0.15)', 'rgba(196, 73, 188, 0.15)']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.gemIcon}
+              style={styles.gemIconContainer}
             >
-              <MaterialCommunityIcons name="diamond-stone" size={24} color="#FFFFFF" />
-            </LinearGradient>
-          </LinearGradient>
-          
-          <LinearGradient
-            colors={['#272931', '#1E1F25']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gemInfoContainer}
-          >
-            <Text style={styles.gemLabel}>Gem+</Text>
-            <View style={styles.inactiveButton}>
-              <Text style={styles.inactiveText}>Inactive</Text>
-            </View>
-            <TouchableOpacity>
               <LinearGradient
-                colors={['#6E69F4', '#5865F2']}
+                colors={['#9C84EF', '#F47FFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.buyButton}
+                style={styles.gemIcon}
               >
-                <Text style={styles.buyText}>Buy</Text>
+                <MaterialCommunityIcons name="diamond-stone" size={24} color="#FFFFFF" />
               </LinearGradient>
-            </TouchableOpacity>
-          </LinearGradient>
+            </LinearGradient>
+            
+            <View style={styles.gemInfoContainer}>
+              <View style={styles.gemLabelContainer}>
+                <Text style={styles.gemLabel}>Gem+</Text>
+                <View style={styles.inactiveButton}>
+                  <Text style={styles.inactiveText}>Inactive</Text>
+                </View>
+              </View>
+              
+              <TouchableOpacity>
+                <LinearGradient
+                  colors={['#6E69F4', '#5865F2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.buyButton}
+                >
+                  <Text style={styles.buyText}>Buy</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
         
         {/* Friends Section */}
-        <TouchableOpacity>
-          <LinearGradient
-            colors={['#1C1D23', '#15151A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.friendsSection}
-          >
-            <View style={styles.friendsSectionLeft}>
-              <Text style={styles.friendsText}>Your Friends</Text>
-              <View style={styles.friendsCountBadge}>
-                <Text style={styles.friendsCountText}>48</Text>
+        <View style={styles.sectionContainer}>
+          <TouchableOpacity activeOpacity={0.8}>
+            <LinearGradient
+              colors={['rgba(110, 105, 244, 0.15)', 'rgba(88, 101, 242, 0.15)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.friendsSection}
+            >
+              <View style={styles.friendsSectionLeft}>
+                <Feather name="users" size={20} color="#FFFFFF" style={styles.friendsIcon} />
+                <Text style={styles.friendsText}>Your Friends</Text>
+                <View style={styles.friendsCountBadge}>
+                  <Text style={styles.friendsCountText}>48</Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.friendsArrowContainer}>
-              <Feather name="chevron-right" size={16} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
+              <View style={styles.friendsArrowContainer}>
+                <Feather name="chevron-right" size={16} color="#FFFFFF" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
         
         {/* Spacing for bottom of screen */}
         <View style={{ height: 70 }} />
-      </ScrollableContentContainer>
+      </ScrollView>
 
       {/* Status Selector Modal */}
       <Modal
@@ -565,12 +785,13 @@ const ProfileScreen = () => {
             activeOpacity={1}
             onPress={hideStatusMenu}
           />
+          
           <Animated.View 
             style={[
               styles.statusSelectorContainer,
               {
-                transform: [{ translateY }],
-                opacity,
+                transform: [{ translateY: statusSelectorTranslateY }],
+                opacity: statusSelectorOpacity,
               }
             ]}
           >
@@ -846,6 +1067,231 @@ const ProfileScreen = () => {
           }} 
         />
       </Modal>
+      
+      {/* Profile Preview Modal */}
+      <Modal
+        visible={showProfilePreview}
+        transparent
+        animationType="none"
+        onRequestClose={dismissPreview}
+      >
+        <Animated.View style={[
+          styles.previewOverlay,
+          { 
+            opacity: panY.interpolate({
+              inputRange: [-300, 0],
+              outputRange: [0, 1],
+              extrapolate: 'clamp'
+            }) 
+          }
+        ]}>
+          <TouchableOpacity 
+            style={styles.previewOverlayTouchable}
+            activeOpacity={1}
+            onPress={dismissPreview}
+          />
+          
+          <Animated.View 
+            style={[
+              styles.previewCard,
+              { 
+                transform: [{ translateY: panY }],
+                opacity: panY.interpolate({
+                  inputRange: [-200, -100, 0, 50],
+                  outputRange: [0, 0.5, 1, 1],
+                  extrapolate: 'clamp'
+                })
+              }
+            ]}
+            {...panResponder.panHandlers}
+          >
+            {/* Improved swipe indicator line */}
+            <View style={styles.swipeIndicatorContainer}>
+              <View style={styles.swipeIndicator} />
+              <Text style={styles.swipeHintText}>@Sophia93</Text>
+            </View>
+            
+            {/* Pagination dots */}
+            <View style={styles.paginationContainer}>
+              <View style={styles.paginationDots}>
+                {Array.from({ length: previewTotalPages }).map((_, index) => (
+                  <View 
+                    key={`dot-${index}`}
+                    style={[
+                      styles.paginationDot, 
+                      previewCurrentPage === index && styles.paginationDotActive
+                    ]} 
+                  />
+                ))}
+              </View>
+            </View>
+            
+            {/* Content (images or bio) */}
+            {previewCurrentPage === previewTotalPages - 1 ? (
+              // Bio page - improved styling
+              <View style={styles.previewBioContainer}>
+                {/* Left side click area for previous */}
+                <TouchableOpacity
+                  style={styles.previewNavigationLeft}
+                  activeOpacity={0.8}
+                  onPress={() => navigatePreview('prev')}
+                />
+                
+                {/* Right side click area for next */}
+                <TouchableOpacity
+                  style={styles.previewNavigationRight}
+                  activeOpacity={0.8}
+                  onPress={() => navigatePreview('next')}
+                />
+                
+                <Text style={styles.previewDisplayNameBio}>Sophia Jack</Text>
+                <View style={styles.bioSeparator} />
+                
+                <Text style={styles.previewBioTitle}>About Me</Text>
+                <Text style={styles.previewBioText}>
+                  Hey there! I'm Sophia. I love photography, music, and exploring new places.
+                  Feel free to message me anytime! 💫
+                </Text>
+              </View>
+            ) : (
+              // Image pages - with top and bottom gradients
+              <View style={styles.previewImageContainer}>
+                {/* Left side click area for previous */}
+                <TouchableOpacity
+                  style={styles.previewNavigationLeft}
+                  activeOpacity={0.8}
+                  onPress={() => navigatePreview('prev')}
+                />
+                
+                {/* Right side click area for next */}
+                <TouchableOpacity
+                  style={styles.previewNavigationRight}
+                  activeOpacity={0.8}
+                  onPress={() => navigatePreview('next')}
+                />
+                
+                <Image 
+                  source={{ uri: previewCurrentPage === 0 
+                    ? profileImage 
+                    : `https://randomuser.me/api/portraits/women/${30 + previewCurrentPage}.jpg` 
+                  }}
+                  style={styles.previewImage}
+                  resizeMode="cover"
+                />
+                
+                {/* Top info overlay with gradient for header */}
+                <LinearGradient
+                  colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'transparent']}
+                  style={styles.previewImageTopOverlay}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                >
+                  <TouchableOpacity 
+                    style={styles.previewBackButton}
+                    onPress={dismissPreview}
+                  >
+                    <Feather name="chevron-left" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.previewNameContainer}>
+                    <Text style={styles.previewDisplayNameImage}>Sophia Jack</Text>
+                    <View style={styles.previewUsernameWrapper}>
+                      <Text style={styles.previewUsername}>@Sophia93</Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity style={styles.previewMoreButton}>
+                    <Feather name="more-vertical" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </LinearGradient>
+                
+                {/* Bottom info overlay with gradient */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                  style={styles.previewImageBottomOverlay}
+                >
+                  <Text style={styles.previewImageDimensions}>1000×1800</Text>
+                </LinearGradient>
+              </View>
+            )}
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+      
+      {/* Photo Options Modal */}
+      <Modal
+        visible={showPhotoOptions}
+        transparent
+        animationType="none"
+        onRequestClose={hidePhotoOptions}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalOverlayTouchable}
+            activeOpacity={1}
+            onPress={hidePhotoOptions}
+          />
+          
+          <Animated.View
+            style={[
+              styles.photoOptionsContainer,
+              {
+                transform: [{ translateY: photoOptionsTranslateY }],
+                opacity: photoOptionsOpacity,
+              }
+            ]}
+          >
+            <View style={styles.photoOptionsHandle} />
+            <Text style={styles.photoOptionsTitle}>Add Photo</Text>
+            
+            <TouchableOpacity 
+              style={styles.photoOptionButton}
+              activeOpacity={0.8}
+              onPress={handleTakePhoto}
+            >
+              <LinearGradient
+                colors={['#6E69F4', '#8C67D4']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.photoOptionIconContainer}
+              >
+                <Ionicons name="camera" size={24} color="#FFFFFF" />
+              </LinearGradient>
+              <View style={styles.photoOptionTextContainer}>
+                <Text style={styles.photoOptionTitle}>Take Selfie</Text>
+                <Text style={styles.photoOptionSubtitle}>Open camera to take a new photo</Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.photoOptionButton}
+              activeOpacity={0.8}
+              onPress={handleUploadPhoto}
+            >
+              <LinearGradient
+                colors={['#6E69F4', '#8C67D4']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.photoOptionIconContainer}
+              >
+                <Ionicons name="images" size={24} color="#FFFFFF" />
+              </LinearGradient>
+              <View style={styles.photoOptionTextContainer}>
+                <Text style={styles.photoOptionTitle}>Upload from Gallery</Text>
+                <Text style={styles.photoOptionSubtitle}>Choose a photo from your device</Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              activeOpacity={0.7}
+              onPress={hidePhotoOptions}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -861,6 +1307,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#131318',
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 28,
@@ -946,32 +1394,61 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 10,
   },
   profileInfoContainer: {
     alignItems: 'center',
+    width: '100%',
   },
-  profileImage: {
-    width: 100,
-    height: 100,
+  profileImageTouchable: {
+    position: 'relative',
     borderRadius: 12,
     marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  profileImage: {
+    width: 110,
+    height: 110,
+    borderRadius: 12,
     borderWidth: 3,
     borderColor: 'rgba(156, 132, 239, 1)',
+  },
+  profileImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0,
   },
   profileInfoTextContainer: {
     alignItems: 'center',
   },
   profileName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   profileUsername: {
-    color: '#A8B3BD',
+    color: '#E0E0E0',
     fontSize: 16,
     fontWeight: '400',
-    marginRight: 8,
   },
   viewsIndicator: {
     flexDirection: 'row',
@@ -987,14 +1464,15 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   photoSection: {
-    paddingTop: 10,
+    paddingTop: 15,
+    marginBottom: 15,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
     backgroundColor: '#1C1D23',
   },
   sectionTitle: {
@@ -1056,35 +1534,47 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
   },
+  sectionContainer: {
+    marginHorizontal: 12,
+    marginTop: 15,
+  },
   gemSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     backgroundColor: '#1C1D23',
+    borderRadius: 16,
     gap: 16,
   },
   gemIconContainer: {
-    width: 65,
-    height: 65,
-    borderRadius: 15,
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   gemIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   gemInfoContainer: {
     flex: 1,
-    height: 65,
-    borderRadius: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    justifyContent: 'space-between',
+  },
+  gemLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   gemLabel: {
     color: '#FFFFFF',
@@ -1093,153 +1583,52 @@ const styles = StyleSheet.create({
   },
   inactiveButton: {
     backgroundColor: '#535864',
-    borderRadius: 20.5,
+    borderRadius: 20,
     paddingVertical: 4,
-    paddingHorizontal: 13,
+    paddingHorizontal: 12,
     marginLeft: 10,
   },
   inactiveText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
   buyButton: {
-    borderRadius: 20.5,
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    marginLeft: 'auto',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
   },
   buyText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-  },
-  viewersArrowContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewsCounterContainer: {
-    marginHorizontal: 12,
-    marginBottom: 15,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  viewsCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 12,
-  },
-  viewsIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  viewsTextContainer: {
-    flex: 1,
-  },
-  viewsLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  viewsTapHint: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontStyle: 'italic',
-  },
-  viewsValue: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  gameTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#15151C',
-  },
-  currencyContainer: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  currencyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingRight: 12,
-    paddingLeft: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  diamondIconContainer: {
-    marginRight: 6,
-  },
-  diamondIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goldIconContainer: {
-    marginRight: 6,
-  },
-  goldIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  currencyAmount: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
   },
   friendsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: 15,
-    marginTop: 15,
-    backgroundColor: 'rgba(21, 21, 26, 0.7)',
-    borderRadius: 15,
+    backgroundColor: '#1C1D23',
+    borderRadius: 16,
     padding: 18,
   },
   friendsSectionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+  },
+  friendsIcon: {
+    marginRight: 12,
   },
   friendsText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
   friendsCountBadge: {
-    backgroundColor: 'rgba(156, 132, 239, 0.3)',
+    backgroundColor: 'rgba(110, 105, 244, 0.3)',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
+    marginLeft: 10,
   },
   friendsCountText: {
     color: '#FFFFFF',
@@ -1247,17 +1636,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   friendsArrowContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlayTouchable: {
     position: 'absolute',
@@ -1267,17 +1657,22 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   statusSelectorContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#1C1D23',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingVertical: 20,
     paddingHorizontal: 15,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20, // Extra padding for iPhone
   },
   statusSelectorHandle: {
     width: 40,
     height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#3E4148',
-    borderRadius: 3,
     alignSelf: 'center',
     marginBottom: 20,
   },
@@ -1456,6 +1851,375 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 12,
+  },
+  gameTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#15151C',
+  },
+  currencyContainer: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  currencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingRight: 12,
+    paddingLeft: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  diamondIconContainer: {
+    marginRight: 6,
+  },
+  diamondIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goldIconContainer: {
+    marginRight: 6,
+  },
+  goldIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currencyAmount: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  viewersArrowContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewsCounterContainer: {
+    marginHorizontal: 12,
+    marginBottom: 15,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  viewsCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    borderRadius: 16,
+  },
+  viewsIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  viewsTextContainer: {
+    flex: 1,
+  },
+  viewsLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  viewsValue: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewOverlayTouchable: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  previewCard: {
+    width: '90%',
+    height: '80%',
+    backgroundColor: '#1A1A20',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  swipeIndicatorContainer: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 5,
+  },
+  swipeIndicator: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  swipeHintText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  paginationContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  paginationDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    backgroundColor: '#FFFFFF',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  previewImageContainer: {
+    flex: 1,
+    position: 'relative',
+    margin: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#0D0D12',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E74C3C',
+  },
+  previewImageTopOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    zIndex: 10,
+  },
+  previewNameContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  previewDisplayNameImage: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    marginBottom: 4,
+  },
+  previewUsernameWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewUsername: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  previewMoreButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImageBottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    alignItems: 'flex-end',
+  },
+  previewImageDimensions: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+  },
+  previewBioContainer: {
+    flex: 1,
+    padding: 22,
+    backgroundColor: '#1C1D23',
+    margin: 10,
+    borderRadius: 16,
+    position: 'relative',
+  },
+  previewDisplayNameBio: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  bioSeparator: {
+    height: 2,
+    backgroundColor: 'rgba(110, 105, 244, 0.5)',
+    width: 60,
+    marginVertical: 12,
+    borderRadius: 1,
+  },
+  previewBioTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  previewBioText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  previewNavigationLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '40%',
+    zIndex: 10,
+  },
+  previewNavigationRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '60%',
+    zIndex: 10,
+  },
+  previewBackButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoOptionsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1C1D23',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20, // Extra padding for iPhone
+  },
+  photoOptionsHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#3E4148',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  photoOptionsTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  photoOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#292B31',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  photoOptionIconContainer: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  photoOptionTextContainer: {
+    flex: 1,
+  },
+  photoOptionTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  photoOptionSubtitle: {
+    color: '#A8B3BD',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  cancelButton: {
+    backgroundColor: '#35383F',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
