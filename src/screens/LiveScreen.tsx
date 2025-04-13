@@ -642,8 +642,7 @@ const LiveScreen = () => {
   const renderGlobalChatSection = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Text Channels</Text>
-        <Pressable 
+        <TouchableOpacity 
           style={styles.globalChatButton} 
           onPress={() => router.push({
             pathname: '/chat',
@@ -652,14 +651,28 @@ const LiveScreen = () => {
             }
           })}
         >
-          <View style={styles.chatButtonContent}>
-            <MaterialIcons name="chat" size={24} color="#FFFFFF" style={styles.chatIcon} />
-            <Text style={styles.chatButtonText}>Global chat</Text>
-          </View>
-          <View style={styles.chatNotificationBadge}>
-            <Text style={styles.notificationText}>2</Text>
-          </View>
-        </Pressable>
+          <LinearGradient
+            colors={['#1D1E26', '#2A2B38']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.globalChatGradient}
+          >
+            <View style={styles.chatButtonContent}>
+              <View style={styles.chatIconContainer}>
+                <LinearGradient
+                  colors={['#3D3E48', '#2D2E38']}
+                  style={styles.chatIconGradient}
+                >
+                  <MaterialIcons name="chat" size={18} color="#FFFFFF" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.chatButtonText}>Global chat</Text>
+            </View>
+            <View style={styles.chatNotificationBadge}>
+              <Text style={styles.notificationText}>2</Text>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -935,15 +948,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginRight: 12,
     padding: 8,
-    shadowColor: '#000',
+    shadowColor: 'rgba(0, 0, 0, 0.5)',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 5,
     elevation: 6,
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(45, 46, 56, 0.8)',
   },
   
   spotlightAvatarWrapper: {
@@ -1151,30 +1164,57 @@ const styles = StyleSheet.create({
   
   // Global Chat Section
   globalChatButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: 'rgba(0, 0, 0, 0.5)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(45, 46, 56, 0.8)',
+  },
+  globalChatGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
   },
   chatButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  chatIcon: {
-    marginRight: 12,
+  chatIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(70, 71, 82, 0.4)',
+  },
+  chatIconGradient: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chatButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.2,
   },
   chatNotificationBadge: {
     backgroundColor: '#F23535',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    shadowColor: 'rgba(242, 53, 53, 0.3)',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 2,
+    elevation: 3,
   },
   notificationText: {
     color: '#FFFFFF',
