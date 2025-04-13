@@ -461,9 +461,12 @@ const LiveScreen = () => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, {marginBottom: 0}]}>{""}</Text>
-          <View style={styles.spotlightCounter}>
-            <Text style={styles.spotlightCountText}>4 online friends</Text>
+          <View style={styles.headerWithIndicator}>
+            <Text style={[styles.sectionTitle, {marginBottom: 0}]}>{"Friends"}</Text>
+            <View style={styles.spotlightCounter}>
+              <Ionicons name="people" size={12} color="#FFFFFF" style={{marginRight: 4}} />
+              <Text style={styles.spotlightCountText}>4 online</Text>
+            </View>
           </View>
         </View>
         
@@ -494,9 +497,9 @@ const LiveScreen = () => {
                 isCurrentUserSpotlighted ? 
                   styles.spotlightAvatarGreen : 
                   { 
-                    width: 50,
-                    height: 50,
-                    borderRadius: 12,
+                    width: 62,
+                    height: 62,
+                    borderRadius: 14,
                     borderWidth: 2,
                     borderColor: getStatusColor(userStatus),
                     overflow: 'hidden',
@@ -507,11 +510,6 @@ const LiveScreen = () => {
                   source={{ uri: userProfileImage }}
                   style={styles.spotlightAvatar}
                 />
-                <UserStatusIndicator
-                  status={isCurrentUserSpotlighted ? "spotlight" : userStatus}
-                  pillStyle={styles.statusPill}
-                  textStyle={styles.statusPillText}
-                />
               </View>
             </View>
             <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
@@ -519,7 +517,7 @@ const LiveScreen = () => {
                 styles.spotlightName, 
                 isCurrentUserSpotlighted ? { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}
               ]}>
-                {""}
+                {"You"}
               </Text>
               <Text style={[
                 styles.spotlightStatus, 
@@ -550,11 +548,6 @@ const LiveScreen = () => {
                     source={{ uri: currentSpotlight.avatar }} 
                     style={styles.spotlightAvatar}
                   />
-                  <UserStatusIndicator
-                    status="spotlight"
-                    pillStyle={styles.statusPill}
-                    textStyle={styles.statusPillText}
-                  />
                 </View>
               </View>
               <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
@@ -576,11 +569,6 @@ const LiveScreen = () => {
                   source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
                   style={styles.spotlightAvatar}
                 />
-                <UserStatusIndicator
-                  status="hosting"
-                  pillStyle={styles.statusPill}
-                  textStyle={styles.statusPillText}
-                />
               </View>
             </View>
             <View style={styles.spotlightInfoWrapper}>
@@ -596,11 +584,6 @@ const LiveScreen = () => {
                 <Image 
                   source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
                   style={styles.spotlightAvatar}
-                />
-                <UserStatusIndicator
-                  status="watching"
-                  pillStyle={styles.statusPill}
-                  textStyle={styles.statusPillText}
                 />
               </View>
             </View>
@@ -935,7 +918,7 @@ const styles = StyleSheet.create({
   
   // Spotlight Section
   spotlightScroll: {
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingRight: 16,
   },
   
@@ -946,11 +929,11 @@ const styles = StyleSheet.create({
   },
   
   spotlightContainer: {
-    height: 100,
-    width: 90,
+    height: 120,
+    width: 100,
     backgroundColor: '#1D1E26',
-    borderRadius: 14,
-    marginRight: 10,
+    borderRadius: 16,
+    marginRight: 12,
     padding: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -964,17 +947,18 @@ const styles = StyleSheet.create({
   },
   
   spotlightAvatarWrapper: {
-    width: 56,
-    height: 56,
+    width: 70,
+    height: 70,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 6,
   },
   
   spotlightAvatarBlue: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 62,
+    height: 62,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#4B8BFF',
     overflow: 'hidden',
@@ -982,9 +966,9 @@ const styles = StyleSheet.create({
   },
   
   spotlightAvatarRed: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 62,
+    height: 62,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#FF4B4B',
     overflow: 'hidden',
@@ -992,9 +976,9 @@ const styles = StyleSheet.create({
   },
   
   spotlightAvatarGreen: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
+    width: 62,
+    height: 62,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#34C759',
     overflow: 'hidden',
@@ -1039,14 +1023,14 @@ const styles = StyleSheet.create({
   // New status indicator style that replaces the dot
   statusPill: {
     position: 'absolute',
-    bottom: -12,
+    bottom: -10,
     alignSelf: 'center',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
     backgroundColor: '#1D1E26',
     borderWidth: 1,
-    minWidth: 40,
+    minWidth: 46,
     alignItems: 'center',
     zIndex: 10,
   },
@@ -1060,14 +1044,16 @@ const styles = StyleSheet.create({
   
   spotlightCounter: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   
   spotlightCountText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
   },
   
   circularProgress: {
@@ -1446,6 +1432,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  
+  headerWithIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });
 
