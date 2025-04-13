@@ -92,6 +92,100 @@ const ProfileScreen = () => {
   // Add animation ref for photo options modal
   const photoOptionsAnim = useRef(new Animated.Value(0)).current;
   
+  // Add new state for friends modal and mock friends data
+  const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [friends, setFriends] = useState([
+    {
+      id: '1',
+      name: 'Emma Wilson',
+      username: '@emmaw',
+      avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
+      online: true,
+      status: 'online'
+    },
+    {
+      id: '2',
+      name: 'Jack Reynolds',
+      username: '@jackr',
+      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+      online: true,
+      status: 'busy'
+    },
+    {
+      id: '3',
+      name: 'Sophie Turner',
+      username: '@sophiet',
+      avatar: 'https://randomuser.me/api/portraits/women/28.jpg',
+      online: false,
+      status: 'offline'
+    },
+    {
+      id: '4',
+      name: 'Liam Chen',
+      username: '@liamc',
+      avatar: 'https://randomuser.me/api/portraits/men/44.jpg',
+      online: true,
+      status: 'happy'
+    },
+    {
+      id: '5',
+      name: 'Olivia Baker',
+      username: '@oliviab',
+      avatar: 'https://randomuser.me/api/portraits/women/15.jpg',
+      online: true,
+      status: 'online'
+    },
+    {
+      id: '6',
+      name: 'Noah Garcia',
+      username: '@noahg',
+      avatar: 'https://randomuser.me/api/portraits/men/23.jpg',
+      online: false,
+      status: 'offline'
+    },
+    {
+      id: '7',
+      name: 'Ava Martinez',
+      username: '@avam',
+      avatar: 'https://randomuser.me/api/portraits/women/19.jpg',
+      online: true,
+      status: 'excited'
+    },
+    {
+      id: '8',
+      name: 'James Johnson',
+      username: '@jamesj',
+      avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
+      online: true,
+      status: 'busy'
+    }
+  ]);
+  
+  // Add state for filtered friends and search query
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [filteredFriends, setFilteredFriends] = useState(friends);
+  
+  // Add useEffect to filter friends when search query changes
+  useEffect(() => {
+    if (!friendSearchQuery.trim()) {
+      setFilteredFriends(friends);
+      return;
+    }
+    
+    const query = friendSearchQuery.toLowerCase().trim();
+    const results = friends.filter(friend => 
+      friend.name.toLowerCase().includes(query) || 
+      friend.username.toLowerCase().includes(query)
+    );
+    
+    setFilteredFriends(results);
+  }, [friendSearchQuery, friends]);
+  
+  // Add search input handler
+  const handleFriendSearch = (text: string) => {
+    setFriendSearchQuery(text);
+  };
+  
   // Increment views when the profile is opened
   useEffect(() => {
     incrementViews();
@@ -473,6 +567,18 @@ const ProfileScreen = () => {
     })
   ).current;
 
+  // Function to get status color based on friend's status
+  const getFriendStatusColor = (status: string): string => {
+    switch(status) {
+      case 'online': return '#7ADA72';
+      case 'busy': return '#E57373';
+      case 'offline': return '#35383F';
+      case 'happy': return '#FFD700';
+      case 'excited': return '#FF5CAD';
+      default: return '#7ADA72';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -747,7 +853,10 @@ const ProfileScreen = () => {
         
         {/* Friends Section */}
         <View style={styles.sectionContainer}>
-          <TouchableOpacity activeOpacity={0.8}>
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => setShowFriendsModal(true)}
+          >
             <LinearGradient
               colors={['rgba(110, 105, 244, 0.15)', 'rgba(88, 101, 242, 0.15)']}
               start={{ x: 0, y: 0 }}
@@ -758,7 +867,7 @@ const ProfileScreen = () => {
                 <Feather name="users" size={20} color="#FFFFFF" style={styles.friendsIcon} />
                 <Text style={styles.friendsText}>Your Friends</Text>
                 <View style={styles.friendsCountBadge}>
-                  <Text style={styles.friendsCountText}>48</Text>
+                  <Text style={styles.friendsCountText}>{friends.length}</Text>
                 </View>
               </View>
               <View style={styles.friendsArrowContainer}>
@@ -1290,6 +1399,81 @@ const ProfileScreen = () => {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Friends Modal */}
+      <Modal
+        visible={showFriendsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFriendsModal(false)}
+      >
+        <View style={styles.friendsModalContainer}>
+          <View style={styles.friendsModalHeader}>
+            <TouchableOpacity 
+              style={styles.friendsModalBackButton}
+              onPress={() => setShowFriendsModal(false)}
+            >
+              <Feather name="arrow-left" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.friendsModalTitle}>Your Friends</Text>
+            <TouchableOpacity style={styles.friendsModalAction}>
+              <Feather name="user-plus" size={22} color="#6E69F4" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.friendsSearchContainer}>
+            <View style={styles.friendsSearchBar}>
+              <Feather name="search" size={18} color="#A8B3BD" />
+              <TextInput
+                style={styles.friendsSearchInput}
+                placeholder="Search friends..."
+                placeholderTextColor="#A8B3BD"
+                value={friendSearchQuery}
+                onChangeText={handleFriendSearch}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+          
+          <ScrollView style={styles.friendsListContainer}>
+            {filteredFriends.length > 0 ? (
+              filteredFriends.map(friend => (
+                <TouchableOpacity key={friend.id} style={styles.friendItem}>
+                  <View style={styles.friendAvatarContainer}>
+                    <Image
+                      source={{ uri: friend.avatar }}
+                      style={styles.friendAvatar}
+                    />
+                    <View 
+                      style={[
+                        styles.friendStatusDot,
+                        { backgroundColor: getFriendStatusColor(friend.status) }
+                      ]} 
+                    />
+                  </View>
+                  
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{friend.name}</Text>
+                    <Text style={styles.friendUsername}>{friend.username}</Text>
+                  </View>
+                  
+                  <View style={styles.friendActions}>
+                    <TouchableOpacity style={styles.friendActionButton}>
+                      <Feather name="message-circle" size={22} color="#6E69F4" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.noResultsContainer}>
+                <Feather name="search" size={52} color="#535864" />
+                <Text style={styles.noResultsText}>No friends found</Text>
+                <Text style={styles.noResultsSubText}>Try a different search term</Text>
+              </View>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -2220,6 +2404,126 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  friendsModalContainer: {
+    flex: 1,
+    backgroundColor: '#131318',
+  },
+  friendsModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 15,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  friendsModalBackButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendsModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  friendsModalAction: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendsSearchContainer: {
+    padding: 16,
+  },
+  friendsSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1C1D23',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  friendsSearchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginLeft: 10,
+    paddingVertical: 8,
+  },
+  friendsListContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  friendAvatarContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
+  friendAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  friendStatusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#131318',
+  },
+  friendInfo: {
+    flex: 1,
+  },
+  friendName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  friendUsername: {
+    color: '#A8B3BD',
+    fontSize: 14,
+  },
+  friendActions: {
+    flexDirection: 'row',
+  },
+  friendActionButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    marginLeft: 5,
+  },
+  noResultsContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  noResultsText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  noResultsSubText: {
+    color: '#A8B3BD',
+    fontSize: 14,
+    marginTop: 4,
   },
 });
 
