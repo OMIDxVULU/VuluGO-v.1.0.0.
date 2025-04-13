@@ -9,6 +9,9 @@ import Svg, { Circle, Path, Defs, LinearGradient as SvgLinearGradient, Stop } fr
 import * as Sensors from 'expo-sensors';
 import CommonHeader from '../components/CommonHeader';
 import ActivityModal from '../components/ActivityModal';
+import UserStatusIndicator from '../components/UserStatusIndicator';
+import { useUserStatus, StatusType, getStatusColor } from '../context/UserStatusContext';
+import { useUserProfile } from '../context/UserProfileContext';
 
 interface Stream {
   id: number;
@@ -27,6 +30,14 @@ const LiveScreen = () => {
   const [inSpotlightQueue, setInSpotlightQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState(2);
   const [showSpotlightedUser, setShowSpotlightedUser] = useState(true); // Show spotlighted user initially
+  
+  // Get user status from context
+  const { userStatus } = useUserStatus();
+  // Get profile information from UserProfileContext
+  const { profileImage } = useUserProfile();
+
+  // Use profile image from context instead of hardcoded one
+  const userProfileImage = profileImage || 'https://randomuser.me/api/portraits/men/32.jpg';
   
   // New spotlight queue state
   const [spotlightQueue, setSpotlightQueue] = useState<{name: string, avatar: string, duration: number}[]>([
@@ -135,7 +146,7 @@ const LiveScreen = () => {
     // Add current user to queue with proper information
     const yourSpotlight = {
       name: 'Your Profile',
-      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+      avatar: userProfileImage, // Use the current profile image from context
       duration
     };
     
@@ -361,31 +372,6 @@ const LiveScreen = () => {
     );
   };
   
-  // Online status indicator component for consistent usage
-  const StatusIndicator = ({ status }: { status: 'online' | 'busy' | 'offline' | 'hosting' | 'watching' | 'spotlight' }) => {
-    let backgroundColor = '#4CAF50'; // Default online - green
-    
-    switch (status) {
-      case 'busy':
-        backgroundColor = '#FFA500'; // Orange
-        break;
-      case 'offline':
-        backgroundColor = '#9E9E9E'; // Gray
-        break;
-      case 'hosting':
-        backgroundColor = '#FF4B4B'; // Red
-        break;
-      case 'watching':
-        backgroundColor = '#4B8BFF'; // Blue
-        break;
-      case 'spotlight':
-        backgroundColor = '#34C759'; // Green (spotlight)
-        break;
-    }
-    
-    return <View style={[styles.statusIndicator, { backgroundColor }]} />;
-  };
-  
   // Demo data for showcasing the animation
   const demoSpotlights = [
     {
@@ -475,7 +461,7 @@ const LiveScreen = () => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, {marginBottom: 0}]}>Spotlight</Text>
+          <Text style={[styles.sectionTitle, {marginBottom: 0}]}>{""}</Text>
           <View style={styles.spotlightCounter}>
             <Text style={styles.spotlightCountText}>4 online friends</Text>
           </View>
@@ -505,13 +491,27 @@ const LiveScreen = () => {
             
             <View style={[styles.spotlightAvatarWrapper, { zIndex: 2 }]}>
               <View style={[
-                isCurrentUserSpotlighted ? styles.spotlightAvatarGreen : styles.spotlightAvatarPurple
+                isCurrentUserSpotlighted ? 
+                  styles.spotlightAvatarGreen : 
+                  { 
+                    width: 50,
+                    height: 50,
+                    borderRadius: 12,
+                    borderWidth: 2,
+                    borderColor: getStatusColor(userStatus),
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }
               ]}>
                 <Image 
-                  source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+                  source={{ uri: userProfileImage }}
                   style={styles.spotlightAvatar}
                 />
-                <StatusIndicator status={isCurrentUserSpotlighted ? "spotlight" : "online"} />
+                <UserStatusIndicator
+                  status={isCurrentUserSpotlighted ? "spotlight" : userStatus}
+                  pillStyle={styles.statusPill}
+                  textStyle={styles.statusPillText}
+                />
               </View>
             </View>
             <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
@@ -519,13 +519,13 @@ const LiveScreen = () => {
                 styles.spotlightName, 
                 isCurrentUserSpotlighted ? { textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 } : {}
               ]}>
-                Your Profile
+                {""}
               </Text>
               <Text style={[
                 styles.spotlightStatus, 
                 isCurrentUserSpotlighted ? { fontWeight: 'bold', color: '#FFFFFF' } : {}
               ]}>
-                {isCurrentUserSpotlighted ? formatTime(remainingTime) : inSpotlightQueue ? `Queue: ${queuePosition}` : 'Manage'}
+                {isCurrentUserSpotlighted ? formatTime(remainingTime) : inSpotlightQueue ? `Queue: ${queuePosition}` : 'Spotlight'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -550,7 +550,11 @@ const LiveScreen = () => {
                     source={{ uri: currentSpotlight.avatar }} 
                     style={styles.spotlightAvatar}
                   />
-                  <StatusIndicator status="spotlight" />
+                  <UserStatusIndicator
+                    status="spotlight"
+                    pillStyle={styles.statusPill}
+                    textStyle={styles.statusPillText}
+                  />
                 </View>
               </View>
               <View style={[styles.spotlightInfoWrapper, { zIndex: 2 }]}>
@@ -572,7 +576,11 @@ const LiveScreen = () => {
                   source={{ uri: 'https://randomuser.me/api/portraits/men/43.jpg' }} 
                   style={styles.spotlightAvatar}
                 />
-                <StatusIndicator status="hosting" />
+                <UserStatusIndicator
+                  status="hosting"
+                  pillStyle={styles.statusPill}
+                  textStyle={styles.statusPillText}
+                />
               </View>
             </View>
             <View style={styles.spotlightInfoWrapper}>
@@ -589,7 +597,11 @@ const LiveScreen = () => {
                   source={{ uri: 'https://randomuser.me/api/portraits/women/44.jpg' }} 
                   style={styles.spotlightAvatar}
                 />
-                <StatusIndicator status="watching" />
+                <UserStatusIndicator
+                  status="watching"
+                  pillStyle={styles.statusPill}
+                  textStyle={styles.statusPillText}
+                />
               </View>
             </View>
             <View style={styles.spotlightInfoWrapper}>
@@ -795,6 +807,11 @@ const LiveScreen = () => {
     );
   };
 
+  // Add this function to navigate to profile screen
+  const navigateToProfile = () => {
+    router.push('/profile');
+  };
+
   return (
     <LinearGradient colors={['#121212', '#121212']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -957,47 +974,47 @@ const styles = StyleSheet.create({
   spotlightAvatarBlue: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#4B8BFF',
-    overflow: 'visible', // Changed to visible for indicator to overlap
+    overflow: 'hidden',
     position: 'relative',
   },
   
   spotlightAvatarRed: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FF4B4B',
-    overflow: 'visible', // Changed to visible for indicator to overlap
+    overflow: 'hidden',
     position: 'relative',
   },
   
   spotlightAvatarGreen: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#34C759',
-    overflow: 'visible', // Changed to visible for indicator to overlap
+    overflow: 'hidden',
     position: 'relative',
   },
   
   spotlightAvatarPurple: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#6E56F7',
-    overflow: 'visible', // Changed to visible for indicator to overlap
+    overflow: 'hidden',
     position: 'relative',
   },
   
   spotlightAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 25,
+    borderRadius: 10,
   },
   
   spotlightInfoWrapper: {
@@ -1019,17 +1036,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // Status indicator that appears on profile avatars
-  statusIndicator: {
+  // New status indicator style that replaces the dot
+  statusPill: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#1D1E26',
+    bottom: -12,
+    alignSelf: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#1D1E26',
+    borderWidth: 1,
+    minWidth: 40,
+    alignItems: 'center',
     zIndex: 10,
+  },
+  
+  statusPillText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   
   spotlightCounter: {
@@ -1403,6 +1429,23 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     opacity: 0.6,
     zIndex: 1,
+  },
+  
+  spotlightActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spotlightActionButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  spotlightActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

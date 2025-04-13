@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import UserStatusIndicator from './UserStatusIndicator';
+import { StatusType, getStatusColor } from '../context/UserStatusContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -22,7 +24,7 @@ interface UserProfileModalProps {
     id: string;
     name: string;
     avatar: string;
-    status: 'online' | 'offline' | 'busy' | 'idle';
+    status: StatusType;
     level?: number;
     bio?: string;
     badges?: Array<{
@@ -106,36 +108,50 @@ const UserProfileModal = ({
     });
   };
 
-  // Get status color
-  const getStatusColor = () => {
-    switch (user.status) {
-      case 'online':
-        return '#4CAF50';
-      case 'busy':
-        return '#FF4B4B';
-      case 'idle':
-        return '#FFCB0E';
-      case 'offline':
-        return '#9BA1A6';
-      default:
-        return '#9BA1A6';
-    }
-  };
-
-  // Get status text
+  // Get status text based on user's status
   const getStatusText = () => {
     switch (user.status) {
       case 'online':
         return 'Online';
       case 'busy':
-        return 'Do not disturb';
-      case 'idle':
+        return 'Do Not Disturb';
+      case 'away':
         return 'Away';
+      case 'invisible':
+        return 'Invisible';
       case 'offline':
         return 'Offline';
+      case 'hosting':
+        return 'Hosting';
+      case 'watching':
+        return 'Watching';
+      case 'spotlight':
+        return 'In Spotlight';
+      // Mood statuses
+      case 'happy':
+        return 'Happy';
+      case 'sad':
+        return 'Sad';
+      case 'angry':
+        return 'Angry';
+      case 'hungry':
+        return 'Hungry';
+      case 'sleepy':
+        return 'Sleepy';
+      case 'excited':
+        return 'Excited';
+      case 'bored':
+        return 'Bored';
+      case 'love':
+        return 'In Love';
       default:
         return 'Offline';
     }
+  };
+
+  const getStatusBorderColor = () => {
+    const statusColor = getStatusColor(user.status);
+    return statusColor;
   };
 
   if (!visible) return null;
@@ -174,24 +190,29 @@ const UserProfileModal = ({
               <View style={styles.profileHeader}>
                 <View style={styles.avatarContainer}>
                   <Image source={{ uri: user.avatar }} style={styles.avatar} />
-                  <View 
-                    style={[
-                      styles.statusIndicator, 
-                      { backgroundColor: getStatusColor() }
-                    ]} 
+                  <UserStatusIndicator
+                    status={user.status}
+                    pillStyle={styles.statusPill}
+                    textStyle={styles.statusPillText}
                   />
                 </View>
 
                 <Text style={styles.userName}>{user.name}</Text>
 
-                <View style={styles.statusContainer}>
-                  <View 
-                    style={[
-                      styles.statusDot, 
-                      { backgroundColor: getStatusColor() }
-                    ]} 
+                {/* Status Badge */}
+                <View style={styles.statusBadge}>
+                  <UserStatusIndicator 
+                    status={user.status}
+                    showText={false}
+                    size={8}
+                    containerStyle={styles.statusDot}
                   />
-                  <Text style={styles.statusText}>{getStatusText()}</Text>
+                  <Text style={[
+                    styles.statusBadgeText,
+                    { color: getStatusText() === 'Offline' ? '#8E8E93' : undefined }
+                  ]}>
+                    {getStatusText()}
+                  </Text>
                 </View>
 
                 {user.level && (
@@ -356,45 +377,39 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 12,
+    marginBottom: 24,
   },
   avatar: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: 20,
     borderWidth: 3,
     borderColor: 'rgba(110, 105, 244, 0.3)',
-  },
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 3,
-    borderColor: '#272830',
   },
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  statusContainer: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 6,
+    marginRight: 8,
   },
-  statusText: {
+  statusBadgeText: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '600',
   },
   levelContainer: {
     flexDirection: 'row',
@@ -511,6 +526,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 16,
     fontWeight: '500',
+  },
+  statusPill: {
+    position: 'absolute',
+    bottom: -12,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#1D1E26',
+    borderWidth: 1,
+    minWidth: 60,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  statusPillText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

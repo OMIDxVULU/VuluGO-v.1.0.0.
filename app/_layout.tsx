@@ -9,6 +9,7 @@ import { View, ActivityIndicator, Platform, Text, StyleSheet } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
 import { UserProfileProvider } from '../src/context/UserProfileContext';
+import { UserStatusProvider } from '../src/context/UserStatusContext';
 
 // Create a custom Material theme
 const paperTheme = {
@@ -85,28 +86,30 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <UserProfileProvider>
-        <AppContext.Provider value={{ fontsLoaded }}>
-          <MenuPositionProvider>
-            <SafeAreaProvider>
-              <PaperProvider theme={paperTheme}>
-                <StatusBar style="light" />
-                <Stack screenOptions={{ 
-                  headerShown: false, 
-                  gestureEnabled: true, // Explicitly enable swipe gesture
-                  contentStyle: { backgroundColor: '#131318' },
-                  animation: Platform.OS === 'ios' ? 'default' : 'fade',
-                }}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="login" />
-                  <Stack.Screen name="signup" />
-                  <Stack.Screen name="(main)" />
-                </Stack>
-              </PaperProvider>
-            </SafeAreaProvider>
-          </MenuPositionProvider>
-        </AppContext.Provider>
-      </UserProfileProvider>
+      <UserStatusProvider>
+        <UserProfileProvider>
+          <AppContext.Provider value={{ fontsLoaded }}>
+            <MenuPositionProvider>
+              <SafeAreaProvider>
+                <PaperProvider theme={paperTheme}>
+                  <StatusBar style="light" />
+                  <Stack screenOptions={{ 
+                    headerShown: false, 
+                    gestureEnabled: true, // Explicitly enable swipe gesture
+                    contentStyle: { backgroundColor: '#131318' },
+                    animation: Platform.OS === 'ios' ? 'default' : 'fade',
+                  }}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="login" />
+                    <Stack.Screen name="signup" />
+                    <Stack.Screen name="(main)" />
+                  </Stack>
+                </PaperProvider>
+              </SafeAreaProvider>
+            </MenuPositionProvider>
+          </AppContext.Provider>
+        </UserProfileProvider>
+      </UserStatusProvider>
     </GestureHandlerRootView>
   );
 }

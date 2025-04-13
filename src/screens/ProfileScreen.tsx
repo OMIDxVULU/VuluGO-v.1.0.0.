@@ -27,26 +27,9 @@ import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { useUserProfile } from '../context/UserProfileContext';
 import ProfileViewersSection from '../components/ProfileViewers';
+import { useUserStatus, STATUS_TYPES, StatusType } from '../context/UserStatusContext';
 
 const { width } = Dimensions.get('window');
-
-// Define available status types
-const STATUS_TYPES = {
-  // Basic status types
-  ONLINE: 'online',
-  BUSY: 'busy',
-  OFFLINE: 'offline',
-  
-  // Mood status types
-  HAPPY: 'happy',
-  SAD: 'sad',
-  ANGRY: 'angry',
-  HUNGRY: 'hungry',
-  SLEEPY: 'sleepy',
-  EXCITED: 'excited',
-  BORED: 'bored',
-  LOVE: 'love',
-};
 
 // Status category grouping
 const STATUS_CATEGORIES = {
@@ -59,10 +42,6 @@ const ProfileScreen = () => {
   const { 
     profileImage, 
     setProfileImage, 
-    userStatus, 
-    setUserStatus, 
-    statusColor, 
-    setStatusColor,
     totalViews,
     dailyViews,
     resetDailyViews,
@@ -70,9 +49,18 @@ const ProfileScreen = () => {
     hasGemPlus,
     setHasGemPlus
   } = useUserProfile();
+  
+  // Use UserStatusContext instead of local state
+  const { 
+    userStatus, 
+    setUserStatus,
+    contextStatusData,
+    closefriendsOnly,
+    setClosefriendsOnly
+  } = useUserStatus();
+  
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
-  const [closefriendsOnly, setClosefriendsOnly] = useState(false);
   const [showProfileViewers, setShowProfileViewers] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [previewCurrentPage, setPreviewCurrentPage] = useState(0);
@@ -205,7 +193,6 @@ const ProfileScreen = () => {
     router.push('/(main)/account');
   };
 
-  // Update function to show photo options with animation
   const handleAddPhoto = () => {
     setShowPhotoOptions(true);
     Animated.timing(photoOptionsAnim, {
@@ -215,7 +202,6 @@ const ProfileScreen = () => {
     }).start();
   };
 
-  // Function to hide photo options with animation
   const hidePhotoOptions = () => {
     Animated.timing(photoOptionsAnim, {
       toValue: 0,
@@ -226,51 +212,27 @@ const ProfileScreen = () => {
     });
   };
 
-  // Update the take photo/upload photo handlers to use the hide function
   const handleTakePhoto = () => {
-    // In a real app, this would open the camera
-    Alert.alert('Camera', 'Opening camera for selfie...');
-    
     hidePhotoOptions();
     
-    // For demo purposes, simulate taking a photo with a delay
-    setTimeout(() => {
-      const newPhotoId = Math.floor(Math.random() * 70) + 1;
-      const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
-      setProfileImage(newProfileImage);
-      
-      // Show success message
-      Alert.alert('Success', 'Your new selfie has been added to your profile!');
-    }, 1500);
+    // Change profile image for demo
+    const newPhotoId = Math.floor(Math.random() * 50) + 20;
+    const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
+    setProfileImage(newProfileImage);
+    
+    Alert.alert('Camera', 'Camera would open here to take a new photo.');
   };
 
   const handleUploadPhoto = () => {
-    // In a real app, this would open the photo gallery
-    Alert.alert('Photo Gallery', 'Opening photo gallery...');
-    
     hidePhotoOptions();
     
-    // For demo purposes, simulate selecting a photo with a delay
-    setTimeout(() => {
-      const newPhotoId = Math.floor(Math.random() * 70) + 1;
-      const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
-      setProfileImage(newProfileImage);
-      
-      // Show success message
-      Alert.alert('Success', 'Your selected photo has been added to your profile!');
-    }, 1500);
+    // Change profile image for demo
+    const newPhotoId = Math.floor(Math.random() * 50) + 20;
+    const newProfileImage = `https://randomuser.me/api/portraits/women/${newPhotoId}.jpg`;
+    setProfileImage(newProfileImage);
+    
+    Alert.alert('Photo Library', 'Photo Library would open here to select a photo.');
   };
-
-  // Calculate photo options animations
-  const photoOptionsTranslateY = photoOptionsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [600, 0],
-  });
-
-  const photoOptionsOpacity = photoOptionsAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
 
   // Function to show status selector with animation
   const showStatusMenu = () => {
@@ -294,122 +256,10 @@ const ProfileScreen = () => {
   };
 
   // Function to change status and close menu
-  const changeStatus = (newStatus: string) => {
+  const changeStatus = (newStatus: StatusType) => {
     setUserStatus(newStatus);
-    
-    // Update status color based on the new status
-    const statusData = getStatusData(newStatus);
-    setStatusColor(statusData.color);
-    
     hideStatusMenu();
   };
-
-  // Get status data based on current status
-  const getStatusData = (status: string = userStatus) => {
-    switch(status) {
-      // Default statuses
-      case STATUS_TYPES.ONLINE:
-        return {
-          color: '#7ADA72', // Green
-          text: 'Online',
-          subtext: 'Active Now',
-          glowColor: 'rgba(122, 218, 114, 0.3)',
-          icon: null
-        };
-      case STATUS_TYPES.BUSY:
-        return {
-          color: '#E57373', // Red
-          text: 'Busy',
-          subtext: 'Do Not Disturb',
-          glowColor: 'rgba(229, 115, 115, 0.3)',
-          icon: <Feather name="slash" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.OFFLINE:
-        return {
-          color: '#35383F', // Dark gray/black
-          text: 'Offline',
-          subtext: 'Invisible to Others',
-          glowColor: 'rgba(53, 56, 63, 0.3)',
-          icon: <Feather name="eye-off" size={16} color="#FFFFFF" />
-        };
-        
-      // Mood statuses
-      case STATUS_TYPES.HAPPY:
-        return {
-          color: '#FFD700', // Gold
-          text: 'Happy',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(255, 215, 0, 0.3)',
-          icon: <MaterialCommunityIcons name="emoticon-happy-outline" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.SAD:
-        return {
-          color: '#5C9ACE', // Blue
-          text: 'Sad',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(92, 154, 206, 0.3)',
-          icon: <MaterialCommunityIcons name="emoticon-sad-outline" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.ANGRY:
-        return {
-          color: '#FF6B3D', // Orange Red
-          text: 'Angry',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(255, 107, 61, 0.3)',
-          icon: <MaterialCommunityIcons name="emoticon-angry-outline" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.HUNGRY:
-        return {
-          color: '#FF9966', // Orange
-          text: 'Hungry',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(255, 153, 102, 0.3)',
-          icon: <MaterialCommunityIcons name="food-fork-drink" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.SLEEPY:
-        return {
-          color: '#8E77B5', // Purple
-          text: 'Sleepy',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(142, 119, 181, 0.3)',
-          icon: <MaterialCommunityIcons name="sleep" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.EXCITED:
-        return {
-          color: '#FF5CAD', // Pink
-          text: 'Excited',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(255, 92, 173, 0.3)',
-          icon: <MaterialCommunityIcons name="emoticon-excited-outline" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.BORED:
-        return {
-          color: '#9E9E9E', // Gray
-          text: 'Bored',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(158, 158, 158, 0.3)',
-          icon: <MaterialCommunityIcons name="emoticon-neutral-outline" size={18} color="#FFFFFF" />
-        };
-      case STATUS_TYPES.LOVE:
-        return {
-          color: '#F06292', // Pink
-          text: 'In Love',
-          subtext: closefriendsOnly ? 'Visible to Close Friends' : 'Visible to Everyone',
-          glowColor: 'rgba(240, 98, 146, 0.3)',
-          icon: <MaterialCommunityIcons name="heart-outline" size={18} color="#FFFFFF" />
-        };
-      default:
-        return {
-          color: '#7ADA72',
-          text: 'Online',
-          subtext: 'Active Now',
-          glowColor: 'rgba(122, 218, 114, 0.3)',
-          icon: null
-        };
-    }
-  };
-
-  const statusData = getStatusData();
 
   // Status selector animation calculations
   const statusSelectorTranslateY = statusSelectorAnim.interpolate({
@@ -579,6 +429,17 @@ const ProfileScreen = () => {
     }
   };
 
+  // Photo options animations
+  const photoOptionsTranslateY = photoOptionsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [600, 0],
+  });
+
+  const photoOptionsOpacity = photoOptionsAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -655,21 +516,21 @@ const ProfileScreen = () => {
               <View 
                 style={[
                   styles.onlineStatusIconOuterGlow,
-                  { backgroundColor: statusData.glowColor }
+                  { backgroundColor: contextStatusData.glowColor }
                 ]} 
               />
               <View 
                 style={[
                   styles.onlineStatusIcon,
-                  { backgroundColor: statusData.color }
+                  { backgroundColor: contextStatusData.color }
                 ]}
               >
-                {statusData.icon}
+                {contextStatusData.icon}
               </View>
             </View>
             <View>
-              <Text style={styles.onlineText}>{statusData.text}</Text>
-              <Text style={styles.onlineSubtext}>{statusData.subtext}</Text>
+              <Text style={styles.onlineText}>{contextStatusData.text}</Text>
+              <Text style={styles.onlineSubtext}>{contextStatusData.subtext}</Text>
             </View>
           </TouchableOpacity>
           
@@ -781,7 +642,7 @@ const ProfileScreen = () => {
             
             {/* Profile Photo Display - Shows same image as profile square */}
             <TouchableOpacity style={styles.photoItemContainer}>
-              <View style={[styles.profilePhotoContainer, { borderColor: statusData.color }]}>
+              <View style={[styles.profilePhotoContainer, { borderColor: contextStatusData.color }]}>
                 <Image 
                   source={{ uri: profileImage }} 
                   style={styles.profilePhotoItem}
@@ -977,7 +838,7 @@ const ProfileScreen = () => {
               <>
                 <TouchableOpacity 
                   style={styles.statusOption}
-                  onPress={() => changeStatus(STATUS_TYPES.ONLINE)}
+                  onPress={() => changeStatus(STATUS_TYPES.ONLINE as StatusType)}
                 >
                   <View style={[styles.statusOptionIcon, { backgroundColor: '#7ADA72' }]}>
                     <View style={styles.statusOptionIconInner} />
@@ -995,7 +856,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.statusOption}
-                  onPress={() => changeStatus(STATUS_TYPES.BUSY)}
+                  onPress={() => changeStatus(STATUS_TYPES.BUSY as StatusType)}
                 >
                   <View style={[styles.statusOptionIcon, { backgroundColor: '#E57373' }]}>
                     <Feather name="slash" size={18} color="#FFFFFF" />
@@ -1013,7 +874,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.statusOption}
-                  onPress={() => changeStatus(STATUS_TYPES.OFFLINE)}
+                  onPress={() => changeStatus(STATUS_TYPES.OFFLINE as StatusType)}
                 >
                   <View style={[styles.statusOptionIcon, { backgroundColor: '#35383F' }]}>
                     <Feather name="eye-off" size={16} color="#FFFFFF" />
@@ -1036,7 +897,7 @@ const ProfileScreen = () => {
               <View style={styles.moodGrid}>
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.HAPPY)}
+                  onPress={() => changeStatus(STATUS_TYPES.HAPPY as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#FFD700' }]}>
                     <MaterialCommunityIcons name="emoticon-happy-outline" size={24} color="#FFFFFF" />
@@ -1051,7 +912,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.SAD)}
+                  onPress={() => changeStatus(STATUS_TYPES.SAD as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#5C9ACE' }]}>
                     <MaterialCommunityIcons name="emoticon-sad-outline" size={24} color="#FFFFFF" />
@@ -1066,7 +927,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.ANGRY)}
+                  onPress={() => changeStatus(STATUS_TYPES.ANGRY as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#FF6B3D' }]}>
                     <MaterialCommunityIcons name="emoticon-angry-outline" size={24} color="#FFFFFF" />
@@ -1081,7 +942,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.HUNGRY)}
+                  onPress={() => changeStatus(STATUS_TYPES.HUNGRY as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#FF9966' }]}>
                     <MaterialCommunityIcons name="food-fork-drink" size={24} color="#FFFFFF" />
@@ -1096,7 +957,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.SLEEPY)}
+                  onPress={() => changeStatus(STATUS_TYPES.SLEEPY as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#8E77B5' }]}>
                     <MaterialCommunityIcons name="sleep" size={24} color="#FFFFFF" />
@@ -1111,7 +972,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.EXCITED)}
+                  onPress={() => changeStatus(STATUS_TYPES.EXCITED as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#FF5CAD' }]}>
                     <MaterialCommunityIcons name="emoticon-excited-outline" size={24} color="#FFFFFF" />
@@ -1126,7 +987,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.BORED)}
+                  onPress={() => changeStatus(STATUS_TYPES.BORED as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#9E9E9E' }]}>
                     <MaterialCommunityIcons name="emoticon-neutral-outline" size={24} color="#FFFFFF" />
@@ -1141,7 +1002,7 @@ const ProfileScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.moodItem}
-                  onPress={() => changeStatus(STATUS_TYPES.LOVE)}
+                  onPress={() => changeStatus(STATUS_TYPES.LOVE as StatusType)}
                 >
                   <View style={[styles.moodIcon, { backgroundColor: '#F06292' }]}>
                     <MaterialCommunityIcons name="heart-outline" size={24} color="#FFFFFF" />

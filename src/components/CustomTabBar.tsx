@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'rea
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeIcon, NotificationIcon, PersonIcon } from './icons/AppIcons';
+import { useUserStatus, getStatusColor } from '../context/UserStatusContext';
 
 interface CustomTabBarProps extends BottomTabBarProps {
   profileImage?: string;
@@ -35,6 +36,12 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
   const visibleRoutes = state.routes.filter(route => allowedRoutes.includes(route.name));
   const visibleRouteIndices = visibleRoutes.map(route => state.routes.findIndex(r => r.key === route.key));
   
+  // Get current user status for profile tab indicator
+  const { userStatus: currentUserStatus } = useUserStatus();
+  
+  // Get the current status color for the profile tab indicator
+  const profileStatusColor = getStatusColor(currentUserStatus);
+  
   const getIconComponent = (routeName: string, isFocused: boolean, badge: number | undefined) => {
     const color = isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)";
     const size = 22;
@@ -64,7 +71,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
               <View 
                 style={[
                   styles.profileImageContainer, 
-                  userStatus && { borderColor: statusColor }
+                  { borderColor: profileStatusColor }
                 ]}
               >
                 <Image 
