@@ -15,13 +15,18 @@ import { useUserProfile } from '../context/UserProfileContext';
 
 interface Stream {
   id: number;
-  title: string;
-  host: string;
-  avatar: string;
+  title: string | null;  // Some streams may not have titles
+  hosts: {
+    name: string;
+    avatar: string;
+  }[];  // Multiple hosts, between 1-10
   boost: number;
   views: number;
-  rank: number;
-  participants: number;
+  rank?: number;  // Make rank optional with '?'
+  friends?: {  // Optional friends who are watching
+    name: string;
+    avatar: string;
+  }[];
 }
 
 const LiveScreen = () => {
@@ -678,47 +683,136 @@ const LiveScreen = () => {
   };
 
   const renderLivesSection = () => {
+    // Generate random viewer counts for demo purposes
+    const getRandomViewerCount = () => {
+      const counts = [30, 65, 114, 246, 312, 489, 527, 631, 842, 1024, 1500, 2100];
+      return counts[Math.floor(Math.random() * counts.length)];
+    };
+    
+    // Live streams data
     const liveStreams: Stream[] = [
       {
         id: 1,
         title: 'Epic gameplay session! Join now!',
-        host: 'ProGamer',
-        avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+        hosts: [
+          { name: 'ProGamer', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
+          { name: 'CoolStreamer', avatar: 'https://randomuser.me/api/portraits/women/12.jpg' },
+          { name: 'GamerGirl', avatar: 'https://randomuser.me/api/portraits/women/43.jpg' },
+          { name: 'ProPlayer', avatar: 'https://randomuser.me/api/portraits/men/41.jpg' },
+          { name: 'StreamKing', avatar: 'https://randomuser.me/api/portraits/men/36.jpg' },
+          { name: 'GamingQueen', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
+          { name: 'PlayerOne', avatar: 'https://randomuser.me/api/portraits/men/38.jpg' },
+          { name: 'StreamerPro', avatar: 'https://randomuser.me/api/portraits/women/36.jpg' },
+          { name: 'GameMaster', avatar: 'https://randomuser.me/api/portraits/men/39.jpg' },
+        ],
         boost: 600,
-        views: 1500,
+        views: getRandomViewerCount(),
         rank: 1,
-        participants: 120
+        friends: [
+          { name: 'Friend1', avatar: 'https://randomuser.me/api/portraits/men/43.jpg' },
+          { name: 'Friend2', avatar: 'https://randomuser.me/api/portraits/women/23.jpg' },
+          { name: 'Friend3', avatar: 'https://randomuser.me/api/portraits/men/23.jpg' },
+        ]
       },
       {
         id: 2,
         title: 'Late night stream with friends',
-        host: 'NightOwl',
-        avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+        hosts: [
+          { name: 'NightOwl', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
+          { name: 'MidnightGamer', avatar: 'https://randomuser.me/api/portraits/men/44.jpg' },
+          { name: 'LateStreamer', avatar: 'https://randomuser.me/api/portraits/women/45.jpg' },
+        ],
         boost: 500,
-        views: 1250,
+        views: getRandomViewerCount(),
         rank: 2,
-        participants: 85
+        friends: [
+          { name: 'Friend3', avatar: 'https://randomuser.me/api/portraits/men/22.jpg' },
+        ]
       },
       {
         id: 3,
         title: 'Competitive matchmaking!',
-        host: 'ChampPlayer',
-        avatar: 'https://randomuser.me/api/portraits/men/28.jpg',
+        hosts: [
+          { name: 'ChampPlayer', avatar: 'https://randomuser.me/api/portraits/men/28.jpg' },
+          { name: 'ProCoach', avatar: 'https://randomuser.me/api/portraits/women/28.jpg' },
+          { name: 'Teammate1', avatar: 'https://randomuser.me/api/portraits/men/29.jpg' },
+        ],
         boost: 400,
-        views: 1000,
+        views: getRandomViewerCount(),
         rank: 3,
-        participants: 64
+        friends: [
+          { name: 'Friend4', avatar: 'https://randomuser.me/api/portraits/women/24.jpg' },
+          { name: 'Friend5', avatar: 'https://randomuser.me/api/portraits/men/25.jpg' },
+        ]
       },
       {
         id: 4,
         title: 'Casual gaming & chill vibes',
-        host: 'RelaxedGamer',
-        avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
+        hosts: [
+          { name: 'RelaxedGamer', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' },
+          { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/21.jpg' },
+          { name: 'FunFriend', avatar: 'https://randomuser.me/api/portraits/women/21.jpg' },
+        ],
         boost: 300,
-        views: 750,
+        views: getRandomViewerCount(),
         rank: 4,
-        participants: 42
-      }
+        friends: []
+      },
+      // Popular streams without ranking (no boost)
+      {
+        id: 5,
+        title: 'Beginner friendly gaming lounge',
+        hosts: [
+          { name: 'NewStreamer', avatar: 'https://randomuser.me/api/portraits/women/47.jpg' },
+        ],
+        boost: 0, // No boost
+        views: getRandomViewerCount(),
+        friends: [
+          { name: 'SupportiveFriend', avatar: 'https://randomuser.me/api/portraits/men/47.jpg' },
+          { name: 'ChattyViewer', avatar: 'https://randomuser.me/api/portraits/women/48.jpg' },
+        ]
+      },
+      {
+        id: 6,
+        title: 'Just chatting with viewers',
+        hosts: [
+          { name: 'SocialStreamer', avatar: 'https://randomuser.me/api/portraits/women/35.jpg' },
+          { name: 'CoHost', avatar: 'https://randomuser.me/api/portraits/men/35.jpg' },
+        ],
+        boost: 0, // No boost
+        views: getRandomViewerCount(),
+        friends: [
+          { name: 'RegularViewer', avatar: 'https://randomuser.me/api/portraits/women/36.jpg' },
+        ]
+      },
+      {
+        id: 7,
+        title: null, // No title
+        hosts: [
+          { name: 'MysteryGamer', avatar: 'https://randomuser.me/api/portraits/men/31.jpg' },
+          { name: 'UnknownPlayer', avatar: 'https://randomuser.me/api/portraits/women/31.jpg' },
+          { name: 'SecretStreamer', avatar: 'https://randomuser.me/api/portraits/men/30.jpg' },
+          { name: 'AnonymousHost', avatar: 'https://randomuser.me/api/portraits/women/30.jpg' },
+        ],
+        boost: 0, // No boost
+        views: getRandomViewerCount(),
+        friends: []
+      },
+      {
+        id: 8,
+        title: 'First time streaming! Be nice :)',
+        hosts: [
+          { name: 'FirstTimer', avatar: 'https://randomuser.me/api/portraits/women/25.jpg' },
+        ],
+        boost: 0, // No boost
+        views: 30, // Few viewers
+        friends: [
+          { name: 'SupportFriend1', avatar: 'https://randomuser.me/api/portraits/men/24.jpg' },
+          { name: 'SupportFriend2', avatar: 'https://randomuser.me/api/portraits/women/26.jpg' },
+          { name: 'SupportFriend3', avatar: 'https://randomuser.me/api/portraits/men/26.jpg' },
+          { name: 'SupportFriend4', avatar: 'https://randomuser.me/api/portraits/women/27.jpg' },
+        ]
+      },
     ];
     
     return (
@@ -730,76 +824,265 @@ const LiveScreen = () => {
           </View>
         </View>
         
-        <ScrollView>
-          {liveStreams.map(stream => (
-            <TouchableOpacity
-              key={stream.id}
-              style={styles.streamCard}
-              onPress={() => handleActivityPress('watching', {
-                title: stream.title,
-                hostName: stream.host,
-                hostAvatar: stream.avatar,
-                viewerCount: stream.views,
-                friendName: 'Your Friend',
-                friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
-                avatars: [
-                  stream.avatar,
-                  // Add some random avatars as additional viewers
-                  'https://randomuser.me/api/portraits/women/32.jpg',
-                  'https://randomuser.me/api/portraits/men/32.jpg',
-                  'https://randomuser.me/api/portraits/women/33.jpg',
-                ]
-              })}
-            >
-              <View style={styles.streamThumbnailContainer}>
-                <View style={[
-                  styles.rankBadge, 
-                  stream.rank === 1 ? styles.firstRank : 
-                  stream.rank === 2 ? styles.secondRank : 
-                  stream.rank === 3 ? styles.thirdRank : null
-                ]}>
-                  <Text style={styles.rankText}>
-                    {stream.rank === 1 ? '1st' : 
-                     stream.rank === 2 ? '2nd' : 
-                     stream.rank === 3 ? '3rd' : 
-                     `${stream.rank}th`}
-                  </Text>
-                </View>
-                
-                <View style={styles.streamStatsOverlay}>
-                  <View style={styles.streamStatRow}>
-                    <MaterialIcons name="bolt" size={16} color="#FFD700" />
-                    <Text style={styles.streamStatText}>{stream.boost}</Text>
-                  </View>
-                  
-                  <View style={styles.streamStatRow}>
-                    <MaterialIcons name="visibility" size={16} color="#FFFFFF" />
-                    <Text style={styles.streamStatText}>{stream.views}</Text>
-                  </View>
-                </View>
-              </View>
-              
-              <View style={styles.streamInfoContainer}>
-                <Text style={styles.streamTitle}>{stream.title}</Text>
-                
-                <View style={styles.streamHostContainer}>
-                  <Image source={{ uri: stream.avatar }} style={styles.hostAvatar} />
-                  <Text style={styles.hostName}>{stream.host}</Text>
-                </View>
-                
-                <View style={styles.participantsContainer}>
-                  {[...Array(3)].map((_, i) => (
-                    <View key={i} style={styles.participantDot} />
-                  ))}
-                  <View style={styles.moreParticipants}>
-                    <Text style={styles.moreParticipantsText}>+{stream.participants - 3}</Text>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
+        {/* Simple two-column layout for streams */}
+        <View style={styles.streamsRow}>
+          {liveStreams.slice(0, 2).map((stream) => (
+            <StreamCard key={stream.id} stream={stream} />
           ))}
-        </ScrollView>
+        </View>
+        
+        <View style={styles.streamsRow}>
+          {liveStreams.slice(2, 4).map((stream) => (
+            <StreamCard key={stream.id} stream={stream} />
+          ))}
+        </View>
+        
+        <View style={styles.streamsRow}>
+          {liveStreams.slice(4, 6).map((stream) => (
+            <StreamCard key={stream.id} stream={stream} />
+          ))}
+        </View>
+        
+        <View style={styles.streamsRow}>
+          {liveStreams.slice(6, 8).map((stream) => (
+            <StreamCard key={stream.id} stream={stream} />
+          ))}
+        </View>
       </View>
+    );
+  };
+  
+  // Separate component for stream cards to simplify layout
+  const StreamCard = ({ stream }: { stream: Stream }) => {
+    // Check if stream has minimal content (no title, no rank, no friends)
+    const hasMinimalContent = !stream.title && !stream.rank && (!stream.friends || stream.friends.length === 0);
+    // Check if it's a 4-host grid with minimal content (special case that needs more adjustment)
+    const isFourHostMinimal = hasMinimalContent && stream.hosts.length === 4;
+    
+    // Render hosts with adaptive layout based on count
+    const renderHostGrid = () => {
+      const hostCount = stream.hosts.length;
+      
+      // Single host - one large image
+      if (hostCount === 1) {
+        return (
+          <View style={[styles.singleHostGrid, hasMinimalContent && styles.expandedHostGrid]}>
+            <Image 
+              source={{ uri: stream.hosts[0].avatar }} 
+              style={styles.singleHostImage} 
+              resizeMode="cover"
+            />
+          </View>
+        );
+      }
+      
+      // Two hosts - side by side
+      if (hostCount === 2) {
+        return (
+          <View style={[styles.dualHostGrid, hasMinimalContent && styles.expandedHostGrid]}>
+            {stream.hosts.map((host, idx) => (
+              <View key={`host-${stream.id}-${idx}`} style={styles.dualHostItem}>
+                <Image 
+                  source={{ uri: host.avatar }} 
+                  style={styles.hostImage} 
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </View>
+        );
+      }
+      
+      // Three hosts - side by side
+      if (hostCount === 3) {
+        return (
+          <View style={[styles.tripleHostGrid, hasMinimalContent && styles.expandedHostGrid]}>
+            <View style={styles.tripleHostRow}>
+              {stream.hosts.map((host, idx) => (
+                <View key={`host-${stream.id}-${idx}`} style={styles.tripleHostItem}>
+                  <Image 
+                    source={{ uri: host.avatar }} 
+                    style={styles.hostImage} 
+                    resizeMode="cover"
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      }
+      
+      // Four hosts - 2x2 grid - Special handling for this case
+      if (hostCount === 4) {
+        return (
+          <View style={[
+            styles.standardGrid, 
+            hasMinimalContent && styles.expandedHostGrid
+          ]}>
+            {stream.hosts.map((host, idx) => (
+              <View 
+                key={`host-${stream.id}-${idx}`} 
+                style={styles.gridItemFourth}
+              >
+                <Image 
+                  source={{ uri: host.avatar }} 
+                  style={styles.hostImage} 
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </View>
+        );
+      }
+      
+      // Six hosts - 3x2 grid
+      if (hostCount === 6) {
+        return (
+          <View style={[styles.standardGrid, hasMinimalContent && styles.expandedHostGrid]}>
+            {stream.hosts.map((host, idx) => (
+              <View key={`host-${stream.id}-${idx}`} style={styles.gridItemSixth}>
+                <Image 
+                  source={{ uri: host.avatar }} 
+                  style={styles.hostImage} 
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </View>
+        );
+      }
+      
+      // 5, 7, 8, 9+ hosts - standard 3x3 grid (only show up to 9)
+      return (
+        <View style={[styles.standardGrid, hasMinimalContent && styles.expandedHostGrid]}>
+          {stream.hosts.slice(0, 9).map((host, idx) => (
+            <View key={`host-${stream.id}-${idx}`} style={styles.gridItemStandard}>
+              <Image 
+                source={{ uri: host.avatar }} 
+                style={styles.hostImage} 
+                resizeMode="cover"
+              />
+            </View>
+          ))}
+        </View>
+      );
+    };
+    
+    // Render friends watching with stacked effect
+    const renderFriendsWatching = () => {
+      if (!stream.friends || stream.friends.length === 0) {
+        return (
+          <View style={styles.friendsWatchingContainer}>
+            {/* Empty container to maintain consistent layout */}
+          </View>
+        );
+      }
+      
+      return (
+        <View style={styles.friendsWatchingContainer}>
+          {stream.friends.slice(0, 3).map((friend, idx) => (
+            <View 
+              key={`friend-${stream.id}-${idx}`} 
+              style={[
+                styles.friendAvatarContainer,
+                { zIndex: 10 - idx } // Higher z-index for first friends
+              ]}
+            >
+              <Image 
+                source={{ uri: friend.avatar }} 
+                style={styles.friendAvatar} 
+                resizeMode="cover"
+              />
+            </View>
+          ))}
+          {stream.friends.length > 3 && (
+            <View style={styles.friendsCountBadge}>
+              <Text style={styles.friendsCountBadgeText}>+{stream.friends.length - 3}</Text>
+            </View>
+          )}
+        </View>
+      );
+    };
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.streamGridCard, 
+          hasMinimalContent && styles.streamGridCardMinimal,
+          isFourHostMinimal && styles.fourHostMinimalCard
+        ]}
+        onPress={() => handleActivityPress('watching', {
+          title: stream.title || '',
+          hostName: stream.hosts[0].name,
+          hostAvatar: stream.hosts[0].avatar,
+          viewerCount: stream.views,
+          avatars: [stream.hosts[0].avatar],
+        })}
+      >
+        {/* Add a placeholder space with the same height as the title row when no title/rank */}
+        {!stream.title && !stream.rank && (
+          <View style={styles.placeholderTopRow} />
+        )}
+        
+        {/* Top row with title and rank - only if there's a title */}
+        {stream.title && (
+          <View style={styles.topRow}>
+            {stream.rank ? (
+              <View style={[styles.rankBadge, 
+                stream.rank === 1 ? styles.firstRank : 
+                stream.rank === 2 ? styles.secondRank : 
+                stream.rank === 3 ? styles.thirdRank : null
+              ]}>
+                <Text style={styles.streamRankText}>
+                  {stream.rank === 1 ? '1st' : 
+                  stream.rank === 2 ? '2nd' : 
+                  stream.rank === 3 ? '3rd' : 
+                  `${stream.rank}th`}
+                </Text>
+              </View>
+            ) : null}
+            <Text 
+              style={styles.streamTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {stream.title}
+            </Text>
+          </View>
+        )}
+      
+        {/* Grid of hosts */}
+        <View style={[
+          styles.hostGrid, 
+          hasMinimalContent && styles.expandedHostGridContainer,
+          isFourHostMinimal && styles.fourHostMinimalContainer
+        ]}>
+          {/* Grid layout for hosts */}
+          <View style={[
+            styles.hostGridLayout, 
+            hasMinimalContent && styles.expandedHostGridLayout,
+            isFourHostMinimal && styles.fourHostMinimalLayout
+          ]}>
+            {renderHostGrid()}
+          </View>
+        </View>
+      
+        {/* Bottom row with viewer count and friends - always consistent */}
+        <View style={[
+          styles.bottomRow,
+          isFourHostMinimal && styles.fourHostMinimalBottomRow
+        ]}>
+          {/* Enhanced viewer count at bottom left */}
+          <View style={styles.viewerCountBottom}>
+            <Ionicons name="people" size={14} color="#FFFFFF" style={styles.viewerIcon} />
+            <Text style={styles.viewerCountNumber}>{stream.views}</Text>
+            <Text style={styles.viewerCountLabel}>views</Text>
+          </View>
+        
+          {/* Friends watching at bottom right */}
+          {renderFriendsWatching()}
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -829,11 +1112,13 @@ const LiveScreen = () => {
           ]}
         />
         
-        <ScrollView style={styles.scrollView}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {renderSpotlightSection()}
           {renderTournamentSection()}
           {renderGlobalChatSection()}
           {renderLivesSection()}
+          {/* Add extra padding at the bottom to ensure all content is visible */}
+          <View style={{ height: 20 }} />
         </ScrollView>
         
         <View style={styles.bottomBar}>
@@ -1233,28 +1518,58 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
   },
-  streamCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    marginBottom: 16,
+  streamsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+  },
+  streamGridCard: {
+    backgroundColor: '#1D1E26',
+    borderRadius: 24,
     overflow: 'hidden',
+    width: '48%',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
-  streamThumbnailContainer: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#1C1D23',
-    position: 'relative',
+  streamGridTouchable: {
+    width: '100%',
+    height: '100%',
+    padding: 12,
   },
-  rankBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  streamGridCardLeft: {
+    marginRight: 4,
+  },
+  streamGridCardRight: {
+    marginLeft: 4,
+  },
+  streamStatsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  streamBoostContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  streamBoostText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  streamRankBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    zIndex: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
   },
   firstRank: {
     backgroundColor: '#FFD700',
@@ -1265,71 +1580,113 @@ const styles = StyleSheet.create({
   thirdRank: {
     backgroundColor: '#CD7F32',
   },
-  rankText: {
+  streamRankText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  streamStatsOverlay: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-  },
-  streamStatRow: {
+  streamViewsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
-  streamStatText: {
+  streamViewsText: {
     color: '#FFFFFF',
     fontSize: 12,
     marginLeft: 4,
   },
-  streamInfoContainer: {
-    flex: 1,
-    padding: 12,
-  },
-  streamTitle: {
+  streamGridTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
+    marginTop: 4,
+    marginLeft: 36, // Add margin to allow space for rank badge
   },
-  streamHostContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  hostGrid: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: 12,
   },
-  hostAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  hostName: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-  },
-  participantsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  participantDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    marginRight: 4,
-  },
-  moreParticipants: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  viewerCountBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  moreParticipantsText: {
+  viewerCountText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 3,
+  },
+  hostGridLayout: {
+    width: '100%',
+    aspectRatio: 1, // Keep a square grid regardless of content
+    backgroundColor: '#121212',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  // Dynamic host grid layouts based on count
+  singleHostGrid: {
+    width: '100%',
+    height: '100%',
+  },
+  singleHostImage: {
+    width: '100%',
+    height: '100%',
+  },
+  dualHostGrid: {
+    flexDirection: 'row',
+    width: '100%',
+    height: '100%',
+  },
+  dualHostItem: {
+    width: '50%',
+    height: '100%',
+  },
+  tripleHostGrid: {
+    width: '100%',
+    height: '100%',
+  },
+  tripleHostRow: {
+    flexDirection: 'row',
+    width: '100%',
+    height: '100%',
+  },
+  tripleHostItem: {
+    width: '33.33%',
+    height: '100%',
+  },
+  standardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    height: '100%',
+  },
+  gridItemStandard: {
+    width: '33.33%',
+    height: '33.33%',
+    padding: 0,
+  },
+  gridItemFourth: {
+    width: '50%', 
+    height: '50%',
+    padding: 0,
+  },
+  gridItemSixth: {
+    width: '33.33%',
+    height: '50%',
+    padding: 0,
+  },
+  hostImage: {
+    width: '100%',
+    height: '100%',
   },
   
   // Bottom Bar
@@ -1478,6 +1835,200 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  
+  singleHostContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  
+  threeHostsContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  
+  threeHostsTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 8,
+  },
+  
+  threeHostsBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  
+  fiveHostsContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  
+  fiveHostsTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 8,
+  },
+  
+  fiveHostsBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  
+  multipleHostsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  
+  // Top header with rank and title
+  rankBadgeTop: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  // Layout for bottom row with views and friends
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  expandedHostGridContainer: {
+    flex: 1, // Take up more space when minimal content
+    marginVertical: 10, // More margin to expand
+  },
+  expandedHostGridLayout: {
+    aspectRatio: 0.9, // Slightly taller to fill empty space
+    height: 'auto',
+  },
+  expandedHostGrid: {
+    height: '100%', 
+    width: '100%',
+  },
+  streamGridCardMinimal: {
+    paddingTop: 8, // Keep some padding to match other cards
+    paddingBottom: 8,
+  },
+  // Special styles for the 4-host minimal content case
+  placeholderTopRow: {
+    height: 12, // Height to match the margin used in topRow
+  },
+  fourHostMinimalCard: {
+    padding: 12, // Same padding as other cards for consistency
+  },
+  fourHostMinimalContainer: {
+    flex: 1,
+    marginVertical: 8, // Consistent margin
+  },
+  fourHostMinimalLayout: {
+    aspectRatio: 1, // Same aspect ratio as other cards
+    height: 'auto',
+  },
+  fourHostMinimalBottomRow: {
+    marginTop: 10,
+    paddingTop: 6,
+    borderTopWidth: 1, // Keep the border for consistency
+  },
+  emptyFriendsContainer: {
+    height: 30, // Match the height of the friends container
+    width: 30, // Give it some width
+  },
+  // Top row with title and rank
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rankBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  streamTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  // Enhanced viewer count at bottom left
+  viewerCountBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  viewerIcon: {
+    marginRight: 4,
+  },
+  viewerCountNumber: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  viewerCountLabel: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    marginLeft: 3,
+  },
+  // Enhanced friends watching section
+  friendsWatchingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  friendAvatarContainer: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginLeft: -8, // Overlap for stacked effect
+    borderWidth: 2,
+    borderColor: '#4B8BFF', // Blue border for friends
+    overflow: 'hidden',
+  },
+  friendAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  friendsCountBadge: {
+    backgroundColor: '#4B8BFF',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -4,
+  },
+  friendsCountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 
