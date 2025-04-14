@@ -213,6 +213,32 @@ const LiveScreen = () => {
     setActivityModalVisible(true);
   };
 
+  // Navigate to live stream view screen
+  const navigateToLiveStreamView = (stream: Stream) => {
+    // Provide haptic feedback if available
+    if (Platform.OS === 'ios' && require('expo-haptics')) {
+      try {
+        const Haptics = require('expo-haptics');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log('Haptics not available');
+      }
+    }
+    
+    // Navigate to stream view with parameters
+    router.push({
+      pathname: '/livestream',
+      params: {
+        streamId: stream.id.toString(),
+        title: stream.title || 'Untitled Stream',
+        hostName: stream.hosts[0].name,
+        hostAvatar: stream.hosts[0].avatar,
+        viewCount: stream.views.toString(),
+        hostCount: stream.hosts.length.toString()
+      }
+    });
+  };
+
   // Close the activity modal
   const closeActivityModal = () => {
     setActivityModalVisible(false);
@@ -1011,13 +1037,7 @@ const LiveScreen = () => {
           hasMinimalContent && styles.streamGridCardMinimal,
           isFourHostMinimal && styles.fourHostMinimalCard
         ]}
-        onPress={() => handleActivityPress('watching', {
-          title: stream.title || '',
-          hostName: stream.hosts[0].name,
-          hostAvatar: stream.hosts[0].avatar,
-          viewerCount: stream.views,
-          avatars: [stream.hosts[0].avatar],
-        })}
+        onPress={() => navigateToLiveStreamView(stream)}
       >
         {/* Add a placeholder space with the same height as the title row when no title/rank */}
         {!stream.title && !stream.rank && (
