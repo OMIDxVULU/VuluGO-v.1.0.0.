@@ -153,7 +153,35 @@ type ChatMessageItemProps = {
   isHighlighted?: boolean;
 };
 
-// Update ChatMessageItem to handle replies
+// Update the message rendering to highlight mentions
+const MessageText = ({ text }: { text: string }) => {
+  // Parse message to identify mentions
+  const parts = parseMessage(text);
+  
+  return (
+    <Text style={styles.messageText}>
+      {parts.map((part, index) => {
+        if (part.type === 'mention') {
+          return (
+            <Text 
+              key={index} 
+              style={styles.mentionText}
+              onPress={() => {
+                // Could add action when a mention is tapped
+                console.log('Mention tapped:', part.content);
+              }}
+            >
+              {part.content}
+            </Text>
+          );
+        }
+        return <Text key={index}>{part.content}</Text>;
+      })}
+    </Text>
+  );
+};
+
+// Update the ChatMessageItem component to use MessageText
 const ChatMessageItem = React.memo(({
   message,
   onReply,
@@ -215,7 +243,7 @@ const ChatMessageItem = React.memo(({
           onLongPress={handleLongPress}
           delayLongPress={200} // Shorter delay for more responsiveness
         >
-          <Text style={styles.messageText}>{message.message}</Text>
+          <MessageText text={message.message} />
         </TouchableOpacity>
       </View>
     </View>
@@ -308,6 +336,13 @@ const LiveStreamView = () => {
   // Speaking animation refs
   const speakingAnimationRefs = useRef<Animated.Value[]>(MOCK_PARTICIPANTS.map(() => new Animated.Value(0)));
   
+  // Add new state variables for mention suggestions
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [filteredMentions, setFilteredMentions] = useState<Participant[]>([]);
+  
+  // Add mention animation ref
+  const mentionAnimRef = useRef(new Animated.Value(0)).current;
+  
   // Set up a speaking animation that doesn't cause re-renders
   const animateSpeaking = useCallback(() => {
     MOCK_PARTICIPANTS.forEach((participant, index) => {
@@ -385,9 +420,75 @@ const LiveStreamView = () => {
     }).start();
   };
   
-  // Update handleSendMessage to include reply information
+  // Function to handle message input changes with mention detection
+  const handleMessageChange = (text: string) => {
+    setMessageText(text);
+    
+    // Check for @ symbol to trigger mention suggestions
+    const matches = text.match(/@(\w*)$/);
+    if (matches) {
+      const query = matches[1].toLowerCase();
+      setMentionQuery(query);
+      
+      // Filter participants based on query
+      const filtered = participants.filter(p => 
+        p.name.toLowerCase().includes(query)
+      ).slice(0, 5); // Limit to 5 suggestions
+      
+      setFilteredMentions(filtered);
+    } else {
+      // Clear mention state when no @ is being typed
+      setMentionQuery(null);
+      setFilteredMentions([]);
+    }
+  };
+
+  // Enhance the selectMention function with animation
+  const selectMention = (participant: Participant) => {
+    // Replace the @query with the selected username
+    const currentText = messageText;
+    const atIndex = currentText.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      const newText = currentText.substring(0, atIndex) + `@${participant.name} `;
+      setMessageText(newText);
+    }
+    
+    // Clear mention suggestions
+    setMentionQuery(null);
+    setFilteredMentions([]);
+    
+    // Trigger a small animation to confirm selection
+    Animated.sequence([
+      Animated.timing(mentionAnimRef, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true
+      }),
+      Animated.timing(mentionAnimRef, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      })
+    ]).start();
+    
+    // Optional: Add haptic feedback on selection
+    if (Platform.OS === 'ios' && require('expo-haptics')) {
+      try {
+        const Haptics = require('expo-haptics');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (error) {
+        console.log('Haptics not available');
+      }
+    }
+  };
+
+  // Update handleSendMessage to process mentions
   const handleSendMessage = () => {
     if (messageText.trim() === '') return;
+    
+    // Process message text to standardize mentions if needed
+    const processedMessage = messageText;
     
     // Create new message object with actual user profile
     const newMessage: ChatMessage = {
@@ -396,7 +497,7 @@ const LiveStreamView = () => {
         name: 'Your Name', // Replace with actual username from profile context if available
         avatar: userProfileImage,
       },
-      message: messageText,
+      message: processedMessage,
       timestamp: Date.now(),
       // Add reply information if replying to a message
       ...(replyingTo && {
@@ -569,6 +670,9 @@ const LiveStreamView = () => {
             </View>
           )}
           
+          {/* Mention suggestions popup */}
+          {renderMentionSuggestions()}
+          
           {/* Input field with send button */}
           <View style={styles.inputRow}>
             <TextInput
@@ -576,7 +680,7 @@ const LiveStreamView = () => {
               placeholder="Type a message..."
               placeholderTextColor="#999"
               value={messageText}
-              onChangeText={setMessageText}
+              onChangeText={handleMessageChange}
             />
             <TouchableOpacity
               style={[styles.sendButton, messageText.trim() ? styles.sendButtonActive : {}]}
@@ -658,6 +762,74 @@ const LiveStreamView = () => {
             )}
           </ScrollView>
         </SafeAreaView>
+      </Animated.View>
+    );
+  };
+
+  // Enhance mention suggestions with animation and hover states
+  const renderMentionSuggestions = () => {
+    if (!mentionQuery && filteredMentions.length === 0) return null;
+    
+    return (
+      <Animated.View 
+        style={[
+          styles.mentionSuggestionsContainer,
+          {
+            transform: [
+              {
+                translateY: mentionAnimRef.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -5]
+                })
+              }
+            ]
+          }
+        ]}
+      >
+        <View style={styles.mentionSuggestionsHeader}>
+          <Text style={styles.mentionSuggestionsTitle}>Suggestions</Text>
+          {mentionQuery && (
+            <Text style={styles.mentionQueryText}>@{mentionQuery}</Text>
+          )}
+        </View>
+        
+        {filteredMentions.length === 0 && mentionQuery && mentionQuery.length > 0 ? (
+          <View style={styles.noMentionsContainer}>
+            <Text style={styles.noMentionsText}>No users found matching "@{mentionQuery}"</Text>
+          </View>
+        ) : (
+          filteredMentions.map((participant, index) => (
+            <TouchableOpacity 
+              key={participant.id} 
+              style={[
+                styles.mentionSuggestion,
+                index === 0 && styles.mentionSuggestionFirst,
+                index === filteredMentions.length - 1 && styles.mentionSuggestionLast
+              ]}
+              onPress={() => selectMention(participant)}
+              activeOpacity={0.7}
+            >
+              <Image 
+                source={{ uri: participant.avatar }} 
+                style={styles.mentionAvatar} 
+              />
+              <View style={styles.mentionContent}>
+                <Text style={styles.mentionName}>
+                  {participant.name.split(new RegExp(`(${mentionQuery})`, 'i')).map((part, i) => 
+                    part.toLowerCase() === mentionQuery?.toLowerCase() ? 
+                      <Text key={i} style={styles.mentionHighlight}>{part}</Text> : 
+                      <Text key={i}>{part}</Text>
+                  )}
+                </Text>
+                {participant.isHost && (
+                  <View style={styles.hostBadge}>
+                    <Text style={styles.hostText}>HOST</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </Animated.View>
     );
   };
@@ -1148,6 +1320,106 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 15,
+  },
+  // Mention suggestion styles
+  mentionSuggestionsContainer: {
+    position: 'absolute',
+    bottom: 65,
+    left: 10,
+    right: 10,
+    backgroundColor: '#262730',
+    borderRadius: 12,
+    maxHeight: 220,
+    borderWidth: 1,
+    borderColor: '#3A3B45',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  mentionSuggestionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(58, 59, 69, 0.5)',
+  },
+  mentionSuggestionsTitle: {
+    color: '#9DA3B4',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  mentionQueryText: {
+    color: '#8A7DF6',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  noMentionsContainer: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  noMentionsText: {
+    color: '#9DA3B4',
+    fontSize: 14,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  mentionSuggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(58, 59, 69, 0.2)',
+  },
+  mentionSuggestionFirst: {
+    paddingTop: 12,
+  },
+  mentionSuggestionLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 12,
+  },
+  mentionAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 12,
+  },
+  mentionContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  mentionName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  mentionHighlight: {
+    color: '#8A7DF6',
+    fontWeight: 'bold',
+  },
+  mentionText: {
+    color: '#8A7DF6',
+    fontWeight: 'bold',
+  },
+  hostBadge: {
+    backgroundColor: 'rgba(138, 125, 246, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(138, 125, 246, 0.4)',
+  },
+  hostText: {
+    color: '#8A7DF6',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 
