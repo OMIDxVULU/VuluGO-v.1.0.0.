@@ -673,8 +673,14 @@ const LiveStreamView = () => {
                     : replyingTo.message}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.replyingCancel} onPress={cancelReply}>
-                <MaterialIcons name="close" size={20} color="#999" />
+              <TouchableOpacity 
+                style={styles.replyingCancel} 
+                onPress={cancelReply}
+                hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+              >
+                <View style={styles.cancelButtonCircle}>
+                  <MaterialIcons name="close" size={16} color="#FFF" />
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -1222,6 +1228,7 @@ const styles = StyleSheet.create({
   replyingContent: {
     flex: 1,
     marginLeft: 8,
+    marginRight: 8,
   },
   replyingText: {
     color: '#9DA3B4',
@@ -1239,7 +1246,21 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   replyingCancel: {
-    padding: 8,
+    padding: 2,
+    alignSelf: 'center',
+  },
+  cancelButtonCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#464775',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   
   // Info Panel
