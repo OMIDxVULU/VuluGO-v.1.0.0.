@@ -31,6 +31,14 @@ const HomeScreen = () => {
     avatars: [] as string[],
     friendName: '',
     friendAvatar: '',
+    livestreamData: {
+      streamId: '1',
+      title: 'Untitled Stream',
+      hostName: 'Host',
+      hostAvatar: '',
+      viewCount: '0',
+      hostCount: '1'
+    },
   });
   
   // Function to handle container width measurement
@@ -61,6 +69,7 @@ const HomeScreen = () => {
       avatars?: string[];
       friendName?: string;
       friendAvatar?: string;
+      streamId?: string;
     }
   ) => {
     // Set selected activity data
@@ -74,6 +83,14 @@ const HomeScreen = () => {
       avatars: data.avatars || [],
       friendName: data.friendName || '',
       friendAvatar: data.friendAvatar || '',
+      livestreamData: {
+        streamId: data.streamId || '1',
+        title: data.title || 'Untitled Stream',
+        hostName: data.hostName || 'Host',
+        hostAvatar: data.hostAvatar || '',
+        viewCount: (data.viewerCount || 0).toString(),
+        hostCount: (data.avatars?.length || 1).toString()
+      }
     });
     
     // Show modal
@@ -100,6 +117,7 @@ const HomeScreen = () => {
         'https://randomuser.me/api/portraits/men/32.jpg',
         'https://randomuser.me/api/portraits/men/33.jpg',
       ],
+      streamId: '101',
     };
 
     return (
@@ -167,6 +185,7 @@ const HomeScreen = () => {
         'https://randomuser.me/api/portraits/women/32.jpg',
         'https://randomuser.me/api/portraits/women/33.jpg',
       ],
+      streamId: '102',
     };
 
     return (
@@ -939,6 +958,7 @@ const HomeScreen = () => {
         friendAvatar={selectedActivity.friendAvatar}
         fuelRequired={15}
         fuelAvailable={20}
+        livestreamData={selectedActivity.livestreamData}
       />
     </SafeAreaView>
   );

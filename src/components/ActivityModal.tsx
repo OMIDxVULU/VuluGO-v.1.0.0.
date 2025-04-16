@@ -17,6 +17,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import ViewerIcon from './ViewerIcon';
 import FuelIcon from './FuelIcon';
 
@@ -37,6 +38,15 @@ interface ActivityModalProps {
   // Fuel token props
   fuelRequired?: number;
   fuelAvailable?: number;
+  // Live stream data for navigation
+  livestreamData?: {
+    streamId: string;
+    title: string;
+    hostName: string;
+    hostAvatar: string;
+    viewCount: string;
+    hostCount: string;
+  };
 }
 
 // Add a new function to generate realistic viewer counts
@@ -116,10 +126,13 @@ const ActivityModal = ({
   // Fuel token props with defaults
   fuelRequired = 10,
   fuelAvailable = 25,
+  // Live stream data for navigation
+  livestreamData,
 }: ActivityModalProps) => {
   const translateY = useRef(new Animated.Value(height)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [showFuelModal, setShowFuelModal] = useState(false);
+  const router = useRouter();
 
   // Configure pan responder for swipe down to dismiss
   const panResponder = useRef(
@@ -213,6 +226,31 @@ const ActivityModal = ({
     } else {
       // Proceed with joining
       console.log('Joining activity, fuel will be consumed at 1 per 5 seconds');
+      
+      // Navigate to the live stream if we have livestreamData
+      if (activityType === 'watching' || activityType === 'hosting') {
+        if (livestreamData) {
+          // Navigate to stream view with parameters
+          router.push({
+            pathname: '/livestream',
+            params: livestreamData
+          });
+        } else {
+          // If we don't have livestreamData, create it from current props
+          router.push({
+            pathname: '/livestream',
+            params: {
+              streamId: '1', // Default stream ID if not provided
+              title: title || 'Untitled Stream',
+              hostName: hostName || 'Host',
+              hostAvatar: hostAvatar || '',
+              viewCount: viewerCount?.toString() || '0',
+              hostCount: avatars.length.toString() || '1'
+            }
+          });
+        }
+      }
+      
       // Close modal after joining
       closeModal();
     }

@@ -69,6 +69,14 @@ const LiveScreen = () => {
     avatars: [] as string[],
     friendName: '',
     friendAvatar: '',
+    livestreamData: {
+      streamId: '1',
+      title: 'Untitled Stream',
+      hostName: 'Host',
+      hostAvatar: '',
+      viewCount: '0',
+      hostCount: '1'
+    },
   });
   
   // Timer state for the spotlight countdown
@@ -184,18 +192,9 @@ const LiveScreen = () => {
       avatars?: string[];
       friendName?: string;
       friendAvatar?: string;
+      streamId?: string;
     }
   ) => {
-    // Provide haptic feedback if available
-    if (Platform.OS === 'ios' && require('expo-haptics')) {
-      try {
-        const Haptics = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch (error) {
-        console.log('Haptics not available');
-      }
-    }
-    
     // Set selected activity data
     setSelectedActivity({
       type,
@@ -207,6 +206,14 @@ const LiveScreen = () => {
       avatars: data.avatars || [],
       friendName: data.friendName || '',
       friendAvatar: data.friendAvatar || '',
+      livestreamData: {
+        streamId: data.streamId || '1',
+        title: data.title || 'Untitled Stream',
+        hostName: data.hostName || 'Host',
+        hostAvatar: data.hostAvatar || '',
+        viewCount: (data.viewerCount || 0).toString(),
+        hostCount: (data.avatars?.length || 1).toString()
+      }
     });
     
     // Show modal
@@ -593,7 +600,23 @@ const LiveScreen = () => {
           )}
           
           {/* Friend who is hosting with hosting status */}
-          <TouchableOpacity style={styles.spotlightContainer}>
+          <TouchableOpacity 
+            style={styles.spotlightContainer}
+            onPress={() => handleActivityPress('hosting', {
+              title: 'Live Stream with Friends',
+              hostName: 'James',
+              hostAvatar: 'https://randomuser.me/api/portraits/men/43.jpg',
+              viewerCount: 1350,
+              friendName: 'James',
+              friendAvatar: 'https://randomuser.me/api/portraits/men/43.jpg',
+              avatars: [
+                'https://randomuser.me/api/portraits/men/43.jpg',
+                'https://randomuser.me/api/portraits/women/43.jpg',
+                'https://randomuser.me/api/portraits/men/44.jpg',
+              ],
+              streamId: '201', // Unique stream ID
+            })}
+          >
             <View style={styles.spotlightAvatarWrapper}>
               <View style={styles.spotlightAvatarRed}>
                 <Image 
@@ -609,7 +632,24 @@ const LiveScreen = () => {
           </TouchableOpacity>
           
           {/* Friend who is watching with watching status */}
-          <TouchableOpacity style={styles.spotlightContainer}>
+          <TouchableOpacity 
+            style={styles.spotlightContainer}
+            onPress={() => handleActivityPress('watching', {
+              title: 'Live Stream with Friends',
+              hostName: 'Sara',
+              hostAvatar: 'https://randomuser.me/api/portraits/women/32.jpg',
+              viewerCount: 1420,
+              friendName: 'Ella',
+              friendAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
+              avatars: [
+                'https://randomuser.me/api/portraits/women/32.jpg',
+                'https://randomuser.me/api/portraits/women/33.jpg',
+                'https://randomuser.me/api/portraits/women/34.jpg',
+                'https://randomuser.me/api/portraits/men/32.jpg',
+              ],
+              streamId: '202', // Unique stream ID
+            })}
+          >
             <View style={styles.spotlightAvatarWrapper}>
               <View style={styles.spotlightAvatarBlue}>
                 <Image 
@@ -1170,6 +1210,7 @@ const LiveScreen = () => {
         friendAvatar={selectedActivity.friendAvatar}
         fuelRequired={25} // Higher fuel requirement for live streams
         fuelAvailable={18} // Example where user doesn't have enough fuel
+        livestreamData={selectedActivity.livestreamData}
       />
       
       {/* Spotlight Modal */}
