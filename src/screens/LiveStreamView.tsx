@@ -625,7 +625,7 @@ const LiveStreamView = () => {
     </View>
   ), [participants]);
 
-  // Simplified renderChat function
+  // Update the renderChat function to add a fading shadow at the top
   const renderChat = () => {
     return (
       <KeyboardAvoidingView
@@ -633,21 +633,30 @@ const LiveStreamView = () => {
         style={styles.chatContainer}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <ScrollView
-          ref={chatListRef}
-          style={styles.chatList}
-          contentContainerStyle={styles.chatContent}
-        >
-          {chatMessages.map((message) => (
-            <ChatMessageItem
-              key={message.id}
-              message={message}
-              onReply={handleReplyToMessage}
-              onScrollToMessage={scrollToMessage}
-              isHighlighted={message.id === replyingTo?.id}
-            />
-          ))}
-        </ScrollView>
+        <View style={styles.chatListContainer}>
+          {/* Shadow overlay at the top of chat */}
+          <LinearGradient
+            colors={['rgba(26, 27, 34, 0.9)', 'rgba(26, 27, 34, 0)']}
+            style={styles.chatTopShadow}
+            pointerEvents="none"
+          />
+          
+          <ScrollView
+            ref={chatListRef}
+            style={styles.chatList}
+            contentContainerStyle={styles.chatContent}
+          >
+            {chatMessages.map((message) => (
+              <ChatMessageItem
+                key={message.id}
+                message={message}
+                onReply={handleReplyToMessage}
+                onScrollToMessage={scrollToMessage}
+                isHighlighted={message.id === replyingTo?.id}
+              />
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Chat input with reply UI */}
         <View style={styles.chatInputContainer}>
@@ -1053,8 +1062,26 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
     backgroundColor: '#1A1B22',
-    borderTopWidth: 1,
-    borderTopColor: '#2A2A35',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  
+  // Add container for chat list for positioning the shadow
+  chatListContainer: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  
+  // Add shadow gradient at the top
+  chatTopShadow: {
+    position: 'absolute', 
+    top: 0,
+    left: -5,
+    right: -5,
+    height: 40,
+    zIndex: 10,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
