@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, TextInput, Pressable, Modal, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, TextInput, Pressable, Modal, Platform, FlatList } from 'react-native';
 import { Text, Avatar, Button, Badge, ProgressBar } from 'react-native-paper';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,22 +12,7 @@ import ActivityModal from '../components/ActivityModal';
 import UserStatusIndicator from '../components/UserStatusIndicator';
 import { useUserStatus, StatusType, getStatusColor } from '../context/UserStatusContext';
 import { useUserProfile } from '../context/UserProfileContext';
-
-interface Stream {
-  id: number;
-  title: string | null;  // Some streams may not have titles
-  hosts: {
-    name: string;
-    avatar: string;
-  }[];  // Multiple hosts, between 1-10
-  boost: number;
-  views: number;
-  rank?: number;  // Make rank optional with '?'
-  friends?: {  // Optional friends who are watching
-    name: string;
-    avatar: string;
-  }[];
-}
+import { useLiveStreams, LiveStream } from '../context/LiveStreamContext';
 
 const LiveScreen = () => {
   const router = useRouter();
@@ -40,6 +25,8 @@ const LiveScreen = () => {
   const { userStatus } = useUserStatus();
   // Get profile information from UserProfileContext
   const { profileImage } = useUserProfile();
+  // Get LiveStream context data
+  const { streams, featuredStreams, friendStreams, joinStream } = useLiveStreams();
 
   // Use profile image from context instead of hardcoded one
   const userProfileImage = profileImage || 'https://randomuser.me/api/portraits/men/32.jpg';
@@ -69,6 +56,7 @@ const LiveScreen = () => {
     avatars: [] as string[],
     friendName: '',
     friendAvatar: '',
+    streamId: '',
     livestreamData: {
       streamId: '1',
       title: 'Untitled Stream',
@@ -206,6 +194,7 @@ const LiveScreen = () => {
       avatars: data.avatars || [],
       friendName: data.friendName || '',
       friendAvatar: data.friendAvatar || '',
+      streamId: data.streamId || '',
       livestreamData: {
         streamId: data.streamId || '1',
         title: data.title || 'Untitled Stream',
@@ -221,7 +210,7 @@ const LiveScreen = () => {
   };
 
   // Navigate to live stream view screen
-  const navigateToLiveStreamView = (stream: Stream) => {
+  const navigateToLiveStreamView = (stream: LiveStream) => {
     // Provide haptic feedback if available
     if (Platform.OS === 'ios' && require('expo-haptics')) {
       try {
@@ -232,16 +221,23 @@ const LiveScreen = () => {
       }
     }
     
+    // Join the stream in the LiveStreamContext
+    joinStream(stream.id);
+    
+    // Mock profile views - in a real app this would come from the profile context
+    const mockProfileViews = Math.floor(Math.random() * 2000) + 500; // Random number between 500-2500
+    
     // Navigate to stream view with parameters
     router.push({
       pathname: '/livestream',
       params: {
-        streamId: stream.id.toString(),
+        streamId: stream.id,
         title: stream.title || 'Untitled Stream',
         hostName: stream.hosts[0].name,
         hostAvatar: stream.hosts[0].avatar,
         viewCount: stream.views.toString(),
-        hostCount: stream.hosts.length.toString()
+        hostCount: stream.hosts.length.toString(),
+        profileViews: mockProfileViews.toString(),
       }
     });
   };
@@ -749,177 +745,87 @@ const LiveScreen = () => {
   };
 
   const renderLivesSection = () => {
-    // Generate random viewer counts for demo purposes
-    const getRandomViewerCount = () => {
-      const counts = [30, 65, 114, 246, 312, 489, 527, 631, 842, 1024, 1500, 2100];
-      return counts[Math.floor(Math.random() * counts.length)];
-    };
-    
-    // Live streams data
-    const liveStreams: Stream[] = [
-      {
-        id: 1,
-        title: 'Epic gameplay session! Join now!',
-        hosts: [
-          { name: 'ProGamer', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
-          { name: 'CoolStreamer', avatar: 'https://randomuser.me/api/portraits/women/12.jpg' },
-          { name: 'GamerGirl', avatar: 'https://randomuser.me/api/portraits/women/43.jpg' },
-          { name: 'ProPlayer', avatar: 'https://randomuser.me/api/portraits/men/41.jpg' },
-          { name: 'StreamKing', avatar: 'https://randomuser.me/api/portraits/men/36.jpg' },
-          { name: 'GamingQueen', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
-          { name: 'PlayerOne', avatar: 'https://randomuser.me/api/portraits/men/38.jpg' },
-          { name: 'StreamerPro', avatar: 'https://randomuser.me/api/portraits/women/36.jpg' },
-          { name: 'GameMaster', avatar: 'https://randomuser.me/api/portraits/men/39.jpg' },
-        ],
-        boost: 600,
-        views: getRandomViewerCount(),
-        rank: 1,
-        friends: [
-          { name: 'Friend1', avatar: 'https://randomuser.me/api/portraits/men/43.jpg' },
-          { name: 'Friend2', avatar: 'https://randomuser.me/api/portraits/women/23.jpg' },
-          { name: 'Friend3', avatar: 'https://randomuser.me/api/portraits/men/23.jpg' },
-        ]
-      },
-      {
-        id: 2,
-        title: 'Late night stream with friends',
-        hosts: [
-          { name: 'NightOwl', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
-          { name: 'MidnightGamer', avatar: 'https://randomuser.me/api/portraits/men/44.jpg' },
-          { name: 'LateStreamer', avatar: 'https://randomuser.me/api/portraits/women/45.jpg' },
-        ],
-        boost: 500,
-        views: getRandomViewerCount(),
-        rank: 2,
-        friends: [
-          { name: 'Friend3', avatar: 'https://randomuser.me/api/portraits/men/22.jpg' },
-        ]
-      },
-      {
-        id: 3,
-        title: 'Competitive matchmaking!',
-        hosts: [
-          { name: 'ChampPlayer', avatar: 'https://randomuser.me/api/portraits/men/28.jpg' },
-          { name: 'ProCoach', avatar: 'https://randomuser.me/api/portraits/women/28.jpg' },
-          { name: 'Teammate1', avatar: 'https://randomuser.me/api/portraits/men/29.jpg' },
-        ],
-        boost: 400,
-        views: getRandomViewerCount(),
-        rank: 3,
-        friends: [
-          { name: 'Friend4', avatar: 'https://randomuser.me/api/portraits/women/24.jpg' },
-          { name: 'Friend5', avatar: 'https://randomuser.me/api/portraits/men/25.jpg' },
-        ]
-      },
-      {
-        id: 4,
-        title: 'Casual gaming & chill vibes',
-        hosts: [
-          { name: 'RelaxedGamer', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' },
-          { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/21.jpg' },
-          { name: 'FunFriend', avatar: 'https://randomuser.me/api/portraits/women/21.jpg' },
-        ],
-        boost: 300,
-        views: getRandomViewerCount(),
-        rank: 4,
-        friends: []
-      },
-      // Popular streams without ranking (no boost)
-      {
-        id: 5,
-        title: 'Beginner friendly gaming lounge',
-        hosts: [
-          { name: 'NewStreamer', avatar: 'https://randomuser.me/api/portraits/women/47.jpg' },
-        ],
-        boost: 0, // No boost
-        views: getRandomViewerCount(),
-        friends: [
-          { name: 'SupportiveFriend', avatar: 'https://randomuser.me/api/portraits/men/47.jpg' },
-          { name: 'ChattyViewer', avatar: 'https://randomuser.me/api/portraits/women/48.jpg' },
-        ]
-      },
-      {
-        id: 6,
-        title: 'Just chatting with viewers',
-        hosts: [
-          { name: 'SocialStreamer', avatar: 'https://randomuser.me/api/portraits/women/35.jpg' },
-          { name: 'CoHost', avatar: 'https://randomuser.me/api/portraits/men/35.jpg' },
-        ],
-        boost: 0, // No boost
-        views: getRandomViewerCount(),
-        friends: [
-          { name: 'RegularViewer', avatar: 'https://randomuser.me/api/portraits/women/36.jpg' },
-        ]
-      },
-      {
-        id: 7,
-        title: null, // No title
-        hosts: [
-          { name: 'MysteryGamer', avatar: 'https://randomuser.me/api/portraits/men/31.jpg' },
-          { name: 'UnknownPlayer', avatar: 'https://randomuser.me/api/portraits/women/31.jpg' },
-          { name: 'SecretStreamer', avatar: 'https://randomuser.me/api/portraits/men/30.jpg' },
-          { name: 'AnonymousHost', avatar: 'https://randomuser.me/api/portraits/women/30.jpg' },
-        ],
-        boost: 0, // No boost
-        views: getRandomViewerCount(),
-        friends: []
-      },
-      {
-        id: 8,
-        title: 'First time streaming! Be nice :)',
-        hosts: [
-          { name: 'FirstTimer', avatar: 'https://randomuser.me/api/portraits/women/25.jpg' },
-        ],
-        boost: 0, // No boost
-        views: 30, // Few viewers
-        friends: [
-          { name: 'SupportFriend1', avatar: 'https://randomuser.me/api/portraits/men/24.jpg' },
-          { name: 'SupportFriend2', avatar: 'https://randomuser.me/api/portraits/women/26.jpg' },
-          { name: 'SupportFriend3', avatar: 'https://randomuser.me/api/portraits/men/26.jpg' },
-          { name: 'SupportFriend4', avatar: 'https://randomuser.me/api/portraits/women/27.jpg' },
-        ]
-      },
-    ];
-    
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Lives</Text>
           <View style={styles.livesCounter}>
-            <Text style={styles.livesCountText}>{liveStreams.length} streams</Text>
+            <Text style={styles.livesCountText}>{streams.length} streams</Text>
           </View>
         </View>
         
-        {/* Simple two-column layout for streams */}
+        {/* Featured streams section */}
+        {featuredStreams.length > 0 && (
+          <>
+            <View style={styles.featuredHeader}>
+              <Text style={styles.featuredSubtitle}>Featured</Text>
+            </View>
+            <View style={styles.streamsRow}>
+              {featuredStreams.slice(0, 2).map((stream) => (
+                <StreamCard key={stream.id} stream={stream} />
+              ))}
+            </View>
+          </>
+        )}
+        
+        {/* Friends hosting streams */}
+        {friendStreams.hosting.length > 0 && (
+          <>
+            <View style={styles.featuredHeader}>
+              <Text style={styles.featuredSubtitle}>Friends Hosting</Text>
+            </View>
+            <View style={styles.streamsRow}>
+              {friendStreams.hosting.slice(0, 2).map((stream) => (
+                <StreamCard key={stream.id} stream={stream} />
+              ))}
+            </View>
+          </>
+        )}
+        
+        {/* Friends watching streams */}
+        {friendStreams.watching.length > 0 && (
+          <>
+            <View style={styles.featuredHeader}>
+              <Text style={styles.featuredSubtitle}>Friends Watching</Text>
+            </View>
+            <View style={styles.streamsRow}>
+              {friendStreams.watching.slice(0, 2).map((stream) => (
+                <StreamCard key={stream.id} stream={stream} />
+              ))}
+            </View>
+          </>
+        )}
+        
+        {/* Display all other streams */}
         <View style={styles.streamsRow}>
-          {liveStreams.slice(0, 2).map((stream) => (
-            <StreamCard key={stream.id} stream={stream} />
-          ))}
+          {streams
+            .filter(stream => 
+              !featuredStreams.includes(stream) && 
+              !friendStreams.hosting.includes(stream) && 
+              !friendStreams.watching.includes(stream))
+            .slice(0, 2)
+            .map((stream) => (
+              <StreamCard key={stream.id} stream={stream} />
+            ))}
         </View>
         
         <View style={styles.streamsRow}>
-          {liveStreams.slice(2, 4).map((stream) => (
-            <StreamCard key={stream.id} stream={stream} />
-          ))}
-        </View>
-        
-        <View style={styles.streamsRow}>
-          {liveStreams.slice(4, 6).map((stream) => (
-            <StreamCard key={stream.id} stream={stream} />
-          ))}
-        </View>
-        
-        <View style={styles.streamsRow}>
-          {liveStreams.slice(6, 8).map((stream) => (
-            <StreamCard key={stream.id} stream={stream} />
-          ))}
+          {streams
+            .filter(stream => 
+              !featuredStreams.includes(stream) && 
+              !friendStreams.hosting.includes(stream) && 
+              !friendStreams.watching.includes(stream))
+            .slice(2, 4)
+            .map((stream) => (
+              <StreamCard key={stream.id} stream={stream} />
+            ))}
         </View>
       </View>
     );
   };
   
   // Separate component for stream cards to simplify layout
-  const StreamCard = ({ stream }: { stream: Stream }) => {
+  const StreamCard = ({ stream }: { stream: LiveStream }) => {
     // Check if stream has minimal content (no title, no rank, no friends)
     const hasMinimalContent = !stream.title && !stream.rank && (!stream.friends || stream.friends.length === 0);
     // Check if it's a 4-host grid with minimal content (special case that needs more adjustment)
@@ -1200,6 +1106,7 @@ const LiveScreen = () => {
         visible={activityModalVisible}
         onClose={closeActivityModal}
         activityType={selectedActivity.type}
+        streamId={selectedActivity.streamId}
         title={selectedActivity.title}
         subtitle={selectedActivity.subtitle}
         hostName={selectedActivity.hostName}
@@ -1208,9 +1115,8 @@ const LiveScreen = () => {
         avatars={selectedActivity.avatars}
         friendName={selectedActivity.friendName}
         friendAvatar={selectedActivity.friendAvatar}
-        fuelRequired={25} // Higher fuel requirement for live streams
-        fuelAvailable={18} // Example where user doesn't have enough fuel
-        livestreamData={selectedActivity.livestreamData}
+        fuelRequired={15}
+        fuelAvailable={20}
       />
       
       {/* Spotlight Modal */}
@@ -2091,7 +1997,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  
+  // Add the missing style properties for the new section headers
+  featuredHeader: {
+    marginVertical: 8,
+    marginLeft: 4,
+  },
+  featuredSubtitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    opacity: 0.8,
+  },
 });
 
 export default LiveScreen; 
+
 

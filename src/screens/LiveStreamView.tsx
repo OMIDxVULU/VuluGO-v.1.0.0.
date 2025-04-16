@@ -19,13 +19,14 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, Ionicons, FontAwesome5, Entypo } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5, Entypo, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text as PaperText, Avatar, Button } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useLoopProtection } from '../FixInfiniteLoop';
+import { useLiveStreams, LiveStream, StreamHost } from '../context/LiveStreamContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,6 +65,25 @@ interface ChatMessage {
 
 // Function to generate unique message IDs
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// Helper function to format time ago
+const timeAgo = (timestamp: number): string => {
+  const now = Date.now();
+  const secondsAgo = Math.floor((now - timestamp) / 1000);
+  
+  if (secondsAgo < 60) {
+    return `just now`;
+  } else if (secondsAgo < 3600) {
+    const minutes = Math.floor(secondsAgo / 60);
+    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  } else if (secondsAgo < 86400) {
+    const hours = Math.floor(secondsAgo / 3600);
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else {
+    const days = Math.floor(secondsAgo / 86400);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  }
+};
 
 // Update mock messages with a message from the user
 const MOCK_CHAT_MESSAGES = [
@@ -313,12 +333,56 @@ const LiveStreamView = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { profileImage } = useUserProfile();
+  const { getStreamById, streams } = useLiveStreams();
   
-  const streamTitle = params.title as string || 'Live Audio Room';
+  // Use streamId from params to fetch the actual stream data from context
+  const streamId = params.streamId as string;
+  const stream = getStreamById(streamId);
+  
+  // Default values if stream not found, otherwise use stream data
+  const streamTitle = stream ? stream.title : (params.title as string || 'Live Audio Room');
+  const hostName = stream?.hosts[0]?.name || (params.hostName as string || 'Host');
+  const hostAvatar = stream?.hosts[0]?.avatar || (params.hostAvatar as string || 'https://randomuser.me/api/portraits/women/43.jpg');
+  const viewCount = stream?.views.toString() || (params.viewCount as string || '0');
+  const formatViewCount = (count: string | number) => {
+    const num = typeof count === 'string' ? parseInt(count) : count;
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'k';
+    }
+    return num.toString();
+  };
+  const displayViewCount = formatViewCount(stream?.views || viewCount);
+  const boosts = stream?.boost || ROOM_STATS.boosts;
+  const rank = stream?.rank || ROOM_STATS.rank;
+  
+  // Mock profile views (this would come from the user profile in a real app)
+  // Using the host count as profile views for demonstration
+  const hostCount = stream?.hosts.length || parseInt(params.hostCount as string || '0');
+  
+  // In a real app this would come from a user profile context
+  // For demo, using a fixed high number or a value from the URL parameters
+  const profileViews = params.profileViews ? parseInt(params.profileViews as string) : 1400;
+  
   const userProfileImage = profileImage || 'https://randomuser.me/api/portraits/men/32.jpg';
   
+  // Convert stream hosts to participants
+  const initializeParticipants = () => {
+    if (stream && stream.hosts) {
+      return stream.hosts.map((host, index) => ({
+        id: index.toString(),
+        name: host.name,
+        avatar: host.avatar,
+        isHost: true,
+        isSpeaking: index === 0, // First host is speaking by default
+        placeholder: false
+      }));
+    }
+    // Fallback to mock participants
+    return MOCK_PARTICIPANTS;
+  };
+  
   // State variables
-  const [participants, setParticipants] = useState<Participant[]>(MOCK_PARTICIPANTS);
+  const [participants, setParticipants] = useState<Participant[]>(initializeParticipants());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
   const [messageText, setMessageText] = useState('');
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false);
@@ -390,15 +454,37 @@ const LiveStreamView = () => {
   // Pan responder for info panel swipe
   const panResponder = useMemo(() => 
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Only register pan responder if gesture starts near the edge of the screen
+        const screenWidth = Dimensions.get('window').width;
+        return (
+          // For opening: gesture starts within 20px of right edge
+          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 20) ||
+          // For closing: gesture starts anywhere on the panel when it's open
+          isInfoPanelVisible
+        );
+      },
       onPanResponderMove: (evt, gestureState) => {
-        if ((!isInfoPanelVisible && gestureState.dx < -50) || (isInfoPanelVisible && gestureState.dx > 50)) {
+        if ((!isInfoPanelVisible && gestureState.dx < 0) || (isInfoPanelVisible && gestureState.dx > 0)) {
           slideAnim.setValue(isInfoPanelVisible ? gestureState.dx : Dimensions.get('window').width + gestureState.dx);
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
-        if ((!isInfoPanelVisible && gestureState.dx < -100) || (isInfoPanelVisible && gestureState.dx > 100)) {
+        const swipeThreshold = Dimensions.get('window').width * 0.25; // 25% of screen width
+        
+        if ((!isInfoPanelVisible && gestureState.dx < -swipeThreshold) || 
+            (isInfoPanelVisible && gestureState.dx > swipeThreshold)) {
           toggleInfoPanel();
+          
+          // Add haptic feedback for swipe completion
+          if (Platform.OS === 'ios' && require('expo-haptics')) {
+            try {
+              const Haptics = require('expo-haptics');
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            } catch (error) {
+              console.log('Haptics not available');
+            }
+          }
         } else {
           Animated.spring(slideAnim, {
             toValue: isInfoPanelVisible ? 0 : Dimensions.get('window').width,
@@ -562,56 +648,124 @@ const LiveStreamView = () => {
     }
   };
   
+  // Update participants when stream changes
+  useEffect(() => {
+    if (stream) {
+      setParticipants(initializeParticipants());
+      
+      // Update chat messages to include a friend watching message if appropriate
+      if (stream.friends && stream.friends.length > 0) {
+        const friendWatching = stream.friends[0];
+        const friendMessage: ChatMessage = {
+          id: generateId(),
+          user: { 
+            name: friendWatching.name, 
+            avatar: friendWatching.avatar 
+          },
+          message: 'Just joined the stream! 👋',
+          timestamp: Date.now() - 30000 // Joined 30 seconds ago
+        };
+        
+        setChatMessages(prevMessages => {
+          // Check if we already have this message
+          const exists = prevMessages.some(msg => 
+            msg.user.name === friendWatching.name && 
+            msg.message.includes('joined the stream')
+          );
+          
+          if (!exists) {
+            // Add the friend message near the end
+            const newMessages = [...prevMessages];
+            newMessages.splice(prevMessages.length - 1, 0, friendMessage);
+            return newMessages;
+          }
+          return prevMessages;
+        });
+      }
+    }
+  }, [stream]);
+  
+  // Show friend watching or hosting indicator
+  const renderFriendIndicator = useCallback(() => {
+    // Return null to hide the friend indicator
+    return null;
+  }, [stream]);
+  
   // --- Render Functions --- 
 
-  const renderTopBar = () => (
-    <View style={styles.topBarOuterContainer}>
-      <View style={styles.topBarContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialIcons name="keyboard-arrow-down" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
-        <View style={styles.progressBarContainer}>
-          <LinearGradient
-            colors={['#A078F0', '#6C53D8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.progressBarFill, { width: `${ROOM_STATS.progress}%` }]}
+  const renderTopBar = () => {
+    return (
+      <View style={styles.topBarOuterContainer}>
+        <View style={styles.topBarContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
           >
-            <MaterialIcons name="rocket-launch" size={14} color="#FFFFFF" style={styles.rocketIcon} />
-            <View style={styles.arrowsContainer}>
-              {[...Array(4)].map((_, i) => (
-                <MaterialIcons key={i} name="keyboard-arrow-left" size={14} color="#FFFFFF" style={styles.arrowIcon} />
-              ))}
-            </View>
-          </LinearGradient>
+            <MaterialIcons name="chevron-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          
+          <View style={styles.progressBarContainer}>
+            <LinearGradient
+              colors={['#6E56F7', '#f25899']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.progressBarFill,
+                { width: `${stream?.rank ? 100 : ROOM_STATS.progress}%` }
+              ]}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }} numberOfLines={1} ellipsizeMode="tail">
+                {streamTitle}
+              </Text>
+              <Ionicons name="rocket" size={16} color="#FFFFFF" style={styles.rocketIcon} />
+              <View style={styles.arrowsContainer}>
+                <MaterialIcons name="arrow-drop-up" size={20} color="#FFFFFF" style={styles.arrowIcon} />
+                <MaterialIcons name="arrow-drop-up" size={20} color="#FFFFFF" style={styles.arrowIcon} />
+                <MaterialIcons name="arrow-drop-up" size={20} color="#FFFFFF" style={styles.arrowIcon} />
+              </View>
+            </LinearGradient>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
   
-  const renderStatsBar = () => (
-    <View style={styles.statsContainer}>
-      <View style={styles.boostContainer}>
-        <View style={styles.rankBadge}>
-          <Text style={styles.rankText}>1st</Text>
+  const renderStatsBar = () => {
+    return (
+      <View style={styles.statsContainer}>
+        <View style={styles.boostContainer}>
+          {rank && (
+            <View style={styles.rankBadge}>
+              <Text style={styles.rankText}>{rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : `${rank}th`}</Text>
+            </View>
+          )}
+          <View style={styles.boostBadge}>
+            <FontAwesome5 name="rocket" size={16} color="#6E56F7" />
+            <Text style={styles.boostCount}>{boosts}</Text>
+          </View>
         </View>
-        <View style={styles.boostBadge}>
-          <MaterialIcons name="flash-on" size={16} color="#FFFFFF" />
-          <Text style={styles.boostCount}>{ROOM_STATS.boosts}</Text>
+        
+        <View style={styles.rightStatsContainer}>
+          {/* Profile Views */}
+          <View style={styles.statBadge}>
+            <Ionicons name="eye-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.statText}>{formatViewCount(profileViews)}</Text>
+          </View>
+          
+          {/* Live Views - updated to show group of people */}
+          <TouchableOpacity 
+            style={styles.infoStatBadge}
+            onPress={toggleInfoPanel}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="people-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.statText}>{displayViewCount}</Text>
+            {/* Information icon removed */}
+          </TouchableOpacity>
         </View>
       </View>
-      <View style={styles.rightStatsContainer}>
-        <View style={styles.statBadge}>
-          <MaterialIcons name="visibility" size={14} color="#FFFFFF" />
-          <Text style={styles.statText}>{ROOM_STATS.viewers}</Text>
-        </View>
-        <View style={styles.statBadge}>
-          <MaterialIcons name="celebration" size={14} color="#FFFFFF" />
-          <Text style={styles.statText}>{ROOM_STATS.participants}</Text>
-        </View>
-      </View>
-    </View>
-  );
+    );
+  };
   
   const renderParticipantsGrid = useCallback(() => (
     <View style={styles.gridContainer}>
@@ -739,13 +893,25 @@ const LiveStreamView = () => {
             {activeTab === 'info' && (
               <View>
                 <Text style={styles.infoSectionTitle}>{streamTitle}</Text>
+                
                 <View style={styles.infoRow}>
                   <Ionicons name="time-outline" size={18} color="#AAAAAA" />
-                  <Text style={styles.infoText}>Started 1 hour ago</Text>
+                  <Text style={styles.infoText}>Started {stream?.startedAt ? timeAgo(stream.startedAt) : '1 hour ago'}</Text>
                 </View>
+                
                 <View style={styles.infoRow}>
                   <MaterialIcons name="bolt" size={18} color="#FFD700" />
-                  <Text style={styles.infoText}>Total Boost: {ROOM_STATS.boosts}</Text>
+                  <Text style={styles.infoText}>Total Boost: {boosts}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Ionicons name="eye-outline" size={18} color="#AAAAAA" />
+                  <Text style={styles.infoText}>Live Viewers: {displayViewCount}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Ionicons name="person-outline" size={18} color="#AAAAAA" />
+                  <Text style={styles.infoText}>Profile Views: {formatViewCount(profileViews)}</Text>
                 </View>
               </View>
             )}
@@ -849,18 +1015,35 @@ const LiveStreamView = () => {
     );
   };
 
+  // Add a function to render the swipe indicator
+  const renderSwipeIndicator = () => {
+    // Only show indicator when panel is not visible
+    if (isInfoPanelVisible) return null;
+
+    return (
+      <View style={styles.swipeIndicatorContainer}>
+        <View style={styles.swipeIndicator} />
+      </View>
+    );
+  };
+
   // --- Main Return --- 
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}> 
       <StatusBar style="light" />
-      <Animated.View style={[styles.content, { opacity: fadeAnim }] }>
+      <Animated.View 
+        style={[styles.content, { opacity: fadeAnim }]}
+        {...panResponder.panHandlers} // Add pan handlers to the main content view
+      >
         {renderTopBar()}
         {renderStatsBar()}
+        {renderFriendIndicator()}
         {renderParticipantsGrid()}
         {renderChat()}
       </Animated.View>
       {renderInfoPanel()}
+      {renderSwipeIndicator()}
     </SafeAreaView>
   );
 };
@@ -1473,6 +1656,94 @@ const styles = StyleSheet.create({
     color: '#8A7DF6',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  infoStatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(38, 39, 48, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,  // Slightly increased for visual feedback
+    shadowRadius: 3,
+    elevation: 3,         // Slightly increased for visual feedback
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)', // Subtle border to indicate interaction
+  },
+  infoIcon: {
+    marginLeft: 4,
+  },
+  // Swipe indicator styles
+  swipeIndicatorContainer: {
+    position: 'absolute',
+    top: '50%',
+    right: 0,
+    width: 20,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginTop: -40, // Half of height to center vertically
+    zIndex: 900,
+  },
+  swipeIndicator: {
+    width: 5,
+    height: 60,
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
+    backgroundColor: 'rgba(138, 125, 246, 0.5)',
+  },
+  enhancedStatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(38, 39, 48, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  enhancedInfoStatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(38, 39, 48, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  iconGradientContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  enhancedStatText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  enhancedInfoIconContainer: {
+    marginLeft: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

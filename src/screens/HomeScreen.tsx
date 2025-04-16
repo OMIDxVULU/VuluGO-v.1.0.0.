@@ -9,6 +9,7 @@ import ScrollableContentContainer from '../components/ScrollableContentContainer
 import CommonHeader from '../components/CommonHeader';
 import ActivityModal from '../components/ActivityModal';
 import PersonGroupIcon from '../components/PersonGroupIcon';
+import { useLiveStreams } from '../context/LiveStreamContext';
 
 // Use the router for navigation
 const HomeScreen = () => {
@@ -18,6 +19,9 @@ const HomeScreen = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const [contentWidth, setContentWidth] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
+  
+  // Get live stream data from context
+  const { friendStreams } = useLiveStreams();
   
   // Activity Modal states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
@@ -31,14 +35,7 @@ const HomeScreen = () => {
     avatars: [] as string[],
     friendName: '',
     friendAvatar: '',
-    livestreamData: {
-      streamId: '1',
-      title: 'Untitled Stream',
-      hostName: 'Host',
-      hostAvatar: '',
-      viewCount: '0',
-      hostCount: '1'
-    },
+    streamId: '1', // Default stream ID
   });
   
   // Function to handle container width measurement
@@ -61,7 +58,8 @@ const HomeScreen = () => {
   const handleActivityPress = (
     type: 'watching' | 'hosting' | 'listening' | 'tournament',
     data: {
-      title: string;
+      streamId: string;
+      title?: string;
       subtitle?: string;
       hostName?: string;
       hostAvatar?: string;
@@ -69,13 +67,12 @@ const HomeScreen = () => {
       avatars?: string[];
       friendName?: string;
       friendAvatar?: string;
-      streamId?: string;
     }
   ) => {
     // Set selected activity data
     setSelectedActivity({
       type,
-      title: data.title,
+      title: data.title || '',
       subtitle: data.subtitle || '',
       hostName: data.hostName || '',
       hostAvatar: data.hostAvatar || '',
@@ -83,14 +80,7 @@ const HomeScreen = () => {
       avatars: data.avatars || [],
       friendName: data.friendName || '',
       friendAvatar: data.friendAvatar || '',
-      livestreamData: {
-        streamId: data.streamId || '1',
-        title: data.title || 'Untitled Stream',
-        hostName: data.hostName || 'Host',
-        hostAvatar: data.hostAvatar || '',
-        viewCount: (data.viewerCount || 0).toString(),
-        hostCount: (data.avatars?.length || 1).toString()
-      }
+      streamId: data.streamId, // Using the stream ID from the data
     });
     
     // Show modal
@@ -103,66 +93,65 @@ const HomeScreen = () => {
   };
 
   const renderFriendWatchingLive = () => {
-    const activityData = {
-      title: 'Live Stream with Friends',
-      hostName: 'Sara',
-      hostAvatar: 'https://randomuser.me/api/portraits/women/32.jpg',
-      viewerCount: 1500,
-      friendName: 'Jessica',
-      friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
-      avatars: [
-        'https://randomuser.me/api/portraits/women/32.jpg',
-        'https://randomuser.me/api/portraits/women/33.jpg',
-        'https://randomuser.me/api/portraits/women/34.jpg',
-        'https://randomuser.me/api/portraits/men/32.jpg',
-        'https://randomuser.me/api/portraits/men/33.jpg',
-      ],
-      streamId: '101',
-    };
-
+    // Use the first watching stream from the context or fallback to default
+    const stream = friendStreams.watching[0];
+    
+    if (!stream) {
+      return null; // No watching activity to display
+    }
+    
+    // Get the host and friend details
+    const host = stream.hosts[0];
+    const friend = stream.friends?.[0];
+    
+    if (!friend) {
+      return null; // No friend watching this stream
+    }
+    
     return (
       <TouchableOpacity 
         style={styles.liveStreamContainer}
-        onPress={() => handleActivityPress('watching', activityData)}
+        onPress={() => handleActivityPress('watching', {
+          streamId: stream.id,
+          title: stream.title,
+          hostName: host.name,
+          hostAvatar: host.avatar,
+          viewerCount: stream.views,
+          avatars: stream.hosts.map(h => h.avatar),
+          friendName: friend.name,
+          friendAvatar: friend.avatar,
+        })}
       >
         {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/32.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/33.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/34.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
-            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+2</Text>
-          </View>
+          {stream.hosts.slice(0, 3).map((host, index) => (
+            <View key={`host-${index}`} style={styles.avatarWrapperRed}>
+              <Image 
+                source={{ uri: host.avatar }} 
+                style={styles.gridAvatar}
+              />
+            </View>
+          ))}
+          {stream.hosts.length > 3 && (
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+{stream.hosts.length - 3}</Text>
+            </View>
+          )}
         </View>
         
         {/* Center section with stream title and viewers */}
         <View style={styles.streamInfoContainer}>
           <Text style={styles.streamTitle} numberOfLines={2}>
-            Live title, test test test test test 123, .....
+            {stream.title}
           </Text>
-          <Text style={styles.viewersText}>2590 Viewers watching</Text>
+          <Text style={styles.viewersText}>{stream.views} Viewers watching</Text>
         </View>
         
         {/* Right section with broadcaster avatar - friend watching (blue) */}
         <View style={styles.broadcasterContainerWrapper}>
           <View style={styles.broadcasterContainer}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+              source={{ uri: friend.avatar }} 
               style={styles.broadcasterAvatar}
             />
             <View style={styles.liveIndicator}></View>
@@ -173,64 +162,66 @@ const HomeScreen = () => {
   };
 
   const renderFriendHostingLive = () => {
-    const activityData = {
-      title: 'Friday Night Live Stream',
-      hostName: 'Michael',
-      hostAvatar: 'https://randomuser.me/api/portraits/men/33.jpg',
-      viewerCount: 1240,
-      friendName: 'Michael',
-      friendAvatar: 'https://randomuser.me/api/portraits/men/33.jpg',
-      avatars: [
-        'https://randomuser.me/api/portraits/men/33.jpg',
-        'https://randomuser.me/api/portraits/women/32.jpg',
-        'https://randomuser.me/api/portraits/women/33.jpg',
-      ],
-      streamId: '102',
-    };
-
+    // Use the first hosting stream from the context or fallback to default
+    const stream = friendStreams.hosting[0];
+    
+    if (!stream) {
+      return null; // No hosting activity to display
+    }
+    
+    // Find the friend who is hosting
+    const friendHost = stream.hosts.find(host => 
+      host.name === 'Michael' || host.name === 'James'
+    );
+    
+    if (!friendHost) {
+      return null; // Friend not hosting this stream
+    }
+    
     return (
       <TouchableOpacity 
         style={styles.liveStreamContainer}
-        onPress={() => handleActivityPress('hosting', activityData)}
+        onPress={() => handleActivityPress('hosting', {
+          streamId: stream.id,
+          title: stream.title,
+          hostName: friendHost.name,
+          hostAvatar: friendHost.avatar,
+          viewerCount: stream.views,
+          avatars: stream.hosts.map(h => h.avatar),
+          friendName: friendHost.name,
+          friendAvatar: friendHost.avatar,
+        })}
       >
         {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/33.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={styles.avatarWrapperRed}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/34.jpg' }} 
-              style={styles.gridAvatar}
-            />
-          </View>
-          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
-            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+2</Text>
-          </View>
+          {stream.hosts.slice(0, 3).map((host, index) => (
+            <View key={`host-${index}`} style={styles.avatarWrapperRed}>
+              <Image 
+                source={{ uri: host.avatar }} 
+                style={styles.gridAvatar}
+              />
+            </View>
+          ))}
+          {stream.hosts.length > 3 && (
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>+{stream.hosts.length - 3}</Text>
+            </View>
+          )}
         </View>
         
         {/* Center section with stream title and viewers */}
         <View style={styles.streamInfoContainer}>
           <Text style={styles.streamTitle} numberOfLines={2}>
-            Alex's Live Stream, join now!
+            {stream.title}
           </Text>
-          <Text style={styles.viewersText}>1240 Viewers watching</Text>
+          <Text style={styles.viewersText}>{stream.views} Viewers watching</Text>
         </View>
         
         {/* Right section with broadcaster avatar */}
         <View style={styles.broadcasterContainerWrapper}>
           <View style={styles.broadcasterContainerRed}>
             <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+              source={{ uri: friendHost.avatar }} 
               style={styles.broadcasterAvatar}
             />
             <View style={styles.liveIndicatorRed}></View>
@@ -249,6 +240,7 @@ const HomeScreen = () => {
       avatars: [
         'https://randomuser.me/api/portraits/women/31.jpg',
       ],
+      streamId: '301', // Add streamId
     };
     
     return (
@@ -291,6 +283,7 @@ const HomeScreen = () => {
     
     // Sample data for a random live stream
     const randomLiveData = {
+      streamId: '401', // Add streamId
       title: 'Special Event Live',
       hostName: 'David',
       hostAvatar: 'https://randomuser.me/api/portraits/men/34.jpg',
@@ -948,6 +941,7 @@ const HomeScreen = () => {
         visible={activityModalVisible}
         onClose={closeActivityModal}
         activityType={selectedActivity.type}
+        streamId={selectedActivity.streamId}
         title={selectedActivity.title}
         subtitle={selectedActivity.subtitle}
         hostName={selectedActivity.hostName}
@@ -958,7 +952,6 @@ const HomeScreen = () => {
         friendAvatar={selectedActivity.friendAvatar}
         fuelRequired={15}
         fuelAvailable={20}
-        livestreamData={selectedActivity.livestreamData}
       />
     </SafeAreaView>
   );

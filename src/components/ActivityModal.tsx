@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import ViewerIcon from './ViewerIcon';
 import FuelIcon from './FuelIcon';
+import { useLiveStreams } from '../context/LiveStreamContext';
 
 const { height, width } = Dimensions.get('window');
 
@@ -27,26 +28,18 @@ interface ActivityModalProps {
   visible: boolean;
   onClose: () => void;
   activityType: 'watching' | 'hosting' | 'listening' | 'tournament';
-  title: string;
+  streamId: string; // Now using the streamId directly for consistent referencing
+  title?: string; // Optional fallback
   subtitle?: string;
-  hostName?: string;
-  hostAvatar?: string;
-  viewerCount?: number;
-  avatars?: string[];
-  friendName?: string;
-  friendAvatar?: string;
+  hostName?: string; // Optional fallback
+  hostAvatar?: string; // Optional fallback
+  viewerCount?: number; // Optional fallback
+  avatars?: string[]; // Optional fallback
+  friendName?: string; // Optional fallback
+  friendAvatar?: string; // Optional fallback
   // Fuel token props
   fuelRequired?: number;
   fuelAvailable?: number;
-  // Live stream data for navigation
-  livestreamData?: {
-    streamId: string;
-    title: string;
-    hostName: string;
-    hostAvatar: string;
-    viewCount: string;
-    hostCount: string;
-  };
 }
 
 // Add a new function to generate realistic viewer counts
@@ -115,24 +108,48 @@ const ActivityModal = ({
   visible,
   onClose,
   activityType,
-  title,
+  streamId,
+  title: fallbackTitle,
   subtitle,
-  hostName,
-  hostAvatar,
-  viewerCount = getRealisticViewerCount(), // Use realistic count by default
-  friendName = "Friend",
-  friendAvatar,
-  avatars = [],
+  hostName: fallbackHostName,
+  hostAvatar: fallbackHostAvatar,
+  viewerCount: fallbackViewerCount = getRealisticViewerCount(),
+  friendName: fallbackFriendName = "Friend",
+  friendAvatar: fallbackFriendAvatar,
+  avatars: fallbackAvatars = [],
   // Fuel token props with defaults
   fuelRequired = 10,
   fuelAvailable = 25,
-  // Live stream data for navigation
-  livestreamData,
 }: ActivityModalProps) => {
   const translateY = useRef(new Animated.Value(height)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [showFuelModal, setShowFuelModal] = useState(false);
   const router = useRouter();
+  
+  // Use the LiveStreamContext to get consistent data
+  const { getStreamById, joinStream } = useLiveStreams();
+  const stream = getStreamById(streamId);
+  
+  // Fallback to props if stream not found (shouldn't happen if properly implemented)
+  const title = stream?.title || fallbackTitle || 'Untitled Stream';
+  const hostName = stream?.hosts[0]?.name || fallbackHostName || 'Host';
+  const hostAvatar = stream?.hosts[0]?.avatar || fallbackHostAvatar || '';
+  const viewerCount = stream?.views || fallbackViewerCount;
+  const avatars = stream?.hosts.map(host => host.avatar) || fallbackAvatars;
+  
+  // For friends, we need to determine based on activity type
+  let friendName = fallbackFriendName;
+  let friendAvatar = fallbackFriendAvatar;
+  
+  if (stream?.friends && stream.friends.length > 0 && activityType === 'watching') {
+    // We have friend data and it's a watching activity
+    friendName = stream.friends[0].name;
+    friendAvatar = stream.friends[0].avatar;
+  } else if (activityType === 'hosting' && stream?.hosts && stream.hosts.length > 0) {
+    // For hosting, the friend is actually the host
+    friendName = stream.hosts[0].name;
+    friendAvatar = stream.hosts[0].avatar;
+  }
 
   // Configure pan responder for swipe down to dismiss
   const panResponder = useRef(
@@ -227,28 +244,23 @@ const ActivityModal = ({
       // Proceed with joining
       console.log('Joining activity, fuel will be consumed at 1 per 5 seconds');
       
-      // Navigate to the live stream if we have livestreamData
+      // Use the joinStream function from context to track that we're joining
+      joinStream(streamId);
+      
+      // Navigate to the live stream 
       if (activityType === 'watching' || activityType === 'hosting') {
-        if (livestreamData) {
-          // Navigate to stream view with parameters
-          router.push({
-            pathname: '/livestream',
-            params: livestreamData
-          });
-        } else {
-          // If we don't have livestreamData, create it from current props
-          router.push({
-            pathname: '/livestream',
-            params: {
-              streamId: '1', // Default stream ID if not provided
-              title: title || 'Untitled Stream',
-              hostName: hostName || 'Host',
-              hostAvatar: hostAvatar || '',
-              viewCount: viewerCount?.toString() || '0',
-              hostCount: avatars.length.toString() || '1'
-            }
-          });
-        }
+        // Navigate to stream view with parameters
+        router.push({
+          pathname: '/livestream',
+          params: {
+            streamId: streamId,
+            title: title,
+            hostName: hostName,
+            hostAvatar: hostAvatar,
+            viewCount: viewerCount.toString(),
+            hostCount: avatars.length.toString()
+          }
+        });
       }
       
       // Close modal after joining
