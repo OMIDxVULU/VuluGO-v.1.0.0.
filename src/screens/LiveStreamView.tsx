@@ -1113,30 +1113,34 @@ const styles = StyleSheet.create({
   replyPreview: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 4,
-    padding: 4,
-    backgroundColor: 'rgba(38, 39, 48, 0.5)',
-    borderRadius: 8,
+    marginBottom: 6,
+    marginLeft: 2,
   },
   replyPreviewLine: {
     width: 2,
-    height: '100%',
+    alignSelf: 'stretch',
     backgroundColor: '#8A7DF6',
     marginRight: 8,
   },
   replyPreviewContent: {
     flexDirection: 'column',
-    flex: 1,
+    backgroundColor: '#1D1E26',
+    borderRadius: 12,
+    padding: 8,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
   },
   replyPreviewName: {
     color: '#8A7DF6',
     fontSize: 12,
     fontWeight: 'bold',
     marginBottom: 2,
+    paddingHorizontal: 2,
   },
   replyPreviewMessage: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
+    paddingHorizontal: 2,
   },
   highlightedBubble: {
     backgroundColor: '#464775',
@@ -1179,7 +1183,7 @@ const styles = StyleSheet.create({
   // Replying UI styles
   replyingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 8,
     paddingVertical: 10,
     backgroundColor: '#1D1E26',
@@ -1205,6 +1209,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
     marginTop: 2,
+    alignSelf: 'flex-start',
   },
   replyingCancel: {
     padding: 8,
