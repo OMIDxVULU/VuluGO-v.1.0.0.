@@ -422,6 +422,41 @@ const LiveStreamView = () => {
   const minimizeAnim = useRef(new Animated.Value(1)).current;
   const widgetPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   
+  // Function to calculate dynamic widget size and position
+  const calculateWidgetSize = useCallback((numHosts: number) => {
+    // Determine grid dimensions based on host count
+    let columns = 1;
+    let rows = 1;
+    
+    if (numHosts <= 1) {
+      columns = rows = 1;
+    } else if (numHosts <= 4) {
+      columns = rows = 2;
+    } else {
+      columns = rows = 3;
+    }
+    
+    // Calculate required size based on grid dimensions
+    const widgetWidth = (BASE_ITEM_SIZE * columns) + (GRID_GAP * (columns - 1)) + (OUTER_PADDING * 2);
+    const widgetHeight = (BASE_ITEM_SIZE * rows) + (GRID_GAP * (rows - 1)) + (OUTER_PADDING * 2);
+    
+    // Use the larger dimension to ensure a square widget
+    let size = Math.max(widgetWidth, widgetHeight);
+    
+    // Add a bit of extra buffer space
+    size += 10;
+    
+    // Clamp between min and max sizes
+    size = Math.max(MIN_WIDGET_SIZE, Math.min(size, MAX_WIDGET_SIZE));
+    
+    // Position in bottom right with proper spacing
+    return {
+      size,
+      x: screenWidth - size - 20,
+      y: screenHeight - size - 120, // Increased space from bottom to avoid navigation bar
+    };
+  }, [screenWidth, screenHeight]);
+  
   // Set up a speaking animation that doesn't cause re-renders
   const animateSpeaking = useCallback(() => {
     MOCK_PARTICIPANTS.forEach((participant, index) => {
@@ -466,7 +501,7 @@ const LiveStreamView = () => {
     return () => slideAnim.removeListener(id);
   }, [slideAnim]);
   
-  // Toggle info panel visibility (Define it here)
+  // Toggle info panel visibility
   const toggleInfoPanel = useCallback(() => {
     const toValue = isInfoPanelVisible ? screenWidth : 0;
     setIsInfoPanelVisible(!isInfoPanelVisible);
@@ -480,48 +515,66 @@ const LiveStreamView = () => {
   // Update toggleMinimize to handle animation correctly
   const toggleMinimize = useCallback(() => {
     const minimizing = !isMinimized;
-    setIsMinimized(minimizing);
-    setIsHidden(false); 
     
     if (minimizing) {
-      const { x, y } = calculateWidgetSize(participants.filter(p => p.isHost).length);
-      widgetPan.setValue({ x, y });
+      // Calculate widget position before animation starts
+      const { x, y, size } = calculateWidgetSize(participants.filter(p => p.isHost).length);
       
-      // Set the stream as minimized in the context
-      setStreamMinimized(streamId, true);
-      
-      // Navigate back to the main live screen with params
-      setTimeout(() => {
-        router.push({
-          pathname: '/(main)/live',
-          params: {
-            minimized: 'true',
-            streamId: streamId,
-          }
+      // First, animate the scale down
+      Animated.spring(minimizeAnim, {
+        toValue: 0.7, // Scale down to 70%
+        friction: 7,
+        tension: 40,
+        useNativeDriver: true,
+      }).start(() => {
+        // Then fade out the main view
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          // After animation completes, update state and position widget
+          setIsMinimized(true);
+          widgetPan.setValue({ x, y }); // Position widget at target location
+          
+          // Set the stream as minimized in the context and navigate
+          setStreamMinimized(streamId, true);
+          
+          router.push({
+            pathname: '/(main)/live',
+            params: {
+              minimized: 'true',
+              streamId: streamId,
+            }
+          });
         });
-      }, 100);
+      });
+      
+      // Close info panel if it's open
+      if (isInfoPanelVisible) {
+        toggleInfoPanel();
+      }
     } else {
+      // Maximizing
+      setIsMinimized(false);
+      
+      // Animate scale back to normal
+      Animated.spring(minimizeAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+      
+      // Fade in the main view
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+      
       // Set the stream as not minimized in the context
       setStreamMinimized(streamId, false);
-    }
-    
-    // Animate to final scale
-    Animated.spring(minimizeAnim, {
-      toValue: minimizing ? 1 : 1,
-      friction: 7,
-      tension: 40,
-      useNativeDriver: true, 
-    }).start();
-    
-    // Use fadeAnim for actual hide/show of the full view
-    Animated.timing(fadeAnim, { 
-      toValue: minimizing ? 0 : 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-    if (minimizing && isInfoPanelVisible) {
-      toggleInfoPanel(); 
     }
     
     // Haptic feedback
@@ -533,7 +586,7 @@ const LiveStreamView = () => {
         console.log('Haptics not available');
       }
     }
-  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, toggleInfoPanel, participants, router, streamId, setStreamMinimized]);
+  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, toggleInfoPanel, participants, router, streamId, setStreamMinimized, calculateWidgetSize]);
 
   // Pan responder for the main view (minimize and info panel)
   const mainPanResponder = useMemo(() => 
@@ -562,9 +615,13 @@ const LiveStreamView = () => {
         }
         // Add vertical move handling for visual feedback during swipe down
         else if (!isMinimized && gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5) {
-          // Scale down based on swipe distance, but don't let it go below a certain threshold (e.g., 0.7)
-          const scale = Math.max(0.7, 1 - (gestureState.dy / screenHeight) * 0.8); // Adjust multiplier (0.8) for sensitivity
+          // Scale down based on swipe distance, with improved formula for smoother feedback
+          const scale = Math.max(0.7, 1 - (gestureState.dy / (screenHeight * 0.5)) * 0.3);
           minimizeAnim.setValue(scale);
+          
+          // Add slight transparency as user swipes down for better visual feedback
+          const opacity = Math.max(0.5, 1 - (gestureState.dy / (screenHeight * 0.5)) * 0.5);
+          fadeAnim.setValue(opacity);
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
@@ -586,68 +643,43 @@ const LiveStreamView = () => {
         }
         // Snap back logic
         else {
-           // Snap back info panel if it was a horizontal attempt
-           if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) { 
-               Animated.spring(slideAnim, {
-                   toValue: isInfoPanelVisible ? 0 : screenWidth,
-                   useNativeDriver: false,
-               }).start();
-           } 
-           // Snap back minimize animation if swipe down didn't meet threshold
-           else if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && minimizeAction !== 'minimize') { 
-               minimizeAction = 'snap_back';
-               Animated.spring(minimizeAnim, {
-                   toValue: 1, // Snap back to full scale
-                   useNativeDriver: true, // Scale can use native driver
-               }).start();
-           }
+          // Snap back info panel if it was a horizontal attempt
+          if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) { 
+            Animated.spring(slideAnim, {
+              toValue: isInfoPanelVisible ? 0 : screenWidth,
+              useNativeDriver: false,
+            }).start();
+          } 
+          // Snap back minimize animation if swipe down didn't meet threshold
+          else if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && minimizeAction !== 'minimize') { 
+            minimizeAction = 'snap_back';
+            // Parallel animations for smooth return to normal
+            Animated.parallel([
+              Animated.spring(minimizeAnim, {
+                toValue: 1, // Snap back to full scale
+                useNativeDriver: true,
+                friction: 4,
+                tension: 40
+              }),
+              Animated.timing(fadeAnim, {
+                toValue: 1, // Restore full opacity
+                duration: 150,
+                useNativeDriver: true
+              })
+            ]).start();
+          }
         }
         
         // Ensure info panel snaps back if moved but not enough to toggle
         if (minimizeAction === 'none' || minimizeAction === 'snap_back') {
-           Animated.spring(slideAnim, {
-               toValue: isInfoPanelVisible ? 0 : screenWidth,
-               useNativeDriver: false,
-           }).start();
+          Animated.spring(slideAnim, {
+            toValue: isInfoPanelVisible ? 0 : screenWidth,
+            useNativeDriver: false,
+          }).start();
         }
       },
     }),
-  [isInfoPanelVisible, slideAnim, isMinimized, minimizeAnim, toggleMinimize, toggleInfoPanel, screenWidth, screenHeight]); // Added minimizeAnim, screen dimensions
-
-  // Function to calculate dynamic widget size and position
-  const calculateWidgetSize = useCallback((numHosts: number) => {
-    // Determine grid dimensions based on host count
-    let columns = 1;
-    let rows = 1;
-    
-    if (numHosts <= 1) {
-      columns = rows = 1;
-    } else if (numHosts <= 4) {
-      columns = rows = 2;
-    } else {
-      columns = rows = 3;
-    }
-    
-    // Calculate required size based on grid dimensions
-    const widgetWidth = (BASE_ITEM_SIZE * columns) + (GRID_GAP * (columns - 1)) + (OUTER_PADDING * 2);
-    const widgetHeight = (BASE_ITEM_SIZE * rows) + (GRID_GAP * (rows - 1)) + (OUTER_PADDING * 2);
-    
-    // Use the larger dimension to ensure a square widget
-    let size = Math.max(widgetWidth, widgetHeight);
-    
-    // Add a bit of extra buffer space
-    size += 10;
-    
-    // Clamp between min and max sizes
-    size = Math.max(MIN_WIDGET_SIZE, Math.min(size, MAX_WIDGET_SIZE));
-    
-    // Position in bottom right with proper spacing
-    return {
-      size,
-      x: screenWidth - size - 20,
-      y: screenHeight - size - 120, // Increased space from bottom to avoid navigation bar
-    };
-  }, [screenWidth, screenHeight]);
+  [isInfoPanelVisible, slideAnim, isMinimized, minimizeAnim, fadeAnim, toggleMinimize, toggleInfoPanel, screenWidth, screenHeight]);
 
   // Add ref for double tap detection
   const lastTapTime = useRef(0);
@@ -708,24 +740,36 @@ const LiveStreamView = () => {
 
   // Define closeWidget before renderMinimizedView uses it
   const closeWidget = useCallback(() => {
-    // Animate out
+    // First make the widget disappear
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 200,
+      duration: 150,
       useNativeDriver: true,
     }).start(() => {
-      // Then toggle the minimized state
+      // Then set minimized to false (which will hide the widget)
       setIsMinimized(false);
       setIsHidden(true);
+      
+      // Set the stream as not minimized in the context
+      setStreamMinimized(streamId, false);
       
       // After a brief delay, show the full view again
       setTimeout(() => {
         setIsHidden(false);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }).start();
+        // Restore the full screen view with animation
+        Animated.parallel([
+          Animated.spring(minimizeAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 6,
+            tension: 50
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          })
+        ]).start();
       }, 50);
     });
     
@@ -738,7 +782,7 @@ const LiveStreamView = () => {
         console.log('Haptics not available');
       }
     }
-  }, [fadeAnim]);
+  }, [fadeAnim, minimizeAnim, streamId, setStreamMinimized]);
 
   // Define handleReplyToMessage (add basic implementation if missing)
   const handleReplyToMessage = (message: ChatMessage) => {
@@ -829,7 +873,7 @@ const LiveStreamView = () => {
     const numHosts = hosts.length;
     
     // Calculate widget dimensions
-    const { size: widgetSize, x: initialX, y: initialY } = calculateWidgetSize(numHosts);
+    const { size: widgetSize } = calculateWidgetSize(numHosts);
     
     // Determine grid layout
     let columns = 1;
@@ -848,18 +892,7 @@ const LiveStreamView = () => {
     const itemSize = Math.floor(availableSpace / columns);
     
     return (
-      <Animated.View 
-        style={[
-          styles.minimizedContainer, 
-          { 
-            width: widgetSize,
-            height: widgetSize,
-            transform: [{ translateX: widgetPan.x }, { translateY: widgetPan.y }],
-            opacity: isMinimized ? 1 : 0,
-          }
-        ]}
-        {...widgetPanResponder.panHandlers}
-      >
+      <>
         <View style={[styles.hostGridContainer, { padding: OUTER_PADDING }]}>
           {hosts.map((host) => (
             <View key={host.id} style={[styles.hostGridItem, { 
@@ -893,7 +926,7 @@ const LiveStreamView = () => {
         >
           <MaterialIcons name="close" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-      </Animated.View>
+      </>
     );
   };
 
@@ -1236,10 +1269,16 @@ const LiveStreamView = () => {
       {/* Full screen content - Use fadeAnim for visibility */} 
       {!isHidden && (
         <Animated.View 
-          style={[styles.content, { opacity: fadeAnim, transform: [{ scale: minimizeAnim }] }]}
-          {...(isMinimized ? {} : mainPanResponder.panHandlers)} // Only allow main pan when not minimized 
+          style={[
+            styles.content, 
+            { 
+              opacity: fadeAnim, 
+              transform: [{ scale: minimizeAnim }],
+              zIndex: isMinimized ? 0 : 1
+            }
+          ]}
+          {...(isMinimized ? {} : mainPanResponder.panHandlers)} 
         >
-          {/* Render full content only if not minimized? */} 
           {renderTopBar()} 
           {renderStatsBar()}
           {renderParticipantsGrid()}
@@ -1247,13 +1286,26 @@ const LiveStreamView = () => {
         </Animated.View>
       )}
 
-      {/* Minimized Widget - Rendered separately, but only if not hidden */} 
-      {!isHidden && isMinimized && renderMinimizedView()} 
+      {/* Minimized Widget - Only render when minimized is true and animation has completed */} 
+      {!isHidden && isMinimized && (
+        <Animated.View 
+          style={[
+            styles.minimizedContainer, 
+            { 
+              width: calculateWidgetSize(participants.filter(p => p.isHost).length).size,
+              height: calculateWidgetSize(participants.filter(p => p.isHost).length).size,
+              transform: [{ translateX: widgetPan.x }, { translateY: widgetPan.y }],
+            }
+          ]}
+          {...widgetPanResponder.panHandlers}
+        >
+          {renderMinimizedView()}
+        </Animated.View>
+      )}
 
       {/* Info Panel & Swipe Indicator - Only shown when not minimized/hidden */} 
       {!isMinimized && !isHidden && (!isInfoPanelVisible ? null : renderInfoPanel())}
       {!isMinimized && !isHidden && !isInfoPanelVisible && renderSwipeIndicator()}
-
     </SafeAreaView>
   );
 };
