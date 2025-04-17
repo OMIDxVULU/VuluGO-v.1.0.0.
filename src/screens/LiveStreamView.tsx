@@ -15,9 +15,10 @@ import {
   KeyboardAvoidingView,
   PanResponder,
   Pressable,
-  Alert
+  Alert,
+  ImageStyle
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons, FontAwesome5, Entypo, FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,7 +29,15 @@ import { useUserProfile } from '../context/UserProfileContext';
 import { useLoopProtection } from '../FixInfiniteLoop';
 import { useLiveStreams, LiveStream, StreamHost } from '../context/LiveStreamContext';
 
-const { width, height } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Add dynamic sizing constants
+const BASE_ITEM_SIZE = 52; // Increased from 48
+const GRID_GAP = 8; // Keep the same gap
+const OUTER_PADDING = 16; // Increased from 14
+const MIN_WIDGET_SIZE = 120; // Increased from 110
+const MAX_WIDGET_SIZE = 280; // Increased from 260
+const MAX_HOSTS_TO_DISPLAY = 9; // Maximum number of hosts to display (3x3 grid)
 
 // Mock cat placeholder image URL
 const CAT_PLACEHOLDER = 'https://img.icons8.com/ios-filled/100/FFFFFF/cat-profile.png'; // Simple white cat icon
@@ -252,7 +261,7 @@ const ChatMessageItem = React.memo(({
         <Text style={styles.messageSender}>{message.user.name}</Text>
         
         {/* Reply preview if this is a reply */}
-        {renderReplyPreview()}
+        {message.replyTo && renderReplyPreview()}
         
         {/* Message bubble - with long press for reply */}
         <TouchableOpacity 
@@ -279,12 +288,12 @@ const ParticipantItem = React.memo(({
   animationRef: Animated.Value 
 }) => {
   return (
-    <View style={styles.participantContainer}>
+    <View style={styles.participantItem}>
       {/* Speaking animation */}
       {participant.isSpeaking && (
         <Animated.View 
           style={[
-            styles.speakingAnimation,
+            styles.participantSpeakingAnimation,
             {
               opacity: animationRef,
               transform: [
@@ -300,26 +309,26 @@ const ParticipantItem = React.memo(({
         />
       )}
       
-      <View style={styles.participantImageContainer}>
+      <View style={styles.participantImageWrapper}>
         {participant.placeholder ? (
           <LinearGradient
             colors={['#FF6CAA', '#FF3C8C']} 
-            style={styles.placeholderBackground}
+            style={styles.participantGradient}
           >
             <Image
               source={{ uri: participant.avatar }}
-              style={styles.catIcon} 
+              style={styles.participantCatIcon} 
               resizeMode="contain"
             />
           </LinearGradient>
         ) : (
           <Image
             source={{ uri: participant.avatar }}
-            style={styles.participantImage}
+            style={styles.participantImg}
           />
         )}
       </View>
-      <Text style={styles.participantName}>
+      <Text style={styles.participantLabel}>
         {participant.name}
       </Text>
     </View>
@@ -333,7 +342,7 @@ const LiveStreamView = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { profileImage } = useUserProfile();
-  const { getStreamById, streams } = useLiveStreams();
+  const { getStreamById, streams, currentlyWatching, isMinimized: contextIsMinimized, setStreamMinimized } = useLiveStreams();
   
   // Use streamId from params to fetch the actual stream data from context
   const streamId = params.streamId as string;
@@ -392,9 +401,9 @@ const LiveStreamView = () => {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   
   // Animation refs
-  const slideAnim = useRef<Animated.Value>(new Animated.Value(Dimensions.get('window').width)).current;
-  const [currentSlideValue, setCurrentSlideValue] = useState<number>(Dimensions.get('window').width);
-  const fadeAnim = useRef<Animated.Value>(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+  const [currentSlideValue, setCurrentSlideValue] = useState<number>(screenWidth);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
   const chatListRef = useRef<ScrollView>(null);
   
   // Speaking animation refs
@@ -406,6 +415,12 @@ const LiveStreamView = () => {
   
   // Add mention animation ref
   const mentionAnimRef = useRef(new Animated.Value(0)).current;
+  
+  // Add new state variables for minimized widget
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
+  const minimizeAnim = useRef(new Animated.Value(1)).current;
+  const widgetPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   
   // Set up a speaking animation that doesn't cause re-renders
   const animateSpeaking = useCallback(() => {
@@ -451,172 +466,65 @@ const LiveStreamView = () => {
     return () => slideAnim.removeListener(id);
   }, [slideAnim]);
   
-  // Pan responder for info panel swipe
-  const panResponder = useMemo(() => 
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Only register pan responder if gesture starts near the edge of the screen
-        const screenWidth = Dimensions.get('window').width;
-        return (
-          // For opening: gesture starts within 20px of right edge
-          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 20) ||
-          // For closing: gesture starts anywhere on the panel when it's open
-          isInfoPanelVisible
-        );
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        if ((!isInfoPanelVisible && gestureState.dx < 0) || (isInfoPanelVisible && gestureState.dx > 0)) {
-          slideAnim.setValue(isInfoPanelVisible ? gestureState.dx : Dimensions.get('window').width + gestureState.dx);
-        }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        const swipeThreshold = Dimensions.get('window').width * 0.25; // 25% of screen width
-        
-        if ((!isInfoPanelVisible && gestureState.dx < -swipeThreshold) || 
-            (isInfoPanelVisible && gestureState.dx > swipeThreshold)) {
-          toggleInfoPanel();
-          
-          // Add haptic feedback for swipe completion
-          if (Platform.OS === 'ios' && require('expo-haptics')) {
-            try {
-              const Haptics = require('expo-haptics');
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            } catch (error) {
-              console.log('Haptics not available');
-            }
-          }
-        } else {
-          Animated.spring(slideAnim, {
-            toValue: isInfoPanelVisible ? 0 : Dimensions.get('window').width,
-            useNativeDriver: false,
-          }).start();
-        }
-      },
-    }),
-  [isInfoPanelVisible, slideAnim]);
-  
-  // Toggle info panel visibility
-  const toggleInfoPanel = () => {
-    const toValue = isInfoPanelVisible ? Dimensions.get('window').width : 0;
+  // Toggle info panel visibility (Define it here)
+  const toggleInfoPanel = useCallback(() => {
+    const toValue = isInfoPanelVisible ? screenWidth : 0;
     setIsInfoPanelVisible(!isInfoPanelVisible);
     Animated.timing(slideAnim, {
       toValue,
       duration: 250,
       useNativeDriver: false, 
     }).start();
-  };
-  
-  // Function to handle message input changes with mention detection
-  const handleMessageChange = (text: string) => {
-    setMessageText(text);
+  }, [isInfoPanelVisible, slideAnim, screenWidth]);
+
+  // Update toggleMinimize to handle animation correctly
+  const toggleMinimize = useCallback(() => {
+    const minimizing = !isMinimized;
+    setIsMinimized(minimizing);
+    setIsHidden(false); 
     
-    // Check for @ symbol to trigger mention suggestions
-    const matches = text.match(/@(\w*)$/);
-    if (matches) {
-      const query = matches[1].toLowerCase();
-      setMentionQuery(query);
+    if (minimizing) {
+      const { x, y } = calculateWidgetSize(participants.filter(p => p.isHost).length);
+      widgetPan.setValue({ x, y });
       
-      // Filter participants based on query
-      const filtered = participants.filter(p => 
-        p.name.toLowerCase().includes(query)
-      ).slice(0, 5); // Limit to 5 suggestions
+      // Set the stream as minimized in the context
+      setStreamMinimized(streamId, true);
       
-      setFilteredMentions(filtered);
+      // Navigate back to the main live screen with params
+      setTimeout(() => {
+        router.push({
+          pathname: '/(main)/live',
+          params: {
+            minimized: 'true',
+            streamId: streamId,
+          }
+        });
+      }, 100);
     } else {
-      // Clear mention state when no @ is being typed
-      setMentionQuery(null);
-      setFilteredMentions([]);
+      // Set the stream as not minimized in the context
+      setStreamMinimized(streamId, false);
     }
-  };
+    
+    // Animate to final scale
+    Animated.spring(minimizeAnim, {
+      toValue: minimizing ? 1 : 1,
+      friction: 7,
+      tension: 40,
+      useNativeDriver: true, 
+    }).start();
+    
+    // Use fadeAnim for actual hide/show of the full view
+    Animated.timing(fadeAnim, { 
+      toValue: minimizing ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
 
-  // Enhance the selectMention function with animation
-  const selectMention = (participant: Participant) => {
-    // Replace the @query with the selected username
-    const currentText = messageText;
-    const atIndex = currentText.lastIndexOf('@');
-    
-    if (atIndex !== -1) {
-      const newText = currentText.substring(0, atIndex) + `@${participant.name} `;
-      setMessageText(newText);
+    if (minimizing && isInfoPanelVisible) {
+      toggleInfoPanel(); 
     }
     
-    // Clear mention suggestions
-    setMentionQuery(null);
-    setFilteredMentions([]);
-    
-    // Trigger a small animation to confirm selection
-    Animated.sequence([
-      Animated.timing(mentionAnimRef, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true
-      }),
-      Animated.timing(mentionAnimRef, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true
-      })
-    ]).start();
-    
-    // Optional: Add haptic feedback on selection
-    if (Platform.OS === 'ios' && require('expo-haptics')) {
-      try {
-        const Haptics = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (error) {
-        console.log('Haptics not available');
-      }
-    }
-  };
-
-  // Update handleSendMessage to process mentions
-  const handleSendMessage = () => {
-    if (messageText.trim() === '') return;
-    
-    // Process message text to standardize mentions if needed
-    const processedMessage = messageText;
-    
-    // Create new message object with actual user profile
-    const newMessage: ChatMessage = {
-      id: generateId(),
-      user: {
-        name: 'Your Name', // Replace with actual username from profile context if available
-        avatar: userProfileImage,
-      },
-      message: processedMessage,
-      timestamp: Date.now(),
-      // Add reply information if replying to a message
-      ...(replyingTo && {
-        replyTo: {
-          id: replyingTo.id,
-          userName: replyingTo.user.name,
-          message: replyingTo.message.length > 30 
-            ? replyingTo.message.substring(0, 30) + '...' 
-            : replyingTo.message
-        }
-      })
-    };
-    
-    // Add to chat messages
-    setChatMessages(prev => [...prev, newMessage]);
-    
-    // Clear input and reply state
-    setMessageText('');
-    setReplyingTo(null);
-    
-    // Scroll to bottom
-    setTimeout(() => {
-      if (chatListRef.current) {
-        chatListRef.current.scrollToEnd({ animated: true });
-      }
-    }, 100);
-  };
-  
-  // Function to handle replying to a message
-  const handleReplyToMessage = (message: ChatMessage) => {
-    setReplyingTo(message);
-    
-    // Optional: Add haptic feedback
+    // Haptic feedback
     if (Platform.OS === 'ios' && require('expo-haptics')) {
       try {
         const Haptics = require('expo-haptics');
@@ -625,72 +533,455 @@ const LiveStreamView = () => {
         console.log('Haptics not available');
       }
     }
-  };
-  
-  // Function to cancel replying to a message
+  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, toggleInfoPanel, participants, router, streamId, setStreamMinimized]);
+
+  // Pan responder for the main view (minimize and info panel)
+  const mainPanResponder = useMemo(() => 
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        const isHorizontalSwipe = 
+          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
+          (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
+        const isVerticalSwipe = 
+          !isMinimized && gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
+        return isHorizontalSwipe || isVerticalSwipe;
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+         const isHorizontalSwipe = 
+          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
+          (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
+        const isVerticalSwipe = 
+          !isMinimized && gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
+        return isHorizontalSwipe || isVerticalSwipe;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Horizontal movement for info panel
+        if ((!isInfoPanelVisible && gestureState.dx < 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
+            (isInfoPanelVisible && gestureState.dx > 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
+          slideAnim.setValue(isInfoPanelVisible ? gestureState.dx : screenWidth + gestureState.dx);
+        }
+        // Add vertical move handling for visual feedback during swipe down
+        else if (!isMinimized && gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5) {
+          // Scale down based on swipe distance, but don't let it go below a certain threshold (e.g., 0.7)
+          const scale = Math.max(0.7, 1 - (gestureState.dy / screenHeight) * 0.8); // Adjust multiplier (0.8) for sensitivity
+          minimizeAnim.setValue(scale);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const swipeThresholdHorizontal = screenWidth * 0.25; 
+        const swipeThresholdVertical = 80; // Increased threshold slightly
+        let minimizeAction = 'none'; // 'minimize', 'snap_back', 'none'
+
+        // Check for horizontal swipe completion (info panel)
+        if ((!isInfoPanelVisible && gestureState.dx < -swipeThresholdHorizontal && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
+            (isInfoPanelVisible && gestureState.dx > swipeThresholdHorizontal && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
+          toggleInfoPanel();
+          // Haptic feedback
+          if (Platform.OS === 'ios') { /* ... Haptics ... */ }
+        } 
+        // Check for vertical swipe completion (minimize)
+        else if (!isMinimized && gestureState.dy > swipeThresholdVertical && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5) {
+          toggleMinimize(); // This will handle the final animation state
+          minimizeAction = 'minimize';
+        }
+        // Snap back logic
+        else {
+           // Snap back info panel if it was a horizontal attempt
+           if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) { 
+               Animated.spring(slideAnim, {
+                   toValue: isInfoPanelVisible ? 0 : screenWidth,
+                   useNativeDriver: false,
+               }).start();
+           } 
+           // Snap back minimize animation if swipe down didn't meet threshold
+           else if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && minimizeAction !== 'minimize') { 
+               minimizeAction = 'snap_back';
+               Animated.spring(minimizeAnim, {
+                   toValue: 1, // Snap back to full scale
+                   useNativeDriver: true, // Scale can use native driver
+               }).start();
+           }
+        }
+        
+        // Ensure info panel snaps back if moved but not enough to toggle
+        if (minimizeAction === 'none' || minimizeAction === 'snap_back') {
+           Animated.spring(slideAnim, {
+               toValue: isInfoPanelVisible ? 0 : screenWidth,
+               useNativeDriver: false,
+           }).start();
+        }
+      },
+    }),
+  [isInfoPanelVisible, slideAnim, isMinimized, minimizeAnim, toggleMinimize, toggleInfoPanel, screenWidth, screenHeight]); // Added minimizeAnim, screen dimensions
+
+  // Function to calculate dynamic widget size and position
+  const calculateWidgetSize = useCallback((numHosts: number) => {
+    // Determine grid dimensions based on host count
+    let columns = 1;
+    let rows = 1;
+    
+    if (numHosts <= 1) {
+      columns = rows = 1;
+    } else if (numHosts <= 4) {
+      columns = rows = 2;
+    } else {
+      columns = rows = 3;
+    }
+    
+    // Calculate required size based on grid dimensions
+    const widgetWidth = (BASE_ITEM_SIZE * columns) + (GRID_GAP * (columns - 1)) + (OUTER_PADDING * 2);
+    const widgetHeight = (BASE_ITEM_SIZE * rows) + (GRID_GAP * (rows - 1)) + (OUTER_PADDING * 2);
+    
+    // Use the larger dimension to ensure a square widget
+    let size = Math.max(widgetWidth, widgetHeight);
+    
+    // Add a bit of extra buffer space
+    size += 10;
+    
+    // Clamp between min and max sizes
+    size = Math.max(MIN_WIDGET_SIZE, Math.min(size, MAX_WIDGET_SIZE));
+    
+    // Position in bottom right with proper spacing
+    return {
+      size,
+      x: screenWidth - size - 20,
+      y: screenHeight - size - 120, // Increased space from bottom to avoid navigation bar
+    };
+  }, [screenWidth, screenHeight]);
+
+  // Add ref for double tap detection
+  const lastTapTime = useRef(0);
+
+  // Pan responder for dragging the minimized widget
+  const widgetPanResponder = useMemo(() => 
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        // Extract offset to keep current position as the base
+        widgetPan.extractOffset();
+      },
+      onPanResponderMove: Animated.event(
+        [ null, { dx: widgetPan.x, dy: widgetPan.y } ],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (evt, gestureState) => {
+        widgetPan.flattenOffset();
+        
+        // Get current position using type assertion to avoid TypeScript errors
+        const currentX = (widgetPan.x as any)._value;
+        const currentY = (widgetPan.y as any)._value;
+        
+        // Get widget size
+        const { size } = calculateWidgetSize(participants.filter(p => p.isHost).length);
+        
+        // Calculate bounds to keep widget on screen
+        const minX = 0;
+        const maxX = screenWidth - size;
+        const minY = 0;
+        const maxY = screenHeight - size - 80; // Ensure it stays above navigation bar
+        
+        // Calculate new position that keeps widget in bounds
+        const newX = Math.min(Math.max(currentX, minX), maxX);
+        const newY = Math.min(Math.max(currentY, minY), maxY);
+        
+        // Animate to bounded position if needed
+        if (newX !== currentX || newY !== currentY) {
+          Animated.spring(widgetPan, {
+            toValue: { x: newX, y: newY },
+            useNativeDriver: false,
+            friction: 5,
+            tension: 50
+          }).start();
+        }
+        
+        // Double tap to maximize
+        const now = Date.now();
+        if (Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5) {
+          if (now - lastTapTime.current < 300) {
+            toggleMinimize();
+          }
+          lastTapTime.current = now;
+        }
+      },
+    }),
+  [widgetPan, calculateWidgetSize, participants, screenWidth, screenHeight, toggleMinimize]);
+
+  // Define closeWidget before renderMinimizedView uses it
+  const closeWidget = useCallback(() => {
+    // Animate out
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      // Then toggle the minimized state
+      setIsMinimized(false);
+      setIsHidden(true);
+      
+      // After a brief delay, show the full view again
+      setTimeout(() => {
+        setIsHidden(false);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }, 50);
+    });
+    
+    // Provide haptic feedback
+    if (Platform.OS === 'ios' && require('expo-haptics')) {
+      try {
+        const Haptics = require('expo-haptics');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log('Haptics not available');
+      }
+    }
+  }, [fadeAnim]);
+
+  // Define handleReplyToMessage (add basic implementation if missing)
+  const handleReplyToMessage = (message: ChatMessage) => {
+    setReplyingTo(message);
+    // Optional: Add haptic feedback
+    if (Platform.OS === 'ios' && require('expo-haptics')) {
+        try {
+          const Haptics = require('expo-haptics');
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        } catch (error) {
+          console.log('Haptics not available');
+        }
+    }
+  };  
+
+  // Define cancelReply if used in renderChat
   const cancelReply = () => {
     setReplyingTo(null);
   };
-  
-  // Function to scroll to a message
+
+  // Define scrollToMessage if used in renderChat
   const scrollToMessage = (messageId: string) => {
-    const index = chatMessages.findIndex(msg => msg.id === messageId);
-    if (index !== -1) {
-      // Delay scrolling to ensure UI update has time to happen
-      setTimeout(() => {
-        if (chatListRef.current) {
-          chatListRef.current.scrollTo({
-            y: index * 70, // Approximate height of a message
-            animated: true
-          });
-        }
-      }, 100);
-    }
+    // Implementation depends on how chat messages are rendered (e.g., FlatList or ScrollView)
+    console.log("Scroll to message:", messageId); // Placeholder
   };
   
-  // Update participants when stream changes
+  // Define message handling functions before they are used
+  const handleMessageChange = (text: string) => {
+    setMessageText(text);
+    // Add mention detection logic if needed
+    const matches = text.match(/@(\w*)$/);
+    if (matches) {
+        const query = matches[1].toLowerCase();
+        setMentionQuery(query);
+        const filtered = participants.filter(p => 
+            p.name.toLowerCase().includes(query)
+        ).slice(0, 5); 
+        setFilteredMentions(filtered);
+    } else {
+        setMentionQuery(null);
+        setFilteredMentions([]);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (messageText.trim() === '') return;
+    const newMessage: ChatMessage = {
+      id: generateId(),
+      user: { name: 'Your Name', avatar: userProfileImage },
+      message: messageText,
+      timestamp: Date.now(),
+      ...(replyingTo && { replyTo: { id: replyingTo.id, userName: replyingTo.user.name, message: replyingTo.message.substring(0,30) } })
+    };
+    setChatMessages(prev => [...prev, newMessage]);
+    setMessageText('');
+    setReplyingTo(null);
+    setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 100);
+  };
+
+  const selectMention = (participant: Participant) => {
+    const currentText = messageText;
+    const atIndex = currentText.lastIndexOf('@');
+    if (atIndex !== -1) {
+      const newText = currentText.substring(0, atIndex) + `@${participant.name} `;
+      setMessageText(newText);
+    }
+    setMentionQuery(null);
+    setFilteredMentions([]);
+    // Add animation/haptics if needed
+  };
+
+  // Move the useEffect hook from renderMinimizedView to the component level
   useEffect(() => {
-    if (stream) {
-      setParticipants(initializeParticipants());
+    if (isMinimized) {
+      const hosts = participants.filter(p => p.isHost).slice(0, MAX_HOSTS_TO_DISPLAY);
+      const numHosts = hosts.length;
+      const { x: initialX, y: initialY } = calculateWidgetSize(numHosts);
       
-      // Update chat messages to include a friend watching message if appropriate
-      if (stream.friends && stream.friends.length > 0) {
-        const friendWatching = stream.friends[0];
-        const friendMessage: ChatMessage = {
-          id: generateId(),
-          user: { 
-            name: friendWatching.name, 
-            avatar: friendWatching.avatar 
-          },
-          message: 'Just joined the stream! 👋',
-          timestamp: Date.now() - 30000 // Joined 30 seconds ago
-        };
-        
-        setChatMessages(prevMessages => {
-          // Check if we already have this message
-          const exists = prevMessages.some(msg => 
-            msg.user.name === friendWatching.name && 
-            msg.message.includes('joined the stream')
-          );
-          
-          if (!exists) {
-            // Add the friend message near the end
-            const newMessages = [...prevMessages];
-            newMessages.splice(prevMessages.length - 1, 0, friendMessage);
-            return newMessages;
-          }
-          return prevMessages;
-        });
+      if (!widgetPan.x.hasListeners()) {
+        widgetPan.setValue({ x: initialX, y: initialY });
       }
     }
-  }, [stream]);
-  
-  // Show friend watching or hosting indicator
-  const renderFriendIndicator = useCallback(() => {
-    // Return null to hide the friend indicator
-    return null;
-  }, [stream]);
-  
+  }, [isMinimized, participants, widgetPan, calculateWidgetSize]);
+
+  // Render the minimized draggable widget with dynamic sizing
+  const renderMinimizedView = () => {
+    const hosts = participants.filter(p => p.isHost).slice(0, MAX_HOSTS_TO_DISPLAY);
+    const numHosts = hosts.length;
+    
+    // Calculate widget dimensions
+    const { size: widgetSize, x: initialX, y: initialY } = calculateWidgetSize(numHosts);
+    
+    // Determine grid layout
+    let columns = 1;
+    let rows = 1;
+    
+    if (numHosts <= 1) {
+      columns = rows = 1;
+    } else if (numHosts <= 4) {
+      columns = rows = 2;
+    } else {
+      columns = rows = 3;
+    }
+    
+    // Calculate item size based on the final widget size, ensuring there's proper spacing
+    const availableSpace = widgetSize - (OUTER_PADDING * 2) - ((columns - 1) * GRID_GAP);
+    const itemSize = Math.floor(availableSpace / columns);
+    
+    return (
+      <Animated.View 
+        style={[
+          styles.minimizedContainer, 
+          { 
+            width: widgetSize,
+            height: widgetSize,
+            transform: [{ translateX: widgetPan.x }, { translateY: widgetPan.y }],
+            opacity: isMinimized ? 1 : 0,
+          }
+        ]}
+        {...widgetPanResponder.panHandlers}
+      >
+        <View style={[styles.hostGridContainer, { padding: OUTER_PADDING }]}>
+          {hosts.map((host) => (
+            <View key={host.id} style={[styles.hostGridItem, { 
+              width: itemSize, 
+              height: itemSize,
+              margin: 0, // Remove margin as we're using GRID_GAP between items
+             }]}>
+              {host.placeholder ? (
+                <LinearGradient colors={['#FF6CAA', '#FF3C8C']} style={styles.hostGridImage}>
+                  <Image 
+                    source={{ uri: host.avatar }} 
+                    style={styles.hostGridPlaceholderIcon} 
+                    resizeMode="contain" 
+                  />
+                </LinearGradient>
+              ) : (
+                <Image 
+                  source={{ uri: host.avatar }} 
+                  style={styles.hostGridImage} 
+                  resizeMode="cover" 
+                />
+              )}
+              {host.isSpeaking && <View style={styles.miniSpeakingIndicator} />} 
+            </View>
+          ))}
+        </View>
+        <TouchableOpacity 
+          style={styles.miniCloseButton} 
+          onPress={closeWidget} 
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        >
+          <MaterialIcons name="close" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  // The main renderChat function definition should remain here
+  const renderChat = () => {
+    return (
+       <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.chatContainer}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View style={styles.chatListContainer}>
+          {/* Shadow overlay at the top of chat */}
+          <LinearGradient
+            colors={['rgba(26, 27, 34, 0.9)', 'rgba(26, 27, 34, 0)']}
+            style={styles.chatTopShadow}
+            pointerEvents="none"
+          />
+          
+          <ScrollView
+            ref={chatListRef}
+            style={styles.chatList}
+            contentContainerStyle={styles.chatContent}
+          >
+            {chatMessages.map((message) => (
+              <ChatMessageItem
+                key={message.id}
+                message={message}
+                onReply={handleReplyToMessage}
+                onScrollToMessage={scrollToMessage}
+                isHighlighted={message.id === replyingTo?.id}
+              />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Chat input with reply UI */}
+        <View style={styles.chatInputContainer}>
+          {/* Show reply preview when replying */}
+          {replyingTo && (
+            <View style={styles.replyingContainer}>
+              <View style={styles.replyingContent}>
+                <Text style={styles.replyingText}>
+                  Replying to <Text style={styles.replyingName}>{replyingTo.user.name}</Text>
+                </Text>
+                <Text style={styles.replyingMessage} numberOfLines={1}>
+                  {replyingTo.message.length > 40 
+                    ? replyingTo.message.substring(0, 40) + '...' 
+                    : replyingTo.message}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.replyingCancel} 
+                onPress={cancelReply}
+                hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
+              >
+                <View style={styles.cancelButtonCircle}>
+                  <MaterialIcons name="close" size={16} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Mention suggestions popup */}
+          {mentionQuery && filteredMentions.length > 0 && renderMentionSuggestions()}
+          
+          {/* Input field with send button */}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.chatInput}
+              placeholder="Type a message..."
+              placeholderTextColor="#999"
+              value={messageText}
+              onChangeText={handleMessageChange}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, messageText.trim() ? styles.sendButtonActive : {}]}
+              onPress={handleSendMessage}
+              disabled={messageText.trim() === ''}
+            >
+              <MaterialIcons name="send" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  };
+
   // --- Render Functions --- 
 
   const renderTopBar = () => {
@@ -780,95 +1071,7 @@ const LiveStreamView = () => {
   ), [participants]);
 
   // Update the renderChat function to add a fading shadow at the top
-  const renderChat = () => {
-    return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.chatContainer}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <View style={styles.chatListContainer}>
-          {/* Shadow overlay at the top of chat */}
-          <LinearGradient
-            colors={['rgba(26, 27, 34, 0.9)', 'rgba(26, 27, 34, 0)']}
-            style={styles.chatTopShadow}
-            pointerEvents="none"
-          />
-          
-          <ScrollView
-            ref={chatListRef}
-            style={styles.chatList}
-            contentContainerStyle={styles.chatContent}
-          >
-            {chatMessages.map((message) => (
-              <ChatMessageItem
-                key={message.id}
-                message={message}
-                onReply={handleReplyToMessage}
-                onScrollToMessage={scrollToMessage}
-                isHighlighted={message.id === replyingTo?.id}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Chat input with reply UI */}
-        <View style={styles.chatInputContainer}>
-          {/* Show reply preview when replying */}
-          {replyingTo && (
-            <View style={styles.replyingContainer}>
-              <View style={styles.replyingContent}>
-                <Text style={styles.replyingText}>
-                  Replying to <Text style={styles.replyingName}>{replyingTo.user.name}</Text>
-                </Text>
-                <Text style={styles.replyingMessage} numberOfLines={1}>
-                  {replyingTo.message.length > 40 
-                    ? replyingTo.message.substring(0, 40) + '...' 
-                    : replyingTo.message}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.replyingCancel} 
-                onPress={cancelReply}
-                hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
-              >
-                <View style={styles.cancelButtonCircle}>
-                  <MaterialIcons name="close" size={16} color="#FFF" />
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Mention suggestions popup */}
-          {renderMentionSuggestions()}
-          
-          {/* Input field with send button */}
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder="Type a message..."
-              placeholderTextColor="#999"
-              value={messageText}
-              onChangeText={handleMessageChange}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, messageText.trim() ? styles.sendButtonActive : {}]}
-              onPress={handleSendMessage}
-              disabled={messageText.trim() === ''}
-            >
-              <MaterialIcons name="send" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    );
-  };
-  
   const renderInfoPanel = () => {
-    // Use the state value instead of the ref or __getValue
-    if (!isInfoPanelVisible && currentSlideValue === Dimensions.get('window').width) {
-      return null;
-    }
     return (
       <Animated.View style={[styles.infoPanel, { transform: [{ translateX: slideAnim }] }] }>
         <SafeAreaView style={{ flex: 1 }}>
@@ -949,8 +1152,7 @@ const LiveStreamView = () => {
 
   // Enhance mention suggestions with animation and hover states
   const renderMentionSuggestions = () => {
-    if (!mentionQuery && filteredMentions.length === 0) return null;
-    
+    // Remove early return
     return (
       <Animated.View 
         style={[
@@ -1017,9 +1219,7 @@ const LiveStreamView = () => {
 
   // Add a function to render the swipe indicator
   const renderSwipeIndicator = () => {
-    // Only show indicator when panel is not visible
-    if (isInfoPanelVisible) return null;
-
+    // Remove early return
     return (
       <View style={styles.swipeIndicatorContainer}>
         <View style={styles.swipeIndicator} />
@@ -1032,20 +1232,35 @@ const LiveStreamView = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}> 
       <StatusBar style="light" />
-      <Animated.View 
-        style={[styles.content, { opacity: fadeAnim }]}
-        {...panResponder.panHandlers} // Add pan handlers to the main content view
-      >
-        {renderTopBar()}
-        {renderStatsBar()}
-        {renderFriendIndicator()}
-        {renderParticipantsGrid()}
-        {renderChat()}
-      </Animated.View>
-      {renderInfoPanel()}
-      {renderSwipeIndicator()}
+      
+      {/* Full screen content - Use fadeAnim for visibility */} 
+      {!isHidden && (
+        <Animated.View 
+          style={[styles.content, { opacity: fadeAnim, transform: [{ scale: minimizeAnim }] }]}
+          {...(isMinimized ? {} : mainPanResponder.panHandlers)} // Only allow main pan when not minimized 
+        >
+          {/* Render full content only if not minimized? */} 
+          {renderTopBar()} 
+          {renderStatsBar()}
+          {renderParticipantsGrid()}
+          {renderChat()}
+        </Animated.View>
+      )}
+
+      {/* Minimized Widget - Rendered separately, but only if not hidden */} 
+      {!isHidden && isMinimized && renderMinimizedView()} 
+
+      {/* Info Panel & Swipe Indicator - Only shown when not minimized/hidden */} 
+      {!isMinimized && !isHidden && (!isInfoPanelVisible ? null : renderInfoPanel())}
+      {!isMinimized && !isHidden && !isInfoPanelVisible && renderSwipeIndicator()}
+
     </SafeAreaView>
   );
+};
+
+// Add static options (kept)
+LiveStreamView.options = {
+  gestureEnabled: false,
 };
 
 // --- Styles --- 
@@ -1192,14 +1407,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginHorizontal: 15,
   },
-  participantContainer: {
+  participantItem: {
     width: '30%', 
     marginBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  participantImageContainer: {
+  participantImageWrapper: {
     width: 48,
     height: 48,
     borderRadius: 12,
@@ -1214,29 +1429,29 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     zIndex: 1,
   },
-  participantImage: {
+  participantImg: {
     width: '100%',
     height: '100%',
   },
-  placeholderBackground: {
+  participantGradient: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  catIcon: {
+  participantCatIcon: {
     width: '60%', 
     height: '60%', 
     tintColor: '#FFFFFF',
   },
-  participantName: {
+  participantLabel: {
     color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 10,
     fontWeight: 'bold',
     marginTop: 4,
     textAlign: 'center',
   },
-  speakingAnimation: {
+  participantSpeakingAnimation: {
     position: 'absolute',
     width: 60,
     height: 60,
@@ -1695,55 +1910,75 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
     backgroundColor: 'rgba(138, 125, 246, 0.5)',
   },
-  enhancedStatBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(38, 39, 48, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  minimizedContainer: {
+    position: 'absolute',
     borderRadius: 20,
-    marginLeft: 10,
+    backgroundColor: 'rgba(26, 27, 34, 0.98)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)', 
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  enhancedInfoStatBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(38, 39, 48, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  iconGradientContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 12,
+    overflow: 'visible',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
-  enhancedStatText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+  hostGridContainer: {
+    width: '100%',
+    height: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    alignContent: 'space-between',
   },
-  enhancedInfoIconContainer: {
-    marginLeft: 6,
+  hostGridItem: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  hostGridImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  hostGridPlaceholderIcon: {
+    width: '50%',
+    height: '50%',
+    alignSelf: 'center',
+    tintColor: '#FFFFFF',
+  },
+  miniSpeakingIndicator: {
+    position: 'absolute',
+    bottom: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    borderWidth: 1,
+    borderColor: '#1A1B22',
+  },
+  miniCloseButton: {
+    position: 'absolute',
+    top: -15,
+    right: -15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF3C8C',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 20,
+    elevation: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
 });
 

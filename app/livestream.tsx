@@ -5,9 +5,11 @@ import { LiveStreamProvider } from '../src/context/LiveStreamContext';
 
 export default function LiveStream() {
   return (
-    <View style={styles.container}>
-      <LiveStreamView />
-    </View>
+    <LiveStreamProvider>
+      <View style={styles.container}>
+        <LiveStreamView />
+      </View>
+    </LiveStreamProvider>
   );
 }
 

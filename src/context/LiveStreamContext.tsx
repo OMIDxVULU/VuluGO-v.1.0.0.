@@ -34,6 +34,8 @@ interface LiveStreamContextType {
   getStreamById: (id: string) => LiveStream | undefined;
   joinStream: (streamId: string) => void;
   currentlyWatching: string | null; // ID of the stream the user is currently watching
+  isMinimized: boolean;
+  setStreamMinimized: (streamId: string, minimized: boolean) => void;
 }
 
 // Create the context with a default value
@@ -168,6 +170,7 @@ const MOCK_STREAMS: LiveStream[] = [
 export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [streams, setStreams] = useState<LiveStream[]>(MOCK_STREAMS);
   const [currentlyWatching, setCurrentlyWatching] = useState<string | null>(null);
+  const [isMinimized, setIsMinimized] = useState<boolean>(false);
 
   // In a real app, you would fetch data from your API here
   useEffect(() => {
@@ -210,6 +213,14 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
     // In a real app, you might also track this on your backend
   };
 
+  // Add this new function to handle minimizing streams
+  const setStreamMinimized = (streamId: string, minimized: boolean) => {
+    if (streamId) {
+      setCurrentlyWatching(streamId);
+      setIsMinimized(minimized);
+    }
+  };
+
   return (
     <LiveStreamContext.Provider
       value={{
@@ -219,6 +230,8 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
         getStreamById,
         joinStream,
         currentlyWatching,
+        isMinimized,
+        setStreamMinimized,
       }}
     >
       {children}
