@@ -422,6 +422,15 @@ const LiveStreamView = () => {
   const minimizeAnim = useRef(new Animated.Value(1)).current;
   const widgetPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   
+  // Add the isDragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Add a proper type for the position reference
+  type Position = { x: number; y: number };
+  
+  const currentPanPosition = useRef<Position>({ x: 0, y: 0 });
+  
   // Function to calculate dynamic widget size and position
   const calculateWidgetSize = useCallback((numHosts: number) => {
     // Determine grid dimensions based on host count
@@ -540,7 +549,8 @@ const LiveStreamView = () => {
           // Set the stream as minimized in the context and navigate
           setStreamMinimized(streamId, true);
           
-          router.push({
+          // Replace router.push with router.replace to avoid navigation stack issues
+          router.replace({
             pathname: '/(main)/live',
             params: {
               minimized: 'true',
@@ -552,82 +562,76 @@ const LiveStreamView = () => {
       
       // Close info panel if it's open
       if (isInfoPanelVisible) {
-        toggleInfoPanel();
+        setIsInfoPanelVisible(false);
+        slideAnim.setValue(screenWidth); // Directly set value rather than animating
       }
     } else {
-      // Maximizing
+      // Maximizing - using single animation for better performance
       setIsMinimized(false);
       
-      // Animate scale back to normal
-      Animated.spring(minimizeAnim, {
-        toValue: 1,
-        friction: 7,
-        tension: 40,
-        useNativeDriver: true,
-      }).start();
-      
-      // Fade in the main view
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      // Use single animation with combined spring for better performance
+      Animated.parallel([
+        // Animate scale back to normal
+        Animated.spring(minimizeAnim, {
+          toValue: 1,
+          friction: 7,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        // Fade in the main view
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        })
+      ]).start();
       
       // Set the stream as not minimized in the context
       setStreamMinimized(streamId, false);
     }
     
-    // Haptic feedback
-    if (Platform.OS === 'ios' && require('expo-haptics')) {
+    // Haptic feedback - wrapped in try/catch for better error handling
+    if (Platform.OS === 'ios') {
       try {
         const Haptics = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       } catch (error) {
         console.log('Haptics not available');
       }
     }
-  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, toggleInfoPanel, participants, router, streamId, setStreamMinimized, calculateWidgetSize]);
+  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, slideAnim, participants, router, streamId, setStreamMinimized, calculateWidgetSize, screenWidth]);
 
   // Pan responder for the main view (minimize and info panel)
   const mainPanResponder = useMemo(() => 
     PanResponder.create({
       onStartShouldSetPanResponder: (evt, gestureState) => {
+        // Only detect horizontal swipes for info panel
         const isHorizontalSwipe = 
           (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
           (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
-        const isVerticalSwipe = 
-          !isMinimized && gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
-        return isHorizontalSwipe || isVerticalSwipe;
+        
+        // No vertical swipe detection for minimizing
+        return isHorizontalSwipe;
       },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-         const isHorizontalSwipe = 
+        // Only detect horizontal swipes for info panel
+        const isHorizontalSwipe = 
           (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
           (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
-        const isVerticalSwipe = 
-          !isMinimized && gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5;
-        return isHorizontalSwipe || isVerticalSwipe;
+        
+        // No vertical swipe detection for minimizing
+        return isHorizontalSwipe;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // Horizontal movement for info panel
+        // Horizontal movement for info panel only
         if ((!isInfoPanelVisible && gestureState.dx < 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
             (isInfoPanelVisible && gestureState.dx > 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
           slideAnim.setValue(isInfoPanelVisible ? gestureState.dx : screenWidth + gestureState.dx);
         }
-        // Add vertical move handling for visual feedback during swipe down
-        else if (!isMinimized && gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5) {
-          // Scale down based on swipe distance, with improved formula for smoother feedback
-          const scale = Math.max(0.7, 1 - (gestureState.dy / (screenHeight * 0.5)) * 0.3);
-          minimizeAnim.setValue(scale);
-          
-          // Add slight transparency as user swipes down for better visual feedback
-          const opacity = Math.max(0.5, 1 - (gestureState.dy / (screenHeight * 0.5)) * 0.5);
-          fadeAnim.setValue(opacity);
-        }
+        // Removed vertical swipe handling for minimizing
       },
       onPanResponderRelease: (evt, gestureState) => {
-        const swipeThresholdHorizontal = screenWidth * 0.25; 
-        const swipeThresholdVertical = 80; // Increased threshold slightly
-        let minimizeAction = 'none'; // 'minimize', 'snap_back', 'none'
+        const swipeThresholdHorizontal = screenWidth * 0.25;
 
         // Check for horizontal swipe completion (info panel)
         if ((!isInfoPanelVisible && gestureState.dx < -swipeThresholdHorizontal && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
@@ -636,12 +640,9 @@ const LiveStreamView = () => {
           // Haptic feedback
           if (Platform.OS === 'ios') { /* ... Haptics ... */ }
         } 
-        // Check for vertical swipe completion (minimize)
-        else if (!isMinimized && gestureState.dy > swipeThresholdVertical && Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.5) {
-          toggleMinimize(); // This will handle the final animation state
-          minimizeAction = 'minimize';
-        }
-        // Snap back logic
+        // Removed vertical swipe handling for minimizing
+        
+        // Snap back logic for horizontal swipes only
         else {
           // Snap back info panel if it was a horizontal attempt
           if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) { 
@@ -649,94 +650,78 @@ const LiveStreamView = () => {
               toValue: isInfoPanelVisible ? 0 : screenWidth,
               useNativeDriver: false,
             }).start();
-          } 
-          // Snap back minimize animation if swipe down didn't meet threshold
-          else if (Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && minimizeAction !== 'minimize') { 
-            minimizeAction = 'snap_back';
-            // Parallel animations for smooth return to normal
-            Animated.parallel([
-              Animated.spring(minimizeAnim, {
-                toValue: 1, // Snap back to full scale
-                useNativeDriver: true,
-                friction: 4,
-                tension: 40
-              }),
-              Animated.timing(fadeAnim, {
-                toValue: 1, // Restore full opacity
-                duration: 150,
-                useNativeDriver: true
-              })
-            ]).start();
           }
+          // Removed vertical snap back logic
         }
         
         // Ensure info panel snaps back if moved but not enough to toggle
-        if (minimizeAction === 'none' || minimizeAction === 'snap_back') {
-          Animated.spring(slideAnim, {
-            toValue: isInfoPanelVisible ? 0 : screenWidth,
-            useNativeDriver: false,
-          }).start();
-        }
+        Animated.spring(slideAnim, {
+          toValue: isInfoPanelVisible ? 0 : screenWidth,
+          useNativeDriver: false,
+        }).start();
       },
     }),
-  [isInfoPanelVisible, slideAnim, isMinimized, minimizeAnim, fadeAnim, toggleMinimize, toggleInfoPanel, screenWidth, screenHeight]);
+  [isInfoPanelVisible, slideAnim, screenWidth]);
 
-  // Add ref for double tap detection
-  const lastTapTime = useRef(0);
-
-  // Pan responder for dragging the minimized widget
-  const widgetPanResponder = useMemo(() => 
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        // Extract offset to keep current position as the base
-        widgetPan.extractOffset();
-      },
-      onPanResponderMove: Animated.event(
-        [ null, { dx: widgetPan.x, dy: widgetPan.y } ],
-        { useNativeDriver: false }
-      ),
-      onPanResponderRelease: (evt, gestureState) => {
-        widgetPan.flattenOffset();
-        
-        // Get current position using type assertion to avoid TypeScript errors
-        const currentX = (widgetPan.x as any)._value;
-        const currentY = (widgetPan.y as any)._value;
-        
-        // Get widget size
-        const { size } = calculateWidgetSize(participants.filter(p => p.isHost).length);
-        
-        // Calculate bounds to keep widget on screen
-        const minX = 0;
-        const maxX = screenWidth - size;
-        const minY = 0;
-        const maxY = screenHeight - size - 80; // Ensure it stays above navigation bar
-        
-        // Calculate new position that keeps widget in bounds
-        const newX = Math.min(Math.max(currentX, minX), maxX);
-        const newY = Math.min(Math.max(currentY, minY), maxY);
-        
-        // Animate to bounded position if needed
-        if (newX !== currentX || newY !== currentY) {
-          Animated.spring(widgetPan, {
-            toValue: { x: newX, y: newY },
-            useNativeDriver: false,
-            friction: 5,
-            tension: 50
-          }).start();
-        }
-        
-        // Double tap to maximize
-        const now = Date.now();
-        if (Math.abs(gestureState.dx) < 5 && Math.abs(gestureState.dy) < 5) {
-          if (now - lastTapTime.current < 300) {
-            toggleMinimize();
-          }
-          lastTapTime.current = now;
-        }
-      },
-    }),
-  [widgetPan, calculateWidgetSize, participants, screenWidth, screenHeight, toggleMinimize]);
+  // Widget pan responder for minimized mode
+  const widgetPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      // Clone the previously animated values
+      widgetPan.setOffset({
+        x: (widgetPan as any).__getValue().x,
+        y: (widgetPan as any).__getValue().y,
+      });
+      widgetPan.setValue({ x: 0, y: 0 });
+    },
+    onPanResponderMove: (_, gestureState) => {
+      widgetPan.setValue({
+        x: gestureState.dx,
+        y: gestureState.dy,
+      });
+      
+      // Safely update current position ref
+      if (currentPanPosition.current) {
+        currentPanPosition.current = {
+          x: gestureState.dx + (currentPanPosition.current.x as number || 0),
+          y: gestureState.dy + (currentPanPosition.current.y as number || 0)
+        };
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      widgetPan.flattenOffset();
+      setIsDragging(false);
+      
+      // Use the ref for current position
+      const positionX = currentPanPosition.current?.x || 0;
+      const positionY = currentPanPosition.current?.y || 0;
+      
+      // Calculate widget dimensions based on hosts
+      const visibleHostCount = Math.min(
+        participants.filter(p => p.isHost).length,
+        MAX_HOSTS_TO_DISPLAY
+      );
+      
+      // Calculate dimensions
+      const widgetSize = calculateWidgetSize(visibleHostCount);
+      const maxX = Dimensions.get('window').width - widgetSize;
+      const maxY = Dimensions.get('window').height - widgetSize;
+      
+      // Find the nearest edge and snap to it
+      const targetX = positionX > maxX / 2 ? maxX : 0;
+      const targetY = Math.max(0, Math.min(positionY, maxY));
+      
+      // Update the ref with the target position
+      currentPanPosition.current = { x: targetX, y: targetY };
+      
+      // Animate to the target position
+      Animated.spring(widgetPan, {
+        toValue: { x: targetX, y: targetY },
+        useNativeDriver: false,
+        friction: 7,
+      }).start();
+    },
+  }), [participants]);
 
   // Define closeWidget before renderMinimizedView uses it
   const closeWidget = useCallback(() => {
@@ -1049,6 +1034,14 @@ const LiveStreamView = () => {
               </View>
             </LinearGradient>
           </View>
+
+          {/* Add minimize button */}
+          <TouchableOpacity
+            style={styles.minimizeButton}
+            onPress={toggleMinimize}
+          >
+            <MaterialIcons name="minimize" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -1250,16 +1243,6 @@ const LiveStreamView = () => {
     );
   };
 
-  // Add a function to render the swipe indicator
-  const renderSwipeIndicator = () => {
-    // Remove early return
-    return (
-      <View style={styles.swipeIndicatorContainer}>
-        <View style={styles.swipeIndicator} />
-      </View>
-    );
-  };
-
   // --- Main Return --- 
 
   return (
@@ -1303,9 +1286,8 @@ const LiveStreamView = () => {
         </Animated.View>
       )}
 
-      {/* Info Panel & Swipe Indicator - Only shown when not minimized/hidden */} 
-      {!isMinimized && !isHidden && (!isInfoPanelVisible ? null : renderInfoPanel())}
-      {!isMinimized && !isHidden && !isInfoPanelVisible && renderSwipeIndicator()}
+      {/* Info Panel - Only shown when not minimized/hidden */} 
+      {!isMinimized && !isHidden && isInfoPanelVisible && renderInfoPanel()}
     </SafeAreaView>
   );
 };
@@ -1943,25 +1925,6 @@ const styles = StyleSheet.create({
   infoIcon: {
     marginLeft: 4,
   },
-  // Swipe indicator styles
-  swipeIndicatorContainer: {
-    position: 'absolute',
-    top: '50%',
-    right: 0,
-    width: 20,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    marginTop: -40, // Half of height to center vertically
-    zIndex: 900,
-  },
-  swipeIndicator: {
-    width: 5,
-    height: 60,
-    borderTopLeftRadius: 3,
-    borderBottomLeftRadius: 3,
-    backgroundColor: 'rgba(138, 125, 246, 0.5)',
-  },
   minimizedContainer: {
     position: 'absolute',
     borderRadius: 20,
@@ -2031,6 +1994,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  minimizeButton: {
+    padding: 8,
+    backgroundColor: 'rgba(38, 39, 48, 0.8)',
+    borderRadius: 20,
   },
 });
 
