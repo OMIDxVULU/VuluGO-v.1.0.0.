@@ -11,6 +11,9 @@ import { useFonts } from 'expo-font';
 import { UserProfileProvider } from '../src/context/UserProfileContext';
 import { UserStatusProvider } from '../src/context/UserStatusContext';
 import { LiveStreamProvider } from '../src/context/LiveStreamContext';
+import ErrorBoundary from '../src/components/ErrorBoundary';
+import PerformanceMonitor from '../src/components/PerformanceMonitor';
+import { analyticsService } from '../src/services/AnalyticsService';
 
 // Create a custom Material theme
 const paperTheme = {
@@ -63,10 +66,26 @@ export const IconFallback = ({ size, color }: { size: number; color: string }) =
   />
 );
 
+// Error handler for the ErrorBoundary
+const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
+  // Report error to analytics service
+  analyticsService.reportError({
+    error,
+    componentStack: errorInfo.componentStack || '',
+    metadata: {
+      component: 'RootLayout',
+      timestamp: Date.now()
+    }
+  });
+  
+  console.error('Error caught by ErrorBoundary:', error, errorInfo);
+};
+
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   // Always set fontsLoaded to false on iOS simulator to skip font loading completely
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(__DEV__);
 
   const [loaded] = useFonts({
     // Add any custom fonts here if needed
@@ -75,6 +94,16 @@ export default function RootLayout() {
   useEffect(() => {
     // Just set the app as ready immediately - skip all font loading attempts
     setIsReady(true);
+    
+    // Initialize analytics service
+    analyticsService.initialize().catch(error => {
+      console.error('Failed to initialize analytics:', error);
+    });
+    
+    // Cleanup analytics on unmount
+    return () => {
+      analyticsService.shutdown();
+    };
   }, []);
 
   if (!isReady) {
@@ -86,34 +115,47 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <UserStatusProvider>
-        <UserProfileProvider>
-          <LiveStreamProvider>
-            <AppContext.Provider value={{ fontsLoaded }}>
-              <MenuPositionProvider>
-                <SafeAreaProvider>
-                  <PaperProvider theme={paperTheme}>
-                    <StatusBar style="light" />
-                    <Stack screenOptions={{ 
-                      headerShown: false, 
-                      gestureEnabled: true, // Explicitly enable swipe gesture
-                      contentStyle: { backgroundColor: '#131318' },
-                      animation: Platform.OS === 'ios' ? 'default' : 'fade',
-                    }}>
-                      <Stack.Screen name="index" />
-                      <Stack.Screen name="login" />
-                      <Stack.Screen name="signup" />
-                      <Stack.Screen name="(main)" />
-                    </Stack>
-                  </PaperProvider>
-                </SafeAreaProvider>
-              </MenuPositionProvider>
-            </AppContext.Provider>
-          </LiveStreamProvider>
-        </UserProfileProvider>
-      </UserStatusProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary onError={handleError}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <UserStatusProvider>
+          <UserProfileProvider>
+            <LiveStreamProvider>
+              <AppContext.Provider value={{ fontsLoaded }}>
+                <MenuPositionProvider>
+                  <SafeAreaProvider>
+                    <PaperProvider theme={paperTheme}>
+                      <StatusBar style="light" />
+                      <Stack screenOptions={{ 
+                        headerShown: false, 
+                        gestureEnabled: true, // Explicitly enable swipe gesture
+                        contentStyle: { backgroundColor: '#131318' },
+                        animation: Platform.OS === 'ios' ? 'default' : 'fade',
+                      }}>
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="login" />
+                        <Stack.Screen name="signup" />
+                        <Stack.Screen name="(main)" />
+                      </Stack>
+                      
+                      {/* Performance Monitor */}
+                      {showPerformanceMonitor && (
+                        <PerformanceMonitor 
+                          position="bottom-right"
+                          backgroundColor="rgba(0, 0, 0, 0.7)"
+                          textColor="#FFFFFF"
+                          fontSize={10}
+                          enabled={true}
+                        />
+                      )}
+                    </PaperProvider>
+                  </SafeAreaProvider>
+                </MenuPositionProvider>
+              </AppContext.Provider>
+            </LiveStreamProvider>
+          </UserProfileProvider>
+        </UserStatusProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

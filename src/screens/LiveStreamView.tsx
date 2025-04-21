@@ -152,6 +152,117 @@ interface Participant {
   placeholder: boolean;
 }
 
+// Shared styles for components outside LiveStreamView
+const sharedStyles = StyleSheet.create({
+  messageText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  mentionText: {
+    color: '#6E56F7',
+    fontWeight: 'bold',
+  },
+  replyPreview: {
+    flexDirection: 'row',
+    marginBottom: 4,
+    alignItems: 'flex-start',
+  },
+  replyPreviewLine: {
+    width: 2,
+    height: '100%',
+    backgroundColor: '#6E56F7',
+    marginRight: 6,
+    borderRadius: 1,
+  },
+  replyPreviewContent: {
+    flex: 1,
+  },
+  replyPreviewName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#6E56F7',
+    marginBottom: 2,
+  },
+  replyPreviewMessage: {
+    fontSize: 12,
+    color: '#AAAAAA',
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  avatarContainer: {
+    marginRight: 8,
+  },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  messageContentContainer: {
+    flex: 1,
+  },
+  messageSender: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  messageBubble: {
+    backgroundColor: 'rgba(58, 59, 69, 0.5)',
+    borderRadius: 12,
+    padding: 10,
+    maxWidth: '90%',
+    alignSelf: 'flex-start',
+  },
+  highlightedBubble: {
+    backgroundColor: 'rgba(110, 86, 247, 0.2)',
+  },
+  participantItem: {
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginBottom: 12,
+    width: BASE_ITEM_SIZE,
+  },
+  participantSpeakingAnimation: {
+    position: 'absolute',
+    width: BASE_ITEM_SIZE + 10,
+    height: BASE_ITEM_SIZE + 10,
+    borderRadius: (BASE_ITEM_SIZE + 10) / 2,
+    borderWidth: 2,
+    borderColor: '#6E56F7',
+    zIndex: -1,
+  },
+  participantImageWrapper: {
+    width: BASE_ITEM_SIZE,
+    height: BASE_ITEM_SIZE,
+    borderRadius: BASE_ITEM_SIZE / 2,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  participantGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantCatIcon: {
+    width: BASE_ITEM_SIZE * 0.6,
+    height: BASE_ITEM_SIZE * 0.6,
+  },
+  participantImg: {
+    width: '100%',
+    height: '100%',
+  },
+  participantLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+});
+
 // Helper to parse mentions and text
 const parseMessage = (message: string) => {
   const parts = [];
@@ -174,27 +285,19 @@ const parseMessage = (message: string) => {
   return parts;
 };
 
-// Update the props interface for ChatMessageItem
-type ChatMessageItemProps = {
-  message: ChatMessage;
-  onReply: (message: ChatMessage) => void;
-  onScrollToMessage: (messageId: string) => void;
-  isHighlighted?: boolean;
-};
-
 // Update the message rendering to highlight mentions
 const MessageText = ({ text }: { text: string }) => {
   // Parse message to identify mentions
   const parts = parseMessage(text);
   
   return (
-    <Text style={styles.messageText}>
+    <Text style={sharedStyles.messageText}>
       {parts.map((part, index) => {
         if (part.type === 'mention') {
           return (
             <Text 
               key={index} 
-              style={styles.mentionText}
+              style={sharedStyles.mentionText}
               onPress={() => {
                 // Could add action when a mention is tapped
                 console.log('Mention tapped:', part.content);
@@ -210,7 +313,7 @@ const MessageText = ({ text }: { text: string }) => {
   );
 };
 
-// Update the ChatMessageItem component to use MessageText
+// Update the ChatMessageItem component to use sharedStyles
 const ChatMessageItem = React.memo(({
   message,
   onReply,
@@ -233,15 +336,15 @@ const ChatMessageItem = React.memo(({
     
     return (
       <TouchableOpacity 
-        style={styles.replyPreview}
+        style={sharedStyles.replyPreview}
         onPress={() => onScrollToMessage(message.replyTo!.id)}
       >
-        <View style={styles.replyPreviewLine} />
-        <View style={styles.replyPreviewContent}>
-          <Text style={styles.replyPreviewName}>
+        <View style={sharedStyles.replyPreviewLine} />
+        <View style={sharedStyles.replyPreviewContent}>
+          <Text style={sharedStyles.replyPreviewName}>
             {message.replyTo.userName}
           </Text>
-          <Text style={styles.replyPreviewMessage} numberOfLines={1}>
+          <Text style={sharedStyles.replyPreviewMessage} numberOfLines={1}>
             {message.replyTo.message}
           </Text>
         </View>
@@ -250,15 +353,15 @@ const ChatMessageItem = React.memo(({
   };
 
   return (
-    <View style={styles.messageContainer}>
+    <View style={sharedStyles.messageContainer}>
       {/* Show avatar for all messages */}
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: message.user.avatar }} style={styles.avatarImage} />
+      <View style={sharedStyles.avatarContainer}>
+        <Image source={{ uri: message.user.avatar }} style={sharedStyles.avatarImage} />
       </View>
       
-      <View style={styles.messageContentContainer}>
+      <View style={sharedStyles.messageContentContainer}>
         {/* Show name for all messages */}
-        <Text style={styles.messageSender}>{message.user.name}</Text>
+        <Text style={sharedStyles.messageSender}>{message.user.name}</Text>
         
         {/* Reply preview if this is a reply */}
         {message.replyTo && renderReplyPreview()}
@@ -266,8 +369,8 @@ const ChatMessageItem = React.memo(({
         {/* Message bubble - with long press for reply */}
         <TouchableOpacity 
           style={[
-            styles.messageBubble,
-            isHighlighted && styles.highlightedBubble
+            sharedStyles.messageBubble,
+            isHighlighted && sharedStyles.highlightedBubble
           ]}
           onLongPress={handleLongPress}
           delayLongPress={200} // Shorter delay for more responsiveness
@@ -279,7 +382,7 @@ const ChatMessageItem = React.memo(({
   );
 });
 
-// Memoized participant component to prevent re-renders
+// Update ParticipantItem component to use sharedStyles
 const ParticipantItem = React.memo(({ 
   participant, 
   animationRef 
@@ -288,12 +391,12 @@ const ParticipantItem = React.memo(({
   animationRef: Animated.Value 
 }) => {
   return (
-    <View style={styles.participantItem}>
+    <View style={sharedStyles.participantItem}>
       {/* Speaking animation */}
       {participant.isSpeaking && (
         <Animated.View 
           style={[
-            styles.participantSpeakingAnimation,
+            sharedStyles.participantSpeakingAnimation,
             {
               opacity: animationRef,
               transform: [
@@ -309,29 +412,69 @@ const ParticipantItem = React.memo(({
         />
       )}
       
-      <View style={styles.participantImageWrapper}>
+      <View style={sharedStyles.participantImageWrapper}>
         {participant.placeholder ? (
           <LinearGradient
             colors={['#FF6CAA', '#FF3C8C']} 
-            style={styles.participantGradient}
+            style={sharedStyles.participantGradient}
           >
             <Image
               source={{ uri: participant.avatar }}
-              style={styles.participantCatIcon} 
+              style={sharedStyles.participantCatIcon} 
               resizeMode="contain"
             />
           </LinearGradient>
         ) : (
           <Image
             source={{ uri: participant.avatar }}
-            style={styles.participantImg}
+            style={sharedStyles.participantImg}
           />
         )}
       </View>
-      <Text style={styles.participantLabel}>
+      <Text style={sharedStyles.participantLabel}>
         {participant.name}
       </Text>
     </View>
+  );
+});
+
+// Define MemoizedChatMessages component for optimized rendering
+const MemoizedChatMessages = React.memo(({ 
+  messages, 
+  onReply, 
+  onScrollToMessage, 
+  highlightedId 
+}: { 
+  messages: ChatMessage[], 
+  onReply: (message: ChatMessage) => void,
+  onScrollToMessage: (messageId: string) => void,
+  highlightedId?: string
+}) => {
+  // Memoize the keyExtractor function
+  const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
+  
+  // Memoize the renderItem function
+  const renderItem = useCallback(({ item }: { item: ChatMessage }) => (
+    <ChatMessageItem
+      message={item}
+      onReply={onReply}
+      onScrollToMessage={onScrollToMessage}
+      isHighlighted={item.id === highlightedId}
+    />
+  ), [onReply, onScrollToMessage, highlightedId]);
+  
+  return (
+    <FlatList
+      data={messages}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 16 }}
+      initialNumToRender={10}
+      maxToRenderPerBatch={5}
+      windowSize={10}
+      removeClippedSubviews={true} // Important for memory optimization
+    />
   );
 });
 
@@ -400,11 +543,10 @@ const LiveStreamView = () => {
   // Add reply state
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   
-  // Animation refs
+  // Animation refs with correct initialization
   const slideAnim = useRef(new Animated.Value(screenWidth)).current;
-  const [currentSlideValue, setCurrentSlideValue] = useState<number>(screenWidth);
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const chatListRef = useRef<ScrollView>(null);
+  const minimizeAnim = useRef(new Animated.Value(1)).current;
   
   // Speaking animation refs
   const speakingAnimationRefs = useRef<Animated.Value[]>(MOCK_PARTICIPANTS.map(() => new Animated.Value(0)));
@@ -413,13 +555,18 @@ const LiveStreamView = () => {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [filteredMentions, setFilteredMentions] = useState<Participant[]>([]);
   
+  // Add reference for chat list
+  const chatListRef = useRef<FlatList>(null);
+  
+  // Add slide value state
+  const [currentSlideValue, setCurrentSlideValue] = useState(screenWidth);
+  
   // Add mention animation ref
   const mentionAnimRef = useRef(new Animated.Value(0)).current;
   
   // Add new state variables for minimized widget
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
-  const minimizeAnim = useRef(new Animated.Value(1)).current;
   const widgetPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   
   // Add the isDragging state
@@ -510,16 +657,19 @@ const LiveStreamView = () => {
     return () => slideAnim.removeListener(id);
   }, [slideAnim]);
   
-  // Toggle info panel visibility
+  // Toggle info panel visibility with proper native driver support
   const toggleInfoPanel = useCallback(() => {
-    const toValue = isInfoPanelVisible ? screenWidth : 0;
+    // Use transform instead of position for native driver
+    const toValue = isInfoPanelVisible ? 1 : 0;
     setIsInfoPanelVisible(!isInfoPanelVisible);
-    Animated.timing(slideAnim, {
+    
+    Animated.spring(slideAnim, {
       toValue,
-      duration: 250,
-      useNativeDriver: false, 
+      friction: 8,
+      tension: 40,
+      useNativeDriver: true,
     }).start();
-  }, [isInfoPanelVisible, slideAnim, screenWidth]);
+  }, [isInfoPanelVisible, slideAnim]);
 
   // Update toggleMinimize to handle animation correctly
   const toggleMinimize = useCallback(() => {
@@ -623,12 +773,22 @@ const LiveStreamView = () => {
         return isHorizontalSwipe;
       },
       onPanResponderMove: (evt, gestureState) => {
-        // Horizontal movement for info panel only
+        // Horizontal movement for info panel only with native driver
         if ((!isInfoPanelVisible && gestureState.dx < 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
             (isInfoPanelVisible && gestureState.dx > 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
-          slideAnim.setValue(isInfoPanelVisible ? gestureState.dx : screenWidth + gestureState.dx);
+          
+          // Normalize the drag to be between 0 and 1 for transform
+          let newValue;
+          if (isInfoPanelVisible) {
+            // When panel is visible, dragging right increases value (0 = fully visible, 1 = hidden)
+            newValue = Math.min(1, Math.max(0, gestureState.dx / screenWidth));
+          } else {
+            // When panel is hidden, dragging left decreases value (0 = fully visible, 1 = hidden)
+            newValue = Math.min(1, Math.max(0, 1 + gestureState.dx / screenWidth));
+          }
+          
+          slideAnim.setValue(newValue);
         }
-        // Removed vertical swipe handling for minimizing
       },
       onPanResponderRelease: (evt, gestureState) => {
         const swipeThresholdHorizontal = screenWidth * 0.25;
@@ -640,7 +800,6 @@ const LiveStreamView = () => {
           // Haptic feedback
           if (Platform.OS === 'ios') { /* ... Haptics ... */ }
         } 
-        // Removed vertical swipe handling for minimizing
         
         // Snap back logic for horizontal swipes only
         else {
@@ -651,7 +810,6 @@ const LiveStreamView = () => {
               useNativeDriver: false,
             }).start();
           }
-          // Removed vertical snap back logic
         }
         
         // Ensure info panel snaps back if moved but not enough to toggle
@@ -680,11 +838,11 @@ const LiveStreamView = () => {
         y: gestureState.dy,
       });
       
-      // Safely update current position ref
+      // Safely update current position ref with number type
       if (currentPanPosition.current) {
         currentPanPosition.current = {
-          x: gestureState.dx + (currentPanPosition.current.x as number || 0),
-          y: gestureState.dy + (currentPanPosition.current.y as number || 0)
+          x: Number(gestureState.dx) + Number(currentPanPosition.current.x || 0),
+          y: Number(gestureState.dy) + Number(currentPanPosition.current.y || 0)
         };
       }
     },
@@ -704,8 +862,9 @@ const LiveStreamView = () => {
       
       // Calculate dimensions
       const widgetSize = calculateWidgetSize(visibleHostCount);
-      const maxX = Dimensions.get('window').width - widgetSize;
-      const maxY = Dimensions.get('window').height - widgetSize;
+      const size = widgetSize.size || 0;
+      const maxX = Dimensions.get('window').width - size;
+      const maxY = Dimensions.get('window').height - size;
       
       // Find the nearest edge and snap to it
       const targetX = positionX > maxX / 2 ? maxX : 0;
@@ -915,88 +1074,24 @@ const LiveStreamView = () => {
     );
   };
 
-  // The main renderChat function definition should remain here
+  // Update the renderChat function to use the memoized component
   const renderChat = () => {
     return (
-       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.chatContainer}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <View style={styles.chatListContainer}>
-          {/* Shadow overlay at the top of chat */}
-          <LinearGradient
-            colors={['rgba(26, 27, 34, 0.9)', 'rgba(26, 27, 34, 0)']}
-            style={styles.chatTopShadow}
-            pointerEvents="none"
-          />
-          
-          <ScrollView
-            ref={chatListRef}
-            style={styles.chatList}
-            contentContainerStyle={styles.chatContent}
-          >
-            {chatMessages.map((message) => (
-              <ChatMessageItem
-                key={message.id}
-                message={message}
-                onReply={handleReplyToMessage}
-                onScrollToMessage={scrollToMessage}
-                isHighlighted={message.id === replyingTo?.id}
-              />
-            ))}
-          </ScrollView>
+      <View style={styles.chatContainer}>
+        <View style={styles.chatHeaderContainer}>
+          <Text style={styles.chatHeaderText}>Chat</Text>
+          {/* ... rest of chat header ... */}
         </View>
-
-        {/* Chat input with reply UI */}
-        <View style={styles.chatInputContainer}>
-          {/* Show reply preview when replying */}
-          {replyingTo && (
-            <View style={styles.replyingContainer}>
-              <View style={styles.replyingContent}>
-                <Text style={styles.replyingText}>
-                  Replying to <Text style={styles.replyingName}>{replyingTo.user.name}</Text>
-                </Text>
-                <Text style={styles.replyingMessage} numberOfLines={1}>
-                  {replyingTo.message.length > 40 
-                    ? replyingTo.message.substring(0, 40) + '...' 
-                    : replyingTo.message}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.replyingCancel} 
-                onPress={cancelReply}
-                hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
-              >
-                <View style={styles.cancelButtonCircle}>
-                  <MaterialIcons name="close" size={16} color="#FFF" />
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Mention suggestions popup */}
-          {mentionQuery && filteredMentions.length > 0 && renderMentionSuggestions()}
-          
-          {/* Input field with send button */}
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.chatInput}
-              placeholder="Type a message..."
-              placeholderTextColor="#999"
-              value={messageText}
-              onChangeText={handleMessageChange}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, messageText.trim() ? styles.sendButtonActive : {}]}
-              onPress={handleSendMessage}
-              disabled={messageText.trim() === ''}
-            >
-              <MaterialIcons name="send" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
+        
+        <MemoizedChatMessages
+          messages={chatMessages}
+          onReply={handleReplyToMessage}
+          onScrollToMessage={scrollToMessage}
+          highlightedId={replyingTo?.id}
+        />
+        
+        {/* ... rest of chat UI ... */}
+      </View>
     );
   };
 
@@ -1245,6 +1340,506 @@ const LiveStreamView = () => {
 
   // --- Main Return --- 
 
+  // Create styles with animation values
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#121214',
+    },
+    content: {
+      flex: 1,
+      flexDirection: 'column',
+    },
+    infoPanel: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      width: '85%',
+      maxWidth: 400,
+      height: '100%',
+      backgroundColor: '#262730',
+      zIndex: 10,
+      borderTopLeftRadius: 10,
+      borderBottomLeftRadius: 10,
+      borderLeftWidth: 1,
+      borderLeftColor: '#3A3B45',
+      overflow: 'hidden',
+      elevation: 5,
+      shadowColor: '#000',
+      shadowOffset: { width: -2, height: 0 },
+      shadowOpacity: 0.3,
+      shadowRadius: 5,
+      transform: [{
+        translateX: slideAnim
+      }],
+    },
+    chatHeaderContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(58, 59, 69, 0.5)',
+    },
+    chatHeaderText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    messageText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    mentionText: {
+      color: '#6E56F7',
+      fontWeight: 'bold',
+    },
+    replyPreview: {
+      flexDirection: 'row',
+      marginBottom: 4,
+      alignItems: 'flex-start',
+    },
+    replyPreviewLine: {
+      width: 2,
+      height: '100%',
+      backgroundColor: '#6E56F7',
+      marginRight: 6,
+      borderRadius: 1,
+    },
+    replyPreviewContent: {
+      flex: 1,
+    },
+    replyPreviewName: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#6E56F7',
+      marginBottom: 2,
+    },
+    replyPreviewMessage: {
+      fontSize: 12,
+      color: '#AAAAAA',
+    },
+    messageContainer: {
+      flexDirection: 'row',
+      marginBottom: 12,
+      paddingHorizontal: 16,
+    },
+    avatarContainer: {
+      marginRight: 8,
+    },
+    avatarImage: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    messageContentContainer: {
+      flex: 1,
+    },
+    messageSender: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+      marginBottom: 2,
+    },
+    messageBubble: {
+      backgroundColor: 'rgba(58, 59, 69, 0.5)',
+      borderRadius: 12,
+      padding: 10,
+      maxWidth: '90%',
+      alignSelf: 'flex-start',
+    },
+    highlightedBubble: {
+      backgroundColor: 'rgba(110, 86, 247, 0.2)',
+    },
+    participantItem: {
+      alignItems: 'center',
+      marginHorizontal: 8,
+      marginBottom: 12,
+      width: BASE_ITEM_SIZE,
+    },
+    participantSpeakingAnimation: {
+      position: 'absolute',
+      width: BASE_ITEM_SIZE + 10,
+      height: BASE_ITEM_SIZE + 10,
+      borderRadius: (BASE_ITEM_SIZE + 10) / 2,
+      borderWidth: 2,
+      borderColor: '#6E56F7',
+      zIndex: -1,
+    },
+    participantImageWrapper: {
+      width: BASE_ITEM_SIZE,
+      height: BASE_ITEM_SIZE,
+      borderRadius: BASE_ITEM_SIZE / 2,
+      overflow: 'hidden',
+      marginBottom: 6,
+    },
+    participantGradient: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    participantCatIcon: {
+      width: BASE_ITEM_SIZE * 0.6,
+      height: BASE_ITEM_SIZE * 0.6,
+    },
+    participantImg: {
+      width: '100%',
+      height: '100%',
+    },
+    participantLabel: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+    hostGridContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: GRID_GAP,
+    },
+    hostGridItem: {
+      position: 'relative',
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    hostGridImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 8,
+    },
+    hostGridPlaceholderIcon: {
+      width: '60%',
+      height: '60%',
+      alignSelf: 'center',
+    },
+    miniSpeakingIndicator: {
+      position: 'absolute',
+      bottom: 5,
+      right: 5,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#6E56F7',
+    },
+    miniCloseButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    chatContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(18, 18, 20, 0.8)',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      marginTop: 10,
+    },
+    topBarOuterContainer: {
+      paddingTop: 10,
+      paddingHorizontal: 16,
+      zIndex: 2,
+    },
+    topBarContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+    },
+    backButton: {
+      padding: 8,
+    },
+    progressBarContainer: {
+      flex: 1,
+      height: 40,
+      marginHorizontal: 10,
+      borderRadius: 20,
+      overflow: 'hidden',
+      backgroundColor: 'rgba(58, 59, 69, 0.5)',
+    },
+    progressBarFill: {
+      height: '100%',
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    rocketIcon: {
+      marginHorizontal: 6,
+    },
+    arrowsContainer: {
+      flexDirection: 'row',
+    },
+    arrowIcon: {
+      marginLeft: -8,
+    },
+    minimizeButton: {
+      padding: 8,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      zIndex: 1,
+    },
+    boostContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    rankBadge: {
+      backgroundColor: '#FFD700',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginRight: 8,
+    },
+    rankText: {
+      color: '#000000',
+      fontWeight: 'bold',
+      fontSize: 12,
+    },
+    boostBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    boostCount: {
+      color: '#FFFFFF',
+      marginLeft: 4,
+      fontWeight: 'bold',
+    },
+    rightStatsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    statBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginLeft: 8,
+    },
+    statText: {
+      color: '#FFFFFF',
+      marginLeft: 4,
+      fontWeight: 'bold',
+    },
+    infoStatBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginLeft: 8,
+    },
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      marginTop: 10,
+    },
+    infoPanelHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(58, 59, 69, 0.5)',
+    },
+    infoPanelTitle: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 18,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(58, 59, 69, 0.5)',
+    },
+    tab: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+    },
+    activeTab: {
+      borderBottomWidth: 2,
+      borderBottomColor: '#6E56F7',
+    },
+    tabText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+    },
+    tabContent: {
+      flex: 1,
+      padding: 16,
+    },
+    infoSectionTitle: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 20,
+      marginBottom: 16,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    infoText: {
+      color: '#AAAAAA',
+      marginLeft: 8,
+    },
+    infoSectionHeader: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 16,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    participantRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    participantAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      marginRight: 12,
+    },
+    participantRowName: {
+      color: '#FFFFFF',
+      fontSize: 14,
+    },
+    reportText: {
+      color: '#AAAAAA',
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    reportButton: {
+      backgroundColor: '#F44336',
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 20,
+      alignItems: 'center',
+    },
+    reportButtonText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+    },
+    mentionSuggestionsContainer: {
+      position: 'absolute',
+      bottom: 60,
+      left: 0,
+      right: 0,
+      backgroundColor: '#262730',
+      borderTopLeftRadius: 10,
+      borderTopRightRadius: 10,
+      borderWidth: 1,
+      borderColor: '#3A3B45',
+      maxHeight: 200,
+      zIndex: 100,
+    },
+    mentionSuggestionsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(58, 59, 69, 0.5)',
+    },
+    mentionSuggestionsTitle: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 14,
+    },
+    mentionQueryText: {
+      color: '#6E56F7',
+      fontSize: 14,
+    },
+    noMentionsContainer: {
+      padding: 12,
+      alignItems: 'center',
+    },
+    noMentionsText: {
+      color: '#AAAAAA',
+      fontStyle: 'italic',
+    },
+    mentionSuggestion: {
+      flexDirection: 'row',
+      padding: 12,
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(58, 59, 69, 0.3)',
+    },
+    mentionSuggestionFirst: {
+      borderTopWidth: 0,
+    },
+    mentionSuggestionLast: {
+      borderBottomWidth: 0,
+    },
+    mentionAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      marginRight: 12,
+    },
+    mentionContent: {
+      flex: 1,
+    },
+    mentionName: {
+      color: '#FFFFFF',
+      fontSize: 14,
+    },
+    mentionHighlight: {
+      color: '#6E56F7',
+      fontWeight: 'bold',
+    },
+    hostBadge: {
+      backgroundColor: 'rgba(110, 86, 247, 0.2)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      alignSelf: 'flex-start',
+      marginTop: 4,
+    },
+    hostText: {
+      color: '#6E56F7',
+      fontSize: 10,
+      fontWeight: 'bold',
+    },
+    minimizedContainer: {
+      position: 'absolute',
+      backgroundColor: 'rgba(18, 18, 20, 0.9)',
+      borderRadius: 16,
+      overflow: 'hidden',
+      zIndex: 100,
+      borderWidth: 1,
+      borderColor: '#3A3B45',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 5,
+    }
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}> 
       <StatusBar style="light" />
@@ -1275,8 +1870,8 @@ const LiveStreamView = () => {
           style={[
             styles.minimizedContainer, 
             { 
-              width: calculateWidgetSize(participants.filter(p => p.isHost).length).size,
-              height: calculateWidgetSize(participants.filter(p => p.isHost).length).size,
+              width: calculateWidgetSize(participants.filter(p => p.isHost).length).size || MIN_WIDGET_SIZE,
+              height: calculateWidgetSize(participants.filter(p => p.isHost).length).size || MIN_WIDGET_SIZE,
               transform: [{ translateX: widgetPan.x }, { translateY: widgetPan.y }],
             }
           ]}
@@ -1296,710 +1891,5 @@ const LiveStreamView = () => {
 LiveStreamView.options = {
   gestureEnabled: false,
 };
-
-// --- Styles --- 
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1B22',
-  },
-  content: {
-    flex: 1,
-    flexDirection: 'column',
-  },
-  
-  // Top Bar
-  topBarOuterContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    paddingTop: 10,
-  },
-  topBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingBottom: 10,
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    padding: 8, 
-    marginRight: 6,
-    backgroundColor: 'rgba(38, 39, 48, 0.8)',
-    borderRadius: 20,
-  },
-  progressBarContainer: {
-    flex: 1,
-    height: 28,
-    backgroundColor: '#3A3B45',
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginHorizontal: 12,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  rocketIcon: {
-    marginLeft: 6,
-    marginRight: 4,
-  },
-  arrowsContainer: {
-    flexDirection: 'row',
-    marginLeft: 'auto',
-    marginRight: 6,
-  },
-  arrowIcon: {
-    marginLeft: -9,
-  },
-  
-  // Stats Bar
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 12,
-    paddingHorizontal: 15,
-  },
-  boostContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#262730',
-    borderRadius: 20,
-    overflow: 'hidden',
-    height: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  rankBadge: {
-    backgroundColor: '#FFC107',
-    paddingHorizontal: 14,
-    height: '100%',
-    justifyContent: 'center',
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
-  },
-  rankText: {
-    color: '#1A1B22',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  boostBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: '100%',
-    justifyContent: 'center',
-  },
-  boostCount: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
-  rightStatsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#262730',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
-    marginLeft: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
-  
-  // Participant Grid styles
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    paddingHorizontal: 15, 
-    paddingVertical: 10,
-    marginBottom: 12,
-    backgroundColor: 'rgba(38, 39, 48, 0.4)',
-    borderRadius: 12,
-    marginHorizontal: 15,
-  },
-  participantItem: {
-    width: '30%', 
-    marginBottom: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  participantImageWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#3A3B45',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 0,
-    zIndex: 1,
-  },
-  participantImg: {
-    width: '100%',
-    height: '100%',
-  },
-  participantGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  participantCatIcon: {
-    width: '60%', 
-    height: '60%', 
-    tintColor: '#FFFFFF',
-  },
-  participantLabel: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  participantSpeakingAnimation: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    backgroundColor: 'rgba(138, 125, 246, 0.4)',
-    alignSelf: 'center',
-    top: -6,
-    zIndex: 0,
-  },
-
-  // Chat container
-  chatContainer: {
-    flex: 1,
-    backgroundColor: '#1A1B22',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: 'hidden',
-  },
-  
-  // Add container for chat list for positioning the shadow
-  chatListContainer: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  
-  // Add shadow gradient at the top
-  chatTopShadow: {
-    position: 'absolute', 
-    top: 0,
-    left: -5,
-    right: -5,
-    height: 40,
-    zIndex: 10,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  
-  // Chat list
-  chatList: {
-    flex: 1,
-    padding: 10,
-  },
-  chatContent: {
-    paddingVertical: 5,
-    paddingBottom: 15,
-  },
-  
-  // Message styles - updated for consistency
-  messageContainer: {
-    flexDirection: 'row',
-    marginVertical: 8,
-    maxWidth: '100%',
-    alignItems: 'flex-start',
-  },
-  avatarContainer: {
-    marginRight: 10,
-    marginTop: 2,
-  },
-  avatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  messageContentContainer: {
-    flex: 1,
-    maxWidth: '85%',
-  },
-  messageSender: {
-    color: '#9DA3B4',
-    fontSize: 13,
-    marginBottom: 2,
-    fontWeight: '500',
-    marginLeft: 2,
-  },
-  messageBubble: {
-    backgroundColor: '#262730',
-    borderRadius: 12,
-    padding: 12,
-    paddingVertical: 8,
-    maxWidth: '100%',
-    alignSelf: 'flex-start',
-  },
-  messageText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-  },
-  
-  // Reply preview styles
-  replyPreview: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-    marginLeft: 2,
-  },
-  replyPreviewLine: {
-    width: 2,
-    alignSelf: 'stretch',
-    backgroundColor: '#8A7DF6',
-    marginRight: 8,
-  },
-  replyPreviewContent: {
-    flexDirection: 'column',
-    backgroundColor: '#1D1E26',
-    borderRadius: 12,
-    padding: 8,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-  },
-  replyPreviewName: {
-    color: '#8A7DF6',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 2,
-    paddingHorizontal: 2,
-  },
-  replyPreviewMessage: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    paddingHorizontal: 2,
-  },
-  highlightedBubble: {
-    backgroundColor: '#464775',
-  },
-  
-  // Input styles
-  chatInputContainer: {
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#2A2A35',
-    backgroundColor: '#1A1B22',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    backgroundColor: '#262730',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  chatInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 15,
-    padding: 0,
-  },
-  sendButton: {
-    backgroundColor: '#33344A',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendButtonActive: {
-    backgroundColor: '#464775',
-  },
-  
-  // Replying UI styles
-  replyingContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 8,
-    paddingVertical: 10,
-    backgroundColor: '#1D1E26',
-    borderRadius: 12,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#8A7DF6',
-  },
-  replyingContent: {
-    flex: 1,
-    marginLeft: 8,
-    marginRight: 8,
-  },
-  replyingText: {
-    color: '#9DA3B4',
-    fontSize: 12,
-  },
-  replyingName: {
-    color: '#8A7DF6',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  replyingMessage: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
-    marginTop: 2,
-    alignSelf: 'flex-start',
-  },
-  replyingCancel: {
-    padding: 2,
-    alignSelf: 'center',
-  },
-  cancelButtonCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#464775',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  
-  // Info Panel
-  infoPanel: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '85%',
-    maxWidth: 400,
-    backgroundColor: '#1A1B22',
-    zIndex: 1000,
-    borderLeftWidth: 1,
-    borderLeftColor: '#2D2E38',
-    elevation: 10, 
-    shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  infoPanelHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2D2E38',
-  },
-  infoPanelTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2D2E38',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#8A7DF6',
-  },
-  tabText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  tabContent: {
-    flex: 1,
-    padding: 16,
-  },
-  infoSectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  infoSectionHeader: {
-    color: '#AAAAAA',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoText: {
-    color: '#E0E0E0',
-    fontSize: 14,
-    marginLeft: 10,
-  },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  participantAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  participantRowName: {
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  reportText: {
-    color: '#E0E0E0',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  reportButton: {
-    backgroundColor: '#E63946',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  reportButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  // Mention suggestion styles
-  mentionSuggestionsContainer: {
-    position: 'absolute',
-    bottom: 65,
-    left: 10,
-    right: 10,
-    backgroundColor: '#262730',
-    borderRadius: 12,
-    maxHeight: 220,
-    borderWidth: 1,
-    borderColor: '#3A3B45',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  mentionSuggestionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(58, 59, 69, 0.5)',
-  },
-  mentionSuggestionsTitle: {
-    color: '#9DA3B4',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  mentionQueryText: {
-    color: '#8A7DF6',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  noMentionsContainer: {
-    padding: 12,
-    alignItems: 'center',
-  },
-  noMentionsText: {
-    color: '#9DA3B4',
-    fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  mentionSuggestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(58, 59, 69, 0.2)',
-  },
-  mentionSuggestionFirst: {
-    paddingTop: 12,
-  },
-  mentionSuggestionLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 12,
-  },
-  mentionAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 12,
-  },
-  mentionContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  mentionName: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  mentionHighlight: {
-    color: '#8A7DF6',
-    fontWeight: 'bold',
-  },
-  mentionText: {
-    color: '#8A7DF6',
-    fontWeight: 'bold',
-  },
-  hostBadge: {
-    backgroundColor: 'rgba(138, 125, 246, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(138, 125, 246, 0.4)',
-  },
-  hostText: {
-    color: '#8A7DF6',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  infoStatBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(38, 39, 48, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,  // Slightly increased for visual feedback
-    shadowRadius: 3,
-    elevation: 3,         // Slightly increased for visual feedback
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)', // Subtle border to indicate interaction
-  },
-  infoIcon: {
-    marginLeft: 4,
-  },
-  minimizedContainer: {
-    position: 'absolute',
-    borderRadius: 20,
-    backgroundColor: 'rgba(26, 27, 34, 0.98)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.3)', 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 12,
-    overflow: 'visible',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hostGridContainer: {
-    width: '100%',
-    height: '100%',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    alignContent: 'space-between',
-  },
-  hostGridItem: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  hostGridImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
-  },
-  hostGridPlaceholderIcon: {
-    width: '50%',
-    height: '50%',
-    alignSelf: 'center',
-    tintColor: '#FFFFFF',
-  },
-  miniSpeakingIndicator: {
-    position: 'absolute',
-    bottom: 3,
-    right: 3,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
-    borderWidth: 1,
-    borderColor: '#1A1B22',
-  },
-  miniCloseButton: {
-    position: 'absolute',
-    top: -15,
-    right: -15,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FF3C8C',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  minimizeButton: {
-    padding: 8,
-    backgroundColor: 'rgba(38, 39, 48, 0.8)',
-    borderRadius: 20,
-  },
-});
 
 export default LiveStreamView; 
