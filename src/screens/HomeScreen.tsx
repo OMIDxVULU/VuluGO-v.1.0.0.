@@ -11,6 +11,7 @@ import ActivityModal from '../components/ActivityModal';
 import PersonGroupIcon from '../components/PersonGroupIcon';
 import { useLiveStreams } from '../context/LiveStreamContext';
 import { useUserProfile } from '../context/UserProfileContext';
+import SpotlightProgressBar from '../components/SpotlightProgressBar';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -892,37 +893,84 @@ const HomeScreen = () => {
   // Render dynamic Spotlight widget
   const renderSpotlightWidget = () => {
     if (yourSpotlightTimeLeft <= 0) return null;
+    
+    // Calculate progress for animation (1 to 0)
+    const initialYourSpotlightDuration = 300; // 5 minutes in seconds (you can adjust this or make it a state variable)
+    const yourProgressAnim = Math.min(1, yourSpotlightTimeLeft / initialYourSpotlightDuration);
+    
     return (
-      <TouchableOpacity style={styles.spotlightContainer} onPress={() => console.log("Spotlight active")}>
-        <View style={styles.spotlightAvatarWrapper}>
-          <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.spotlightAvatar} />
-          <View style={styles.spotlightIndicator} />
-        </View>
-        <View style={styles.spotlightInfo}>
-          <Text style={styles.spotlightTitle}>Friday Night Live Stream</Text>
-          <Text style={styles.viewersText}>{viewersCount} Viewers watching</Text>
-          <Text style={styles.spotlightTimer}>{formatTime(yourSpotlightTimeLeft)}</Text>
-        </View>
-      </TouchableOpacity>
+      // New wrapper view
+      <View style={styles.spotlightWrapper}>
+        {/* Loading bar animation - now outside the content container */}
+        <SpotlightProgressBar 
+          width={320} 
+          height={110} 
+          borderRadius={16}
+          progress={yourProgressAnim}
+          color="#34C759" // NEO_GREEN
+          strokeWidth={3}
+          glowIntensity={3}
+        />
+        {/* Content container - slightly padded */}
+        <TouchableOpacity 
+          style={[styles.spotlightContainer, { padding: 5 }]} // Add padding
+          onPress={() => console.log("Spotlight active")}
+          activeOpacity={0.9} // Maintain high opacity
+        >
+          {/* Content is now directly inside TouchableOpacity */}
+          <View style={styles.spotlightAvatarWrapper}>
+            <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.spotlightAvatar} />
+            <View style={styles.spotlightIndicator} />
+          </View>
+          <View style={styles.spotlightInfo}>
+            <Text style={styles.spotlightTitle}>Friday Night Live Stream</Text>
+            <Text style={styles.viewersText}>{viewersCount} Viewers watching</Text>
+            <Text style={styles.spotlightTimer}>{formatTime(yourSpotlightTimeLeft)}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
   // Render random user Spotlight widget
   const renderOtherSpotlightWidget = () => {
     if (!otherSpotlightCandidate || otherSpotlightTimeLeft <= 0) return null;
+    
+    // Calculate progress for animation (1 to 0)
+    const initialOtherSpotlightDuration = 300; // 5 minutes in seconds (you can adjust this or make it a state variable)
+    const otherProgressAnim = Math.min(1, otherSpotlightTimeLeft / initialOtherSpotlightDuration);
+    
     return (
-      <TouchableOpacity style={[styles.spotlightContainer, { borderColor: '#FFC107' }]} onPress={() => console.log('Spotlight other')}>
-        <View style={[styles.spotlightAvatarWrapper, { borderColor: '#FFC107', borderWidth: 2 }]}>  
-          <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.spotlightAvatar} />
-          <View style={[styles.spotlightIndicator, { backgroundColor: '#FFC107' }]} />
-        </View>
-        <View style={styles.spotlightInfo}>
-          
-          <Text style={styles.spotlightTitle}>Weekend Gaming Session</Text>
-          <Text style={styles.viewersText}>{Math.floor(viewersCount * 0.8)} Viewers watching</Text>
-          <Text style={styles.spotlightTimer}>{formatTime(otherSpotlightTimeLeft)}</Text>
-        </View>
-      </TouchableOpacity>
+      // New wrapper view
+      <View style={[styles.spotlightWrapper, { marginRight: 12 }]}> 
+        {/* Loading bar animation - outside the content container */}
+        <SpotlightProgressBar 
+          width={320} 
+          height={110} 
+          borderRadius={16}
+          progress={otherProgressAnim}
+          color="#FFC107" // Match border color
+          strokeWidth={3}
+          glowIntensity={3}
+        />
+        {/* Content container - slightly padded */}
+        <TouchableOpacity 
+          style={[styles.spotlightContainer, { borderColor: '#FFC107', padding: 5 }]} // Add padding
+          onPress={() => console.log('Spotlight other')}
+          activeOpacity={0.9} // Maintain high opacity
+        >
+           {/* Content is now directly inside TouchableOpacity */}
+          <View style={[styles.spotlightAvatarWrapper, { borderColor: '#FFC107', borderWidth: 2 }]}>  
+            <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.spotlightAvatar} />
+            <View style={[styles.spotlightIndicator, { backgroundColor: '#FFC107' }]} />
+          </View>
+          <View style={styles.spotlightInfo}>
+            <Text style={styles.spotlightTitle}>Weekend Gaming Session</Text>
+            <Text style={styles.viewersText}>{Math.floor(viewersCount * 0.8)} Viewers watching</Text>
+            <Text style={styles.spotlightTimer}>{formatTime(otherSpotlightTimeLeft)}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -978,10 +1026,10 @@ const HomeScreen = () => {
             ref={scrollViewRef}
             horizontal
             showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 16 }}
             style={styles.horizontalWidgetContainer}
-            onLayout={(event) => {
-              // Measure content: spotlight + hosting + watching + listening + random
-              const childrenCount = (showYourPill ? 1 : 0) + (showOtherPill && otherSpotlightTimeLeft > 0 ? 1 : 0) +
+            onContentSizeChange={(width) => {
+              const childrenCount = 2 + // Spotlight pills (always 2 slots, even if not all shown)
                 React.Children.count(renderFriendHostingLive()) +
                 React.Children.count(renderFriendWatchingLive()) +
                 React.Children.count(renderFriendListeningMusic()) +
@@ -1002,20 +1050,36 @@ const HomeScreen = () => {
                   yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget
                 ]}
                 onPress={() => openSpotlightModal()}
+                activeOpacity={0.9}
               >
-                <View style={[
-                  styles.avatarContainer,
-                  { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
-                ]}>  
-                  <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
-                </View>
-                <Text style={styles.nameLabel}>You</Text>
-                <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
-                  Spotlight
-                </Text>
+                {/* Progress bar positioned absolutely inside */}
                 {yourSpotlightTimeLeft > 0 && (
-                  <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
+                  <SpotlightProgressBar 
+                    width={80} // Explicitly use squareWidget width
+                    height={110} // Explicitly use squareWidget height
+                    borderRadius={16} // Explicitly use squareWidget borderRadius
+                    progress={Math.min(1, yourSpotlightTimeLeft / 300)} // 5 min default
+                    color="#34C759" // NEO_GREEN
+                    strokeWidth={2.5} // Slightly smaller for the pill
+                    glowIntensity={2}
+                  />
                 )}
+                {/* Content with higher zIndex */}
+                <View style={styles.pillContentWrapper}>
+                  <View style={[
+                    styles.avatarContainer,
+                    { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
+                  ]}>  
+                    <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
+                  </View>
+                  <Text style={styles.nameLabel}>You</Text>
+                  <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
+                    Spotlight
+                  </Text>
+                  {yourSpotlightTimeLeft > 0 && (
+                    <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
             {/* Random user boosting pill */}
@@ -1023,17 +1087,31 @@ const HomeScreen = () => {
               <View style={styles.pillContainer}>
                 <TouchableOpacity
                   style={[
-                    styles.squareWidget,
+                    styles.squareWidget, // Use this for dimensions and radius
                     styles.activeWidget
                   ]}
                   onPress={() => console.log('Boost other')}
+                  activeOpacity={0.9}
                 >
-                  <View style={[styles.avatarContainer, { borderColor: '#4CAF50' }]}>  
-                    <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.gridAvatar} />
+                  {/* Progress bar positioned absolutely inside */}
+                  <SpotlightProgressBar 
+                    width={80} // Explicitly use squareWidget width
+                    height={110} // Explicitly use squareWidget height
+                    borderRadius={16} // Explicitly use squareWidget borderRadius
+                    progress={Math.min(1, otherSpotlightTimeLeft / 300)} // 5 min default
+                    color="#FFC107" // Yellow to match their theme
+                    strokeWidth={2.5} // Slightly smaller for the pill
+                    glowIntensity={2}
+                  />
+                  {/* Content with higher zIndex */}
+                  <View style={styles.pillContentWrapper}>
+                    <View style={[styles.avatarContainer, { borderColor: '#FFC107' }]}>  
+                      <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.gridAvatar} />
+                    </View>
+                    <Text style={styles.nameLabel}>{otherSpotlightCandidate.name}</Text>
+                    <Text style={styles.statusLabel}>Spotlight</Text>
+                    <Text style={styles.timerLabel}>{formatTime(otherSpotlightTimeLeft)}</Text>
                   </View>
-                  <Text style={styles.nameLabel}>{otherSpotlightCandidate.name}</Text>
-                  <Text style={styles.statusLabel}>Spotlight</Text>
-                  <Text style={styles.timerLabel}>{formatTime(otherSpotlightTimeLeft)}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1822,8 +1900,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 0,
+    position: 'relative',
+  },
+  pillContentWrapper: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    bottom: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+    backgroundColor: "#1D1E26",
+    borderRadius: 14,
   },
   avatarContainer: {
     width: 50,
@@ -1882,24 +1972,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  spotlightContainer: {
-    height: 110,
+  spotlightWrapper: {
     width: 320,
+    height: 110,
+    position: 'relative',
+    marginRight: 12,
+  },
+  spotlightContainer: {
     backgroundColor: "#1A1B22",
     borderRadius: 16,
-    marginRight: 12,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
     justifyContent: 'center',
+    position: 'absolute', 
+    top: 0, 
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
   },
   spotlightAvatarWrapper: {
     width: 52,
@@ -1909,6 +1999,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 2,
     borderColor: '#4CAF50',
+    zIndex: 3,
   },
   spotlightAvatar: {
     width: '100%',
@@ -1924,11 +2015,12 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 2,
     borderColor: '#1D1E26',
-    zIndex: 10,
+    zIndex: 4,
   },
   spotlightInfo: {
     flex: 1,
     justifyContent: 'center',
+    zIndex: 3,
   },
   spotlightTitle: {
     color: '#FFFFFF',

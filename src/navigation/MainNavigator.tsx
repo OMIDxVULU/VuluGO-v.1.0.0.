@@ -15,6 +15,7 @@ import MusicScreen from '../screens/MusicScreen';
 import MiningScreen from '../screens/MiningScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ShopScreen from '../screens/ShopScreen';
+import SpotlightDurationDemoScreen from '../screens/SpotlightDurationDemoScreen';
 
 // Import components
 import CustomTabBar from '../components/CustomTabBar';
@@ -41,10 +42,14 @@ export type RootStackParamList = {
   Shop: undefined;
   Account: undefined;
   Profile: undefined;
+  SpotlightDurationDemo: undefined;
   Chat: {
     userId: string;
     name: string;
     avatar: string;
+    goBack?: () => void;
+    goToDMs?: () => void;
+    source?: string;
   };
 };
 
@@ -133,8 +138,12 @@ const MainNavigator = () => {
           <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
           <Stack.Screen name="Shop" component={ShopScreen} />
           <Stack.Screen name="Account" component={AccountScreen} />
-          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen 
+            name="Chat" 
+            component={ChatScreen}
+          />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="SpotlightDurationDemo" component={SpotlightDurationDemoScreen} />
         </Stack.Navigator>
       </View>
       
