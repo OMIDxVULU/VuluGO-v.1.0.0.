@@ -38,7 +38,7 @@ const SpotlightProgressBar = memo(({
   progress,
   color,
   strokeWidth = 3,
-  glowIntensity = 2.2,
+  glowIntensity = 2.5, // Keep intensity prop for potential future use, but default won't be used by filter
   durationCategory = 'medium', // Default to medium
 }: SpotlightProgressBarProps) => {
   // Set colors based on duration category
@@ -64,8 +64,18 @@ const SpotlightProgressBar = memo(({
     }
   };
   
+  // Adjust stroke width based on duration
+  const effectiveStrokeWidth = React.useMemo(() => {
+    switch (durationCategory) {
+      case 'short': return strokeWidth;
+      case 'medium': return strokeWidth * 1.1; // Slightly thicker
+      case 'long': return strokeWidth * 1.2; // Thickest stroke
+      default: return strokeWidth;
+    }
+  }, [durationCategory, strokeWidth]);
+  
   // Calculate the adjusted dimensions and radius for a centered stroke
-  const strokeOffset = strokeWidth / 2; // Center the stroke
+  const strokeOffset = effectiveStrokeWidth / 2; // Center the stroke using the effective width
   const adjustedWidth = width - strokeOffset * 2;
   const adjustedHeight = height - strokeOffset * 2;
   // Adjust radius based on the centered stroke offset
@@ -139,7 +149,7 @@ const SpotlightProgressBar = memo(({
   });
   
   // For Android performance optimization, reduce filter quality and adjust SVG complexity
-  const blurRadius = Platform.OS === 'android' ? 1.6 : 2.2;
+  const blurRadius = Platform.OS === 'android' ? 1.7 : 2.3;
   
   // Adjust filter complexity based on platform
   const filterMatrix = Platform.OS === 'android' 
@@ -172,16 +182,6 @@ const SpotlightProgressBar = memo(({
     ? { renderToHardwareTextureAndroid: true } 
     : { shouldRasterizeIOS: true };
   
-  // Adjust stroke width based on duration
-  const effectiveStrokeWidth = React.useMemo(() => {
-    switch (durationCategory) {
-      case 'short': return strokeWidth;
-      case 'medium': return strokeWidth * 1.1; // Slightly thicker
-      case 'long': return strokeWidth * 1.2; // Thickest stroke
-      default: return strokeWidth;
-    }
-  }, [durationCategory, strokeWidth]);
-  
   return (
     <View 
       style={[
@@ -195,20 +195,7 @@ const SpotlightProgressBar = memo(({
       {...platformProps}
     >
       <Svg width="100%" height="100%" style={{ overflow: 'visible' }}>
-        <Defs>
-          {/* Glow effect filter - Expand bounds further */}
-          <Filter id={FILTER_ID} x="-50%" y="-50%" width="200%" height="200%">
-            <FeGaussianBlur stdDeviation={currentGlowIntensity * (blurRadius / 2.8)} result="blur" />
-            <FeColorMatrix
-              in="blur"
-              type="matrix"
-              values={getFilterMatrix()}
-              result="glow"
-            />
-          </Filter>
-        </Defs>
-        
-        {/* Glow stroke outline */}
+        {/* Glow stroke outline - REMOVED
         <AnimatedRect
           x={strokeOffset}
           y={strokeOffset}
@@ -216,15 +203,16 @@ const SpotlightProgressBar = memo(({
           height={adjustedHeight}
           rx={adjustedRadius}
           ry={adjustedRadius}
-          strokeWidth={effectiveStrokeWidth * 1.5}
+          strokeWidth={effectiveStrokeWidth * 1.55} 
           fill="transparent"
           strokeDasharray={perimeter}
           stroke={baseColor}
           filter={`url(#${FILTER_ID})`}
-          opacity={Platform.OS === 'android' ? 0.6 : 0.7} // Reduce opacity on Android for better performance
+          opacity={Platform.OS === 'android' ? 0.6 : 0.7} 
           animatedProps={animatedProps}
-          strokeLinejoin="round" // Add rounded line joins for smoother corners
-        />
+          strokeLinejoin="round" 
+        /> 
+        */}
         
         {/* Main stroke outline */}
         <AnimatedRect

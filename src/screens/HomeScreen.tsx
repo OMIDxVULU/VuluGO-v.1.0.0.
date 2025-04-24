@@ -12,6 +12,15 @@ import PersonGroupIcon from '../components/PersonGroupIcon';
 import { useLiveStreams } from '../context/LiveStreamContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import SpotlightProgressBar from '../components/SpotlightProgressBar';
+import { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming, 
+  withSequence, 
+  withRepeat, 
+  cancelAnimation, 
+  Easing 
+} from 'react-native-reanimated';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -56,6 +65,72 @@ const HomeScreen = () => {
   const [viewersCount, setViewersCount] = useState<number>(35);
   const [showYourPill, setShowYourPill] = useState<boolean>(true);
   const [showOtherPill, setShowOtherPill] = useState<boolean>(true);
+  
+  // --- Animation Setup for Your Spotlight Shadow ---
+  const yourShadowOpacity = useSharedValue(0.7); // Initial opacity
+
+  // Effect to control the pulsing animation based on timer
+  useEffect(() => {
+    if (yourSpotlightTimeLeft > 0) {
+      // Start pulsing animation
+      yourShadowOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.9, { duration: 800, easing: Easing.inOut(Easing.ease) }), // Pulse brighter
+          withTiming(0.5, { duration: 800, easing: Easing.inOut(Easing.ease) })  // Pulse dimmer
+        ),
+        -1, // Loop indefinitely
+        true // Reverse the animation direction each time
+      );
+    } else {
+      // Stop animation and reset opacity when timer ends
+      cancelAnimation(yourShadowOpacity);
+      yourShadowOpacity.value = 0; // Fade out completely when inactive
+    }
+
+    // Cleanup function to cancel animation on unmount
+    return () => cancelAnimation(yourShadowOpacity);
+  }, [yourSpotlightTimeLeft, yourShadowOpacity]);
+
+  // Animated style for your shadow opacity
+  const yourAnimatedShadowStyle = useAnimatedStyle(() => {
+    return {
+      shadowOpacity: yourShadowOpacity.value,
+    };
+  });
+  // --- End Your Animation Setup ---
+
+  // --- Animation Setup for Other Spotlight Shadow ---
+  const otherShadowOpacity = useSharedValue(0.7); // Initial opacity
+
+  // Effect to control the pulsing animation based on timer
+  useEffect(() => {
+    if (otherSpotlightTimeLeft > 0) {
+      // Start pulsing animation
+      otherShadowOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.9, { duration: 800, easing: Easing.inOut(Easing.ease) }), // Pulse brighter
+          withTiming(0.5, { duration: 800, easing: Easing.inOut(Easing.ease) })  // Pulse dimmer
+        ),
+        -1, // Loop indefinitely
+        true // Reverse the animation direction each time
+      );
+    } else {
+      // Stop animation and reset opacity when timer ends
+      cancelAnimation(otherShadowOpacity);
+      otherShadowOpacity.value = 0; // Fade out completely when inactive
+    }
+
+    // Cleanup function to cancel animation on unmount
+    return () => cancelAnimation(otherShadowOpacity);
+  }, [otherSpotlightTimeLeft, otherShadowOpacity]);
+
+  // Animated style for other shadow opacity
+  const otherAnimatedShadowStyle = useAnimatedStyle(() => {
+    return {
+      shadowOpacity: otherShadowOpacity.value,
+    };
+  });
+  // --- End Other Animation Setup ---
   
   // Random user spotlight candidate
   const [otherSpotlightCandidate, setOtherSpotlightCandidate] = useState<{ name: string; avatar: string }>({ name: 'Alex', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' });
@@ -1046,8 +1121,10 @@ const HomeScreen = () => {
             <View style={styles.pillContainer}>
               <TouchableOpacity
                 style={[
-                  styles.squareWidget,
-                  yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget
+                  styles.squareWidget, 
+                  yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget,
+                  yourSpotlightTimeLeft > 0 && styles.activeShadow,
+                  yourSpotlightTimeLeft > 0 && yourAnimatedShadowStyle
                 ]}
                 onPress={() => openSpotlightModal()}
                 activeOpacity={0.9}
@@ -1087,8 +1164,10 @@ const HomeScreen = () => {
               <View style={styles.pillContainer}>
                 <TouchableOpacity
                   style={[
-                    styles.squareWidget, // Use this for dimensions and radius
-                    styles.activeWidget
+                    styles.squareWidget, 
+                    styles.activeWidget,
+                    otherSpotlightTimeLeft > 0 && styles.otherActiveShadow,
+                    otherSpotlightTimeLeft > 0 && otherAnimatedShadowStyle
                   ]}
                   onPress={() => console.log('Boost other')}
                   activeOpacity={0.9}
@@ -1899,21 +1978,35 @@ const styles = StyleSheet.create({
     height: 110,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
+    overflow: "visible",
     borderWidth: 0,
     position: 'relative',
   },
+  activeShadow: {
+    shadowColor: "#34C759",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+  otherActiveShadow: {
+    shadowColor: "#FFC107",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    elevation: 12,
+  },
   pillContentWrapper: {
     position: 'absolute',
-    top: 2,
-    left: 2,
-    right: 2,
-    bottom: 2,
+    top: 5,
+    left: 5,
+    right: 5,
+    bottom: 5,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
     backgroundColor: "#1D1E26",
-    borderRadius: 14,
+    borderRadius: 11,
   },
   avatarContainer: {
     width: 50,
