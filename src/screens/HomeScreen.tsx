@@ -1003,7 +1003,7 @@ const HomeScreen = () => {
         >
           <View style={{width: '100%'}}>
             <View style={styles.minimalEventHeader}>
-              <Text style={styles.eventTitle}>Event</Text>
+          <Text style={styles.eventTitle}>Event</Text>
             </View>
             
             <View style={styles.minimalProgressContainer}>
@@ -1015,31 +1015,31 @@ const HomeScreen = () => {
                   ]} 
                 />
               </View>
-            </View>
-            
+          </View>
+          
             {/* Content that shows/hides based on expanded state */}
             {isMinimalEventExpanded && (
               <View style={styles.minimalEventContent}>
-                <View style={styles.eventInfoGrid}>
-                  <View style={styles.eventInfoBox}>
+          <View style={styles.eventInfoGrid}>
+            <View style={styles.eventInfoBox}>
                     <Text style={styles.eventInfoValue}>01:23:45</Text>
-                    <Text style={styles.eventInfoLabel}>Time Left</Text>
-                  </View>
-                  
-                  <View style={styles.eventInfoBox}>
-                    <View style={styles.prizeContainer}>
-                      <View style={styles.eventCoinIcon} />
+              <Text style={styles.eventInfoLabel}>Time Left</Text>
+            </View>
+            
+            <View style={styles.eventInfoBox}>
+              <View style={styles.prizeContainer}>
+                <View style={styles.eventCoinIcon} />
                       <Text style={styles.eventInfoValue}>2200</Text>
-                    </View>
-                    <Text style={styles.eventInfoLabel}>Prize Pool</Text>
-                  </View>
-                  
-                  <View style={styles.eventInfoBox}>
+              </View>
+              <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+            </View>
+            
+            <View style={styles.eventInfoBox}>
                     <Text style={styles.eventInfoValue}>18</Text>
-                    <Text style={styles.eventInfoLabel}>Entries</Text>
-                  </View>
-                </View>
-                
+              <Text style={styles.eventInfoLabel}>Entries</Text>
+            </View>
+          </View>
+          
                 <TouchableOpacity 
                   style={[styles.enterButton, {backgroundColor: '#FFC107'}]} 
                   onPress={(e) => {
@@ -1047,13 +1047,13 @@ const HomeScreen = () => {
                     console.log('Event enter button pressed');
                   }}
                 >
-                  <Text style={styles.enterButtonText}>Enter</Text>
-                </TouchableOpacity>
-              </View>
+            <Text style={styles.enterButtonText}>Enter</Text>
+          </TouchableOpacity>
+        </View>
             )}
-          </View>
-        </TouchableOpacity>
       </View>
+          </TouchableOpacity>
+        </View>
     );
   };
 
@@ -1605,7 +1605,7 @@ const HomeScreen = () => {
         
         {/* New Minimal Event Widget */}
         {renderMinimalEventWidget()}
-          
+        
         {/* Event Widget */}
         {/* REMOVE renderEventWidget function */}
         
