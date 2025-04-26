@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, ScrollView, Image, GestureResponderEvent, Platform, UIManager, LayoutAnimation, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,7 +8,6 @@ import NotificationItem, { Notification } from '../components/NotificationItem';
 import { BlurView } from 'expo-blur';
 import CustomModal from '../components/CustomModal';
 import { useModal } from '../hooks/useModal';
-import { useNotifications } from '../context/NotificationContext';
 
 // Enable LayoutAnimation on Android
 if (
@@ -41,7 +40,6 @@ const animationConfig = {
 interface AnnouncementData {
   id: string;
   adminAvatar: string; // URL for the admin's avatar
-  adminName: string; // Add admin name for clarity
   message: string;
   time: string;
   targetRoute: string;
@@ -52,20 +50,12 @@ const AnnouncementWidget = () => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(2); // Initial number of visible announcements
-  const { updateAnnouncementCount, clearNotificationsByType } = useNotifications();
-  
-  // Generate avatar URL with consistent styling
-  const generateAdminAvatar = (name: string) => {
-    const initials = name.split(' ').map(n => n[0]).join('');
-    return `https://ui-avatars.com/api/?background=3A7BFD&color=fff&name=${initials}&size=200`;
-  };
   
   // Extended dummy data with 7 announcements (one for each day of the week)
-  const [announcements, setAnnouncements] = useState<AnnouncementData[]>([
+  const announcements: AnnouncementData[] = [
     {
       id: 'a1',
-      adminName: 'Admin Taylor',
-      adminAvatar: generateAdminAvatar('Admin Taylor'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/1.jpg',
       message: '@Announcement Spotlight duration categories are here!',
       time: '1d ago',
       targetRoute: '/chat',
@@ -73,8 +63,7 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a2',
-      adminName: 'System Admin',
-      adminAvatar: generateAdminAvatar('System Admin'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/2.jpg',
       message: '@Announcement Scheduled Maintenance: Brief downtime expected tonight at 2 AM.',
       time: '2d ago',
       targetRoute: '/chat',
@@ -82,8 +71,7 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a3',
-      adminName: 'Trading Team',
-      adminAvatar: generateAdminAvatar('Trading Team'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/3.jpg',
       message: '@Announcement New trading features coming soon to the platform!',
       time: '3d ago',
       targetRoute: '/chat',
@@ -91,8 +79,7 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a4',
-      adminName: 'Events Team',
-      adminAvatar: generateAdminAvatar('Events Team'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/4.jpg',
       message: '@Announcement Weekend challenge: Double Gold rewards for active users!',
       time: '4d ago',
       targetRoute: '/chat',
@@ -100,8 +87,7 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a5',
-      adminName: 'Community Manager',
-      adminAvatar: generateAdminAvatar('Community Manager'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/5.jpg',
       message: '@Announcement Community spotlight: Submit your best content for features!',
       time: '5d ago',
       targetRoute: '/chat',
@@ -109,8 +95,7 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a6',
-      adminName: 'Dev Team',
-      adminAvatar: generateAdminAvatar('Dev Team'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/6.jpg',
       message: '@Announcement App update v2.1.0 available with new performance improvements',
       time: '6d ago',
       targetRoute: '/chat',
@@ -118,14 +103,13 @@ const AnnouncementWidget = () => {
     },
     {
       id: 'a7',
-      adminName: 'Onboarding Team',
-      adminAvatar: generateAdminAvatar('Onboarding Team'),
+      adminAvatar: 'https://randomuser.me/api/portraits/lego/7.jpg',
       message: '@Announcement Welcome to our new community members! Check out the starter guide.',
       time: '7d ago',
       targetRoute: '/chat',
       targetParams: { chatId: 'global' },
     },
-  ]);
+  ];
   const [unreadCount, setUnreadCount] = useState(announcements.length);
 
   const handleAnnouncementPress = (item: AnnouncementData) => {
@@ -148,19 +132,11 @@ const AnnouncementWidget = () => {
     // Clear count only when expanding announcements
     if (expanding) {
         setUnreadCount(0);
-        clearNotificationsByType('announcements');
     } else {
         // Reset visibleCount back to 2 when collapsing the widget
         setVisibleCount(2);
     }
   }
-
-  // Replace the old useCallback and useEffect with a single useEffect with correct dependencies
-  useEffect(() => {
-    // Only update the count once when the component mounts or when unread count changes
-    updateAnnouncementCount(unreadCount);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unreadCount]); // Re-run when unreadCount changes
 
   return (
     <TouchableOpacity
@@ -253,31 +229,24 @@ const FriendRequestWidget = () => {
   const router = useRouter(); // Need router for profile navigation
   const [isExpanded, setIsExpanded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(2); // Initial number of visible requests
-  const { updateFriendRequestCount, clearNotificationsByType } = useNotifications();
-  
-  // Generate avatar URL with consistent styling
-  const generateAvatar = (name: string) => {
-    const initials = name.split(' ').map(n => n[0]).join('');
-    return `https://ui-avatars.com/api/?background=FF2D55&color=fff&name=${initials}&size=200`;
-  };
   
   // Extended dummy data with many friend requests for scrolling demo
   const initialRequests: FriendRequest[] = [
-    { id: 'fr1', name: 'Jake Wilson', avatar: generateAvatar('Jake Wilson'), mutual: 3, userId: 'jakewilson', status: 'pending' },
-    { id: 'fr2', name: 'Sophia Miller', avatar: generateAvatar('Sophia Miller'), mutual: 1, userId: 'sophiamiller', status: 'pending' },
-    { id: 'fr3', name: 'Daniel Park', avatar: generateAvatar('Daniel Park'), mutual: 5, userId: 'danielpark', status: 'pending' },
-    { id: 'fr4', name: 'Maya Johnson', avatar: generateAvatar('Maya Johnson'), mutual: 2, userId: 'mayajohnson', status: 'pending' },
-    { id: 'fr5', name: 'Chris Davis', avatar: generateAvatar('Chris Davis'), mutual: 0, userId: 'chrisdavis', status: 'pending' },
-    { id: 'fr6', name: 'Aria Rodriguez', avatar: generateAvatar('Aria Rodriguez'), mutual: 7, userId: 'ariarodriguez', status: 'pending' },
-    { id: 'fr7', name: 'Tyler Smith', avatar: generateAvatar('Tyler Smith'), mutual: 4, userId: 'tylersmith', status: 'pending' },
-    { id: 'fr8', name: 'Katie Lee', avatar: generateAvatar('Katie Lee'), mutual: 0, userId: 'katielee', status: 'pending' },
-    { id: 'fr9', name: 'Marcus Santos', avatar: generateAvatar('Marcus Santos'), mutual: 6, userId: 'marcussantos', status: 'pending' },
-    { id: 'fr10', name: 'Lucy Wang', avatar: generateAvatar('Lucy Wang'), mutual: 3, userId: 'lucywang', status: 'pending' },
-    { id: 'fr11', name: 'Ryan Taylor', avatar: generateAvatar('Ryan Taylor'), mutual: 0, userId: 'ryantaylor', status: 'pending' },
-    { id: 'fr12', name: 'Zoe Bennett', avatar: generateAvatar('Zoe Bennett'), mutual: 2, userId: 'zoebennett', status: 'pending' },
-    { id: 'fr13', name: 'Alex Cooper', avatar: generateAvatar('Alex Cooper'), mutual: 1, userId: 'alexcooper', status: 'pending' },
-    { id: 'fr14', name: 'Diana Chen', avatar: generateAvatar('Diana Chen'), mutual: 0, userId: 'dianachen', status: 'pending' },
-    { id: 'fr15', name: 'Nathan Harris', avatar: generateAvatar('Nathan Harris'), mutual: 4, userId: 'nathanharris', status: 'pending' },
+    { id: 'fr1', name: 'GamerGuy42', avatar: 'https://randomuser.me/api/portraits/men/42.jpg', mutual: 3, userId: 'gamerguy42', status: 'pending' },
+    { id: 'fr2', name: 'PixelPrincess', avatar: 'https://randomuser.me/api/portraits/women/55.jpg', mutual: 1, userId: 'pixelprincess', status: 'pending' },
+    { id: 'fr3', name: 'DevNinja', avatar: 'https://randomuser.me/api/portraits/men/22.jpg', mutual: 5, userId: 'devninja', status: 'pending' },
+    { id: 'fr4', name: 'MusicLover88', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', mutual: 2, userId: 'musiclover88', status: 'pending' },
+    { id: 'fr5', name: 'FitnessGuru', avatar: 'https://randomuser.me/api/portraits/men/29.jpg', mutual: 0, userId: 'fitnessguru', status: 'pending' },
+    { id: 'fr6', name: 'ArtCreator', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', mutual: 7, userId: 'artcreator', status: 'pending' },
+    { id: 'fr7', name: 'TechWizard', avatar: 'https://randomuser.me/api/portraits/men/77.jpg', mutual: 4, userId: 'techwizard', status: 'pending' },
+    { id: 'fr8', name: 'BookWorm', avatar: 'https://randomuser.me/api/portraits/women/66.jpg', mutual: 0, userId: 'bookworm', status: 'pending' },
+    { id: 'fr9', name: 'TravelJunkie', avatar: 'https://randomuser.me/api/portraits/men/91.jpg', mutual: 6, userId: 'traveljunkie', status: 'pending' },
+    { id: 'fr10', name: 'FoodieExplorer', avatar: 'https://randomuser.me/api/portraits/women/75.jpg', mutual: 3, userId: 'foodieexplorer', status: 'pending' },
+    { id: 'fr11', name: 'MovieBuff', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', mutual: 0, userId: 'moviebuff', status: 'pending' },
+    { id: 'fr12', name: 'SportsEnthusiast', avatar: 'https://randomuser.me/api/portraits/women/28.jpg', mutual: 2, userId: 'sportsenthusiast', status: 'pending' },
+    { id: 'fr13', name: 'NatureLover', avatar: 'https://randomuser.me/api/portraits/men/18.jpg', mutual: 1, userId: 'naturelover', status: 'pending' },
+    { id: 'fr14', name: 'FashionIcon', avatar: 'https://randomuser.me/api/portraits/women/15.jpg', mutual: 0, userId: 'fashionicon', status: 'pending' },
+    { id: 'fr15', name: 'GadgetGeek', avatar: 'https://randomuser.me/api/portraits/men/56.jpg', mutual: 4, userId: 'gadgetgeek', status: 'pending' },
   ];
   const [requests, setRequests] = useState<FriendRequest[]>(initialRequests);
   const [requestCount, setRequestCount] = useState(requests.filter(r => r.status === 'pending').length); // Count only pending
@@ -320,22 +289,11 @@ const FriendRequestWidget = () => {
       const expanding = !isExpanded;
       setIsExpanded(expanding);
       
-      // Clear the count when expanding
-      if (expanding) {
-        setRequestCount(0);
-        clearNotificationsByType('friendRequests');
-      } else {
-        // Reset visibleCount when collapsing
-        setVisibleCount(2);
+      if (!expanding) {
+          // Reset visibleCount back to 2 when collapsing the widget
+          setVisibleCount(2);
       }
   }
-
-  // Update notification count whenever pending requests change
-  useEffect(() => {
-    const pendingRequests = requests.filter(req => req.status === 'pending');
-    updateFriendRequestCount(pendingRequests.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requests]); // Re-run when requests changes
 
   return (
     <TouchableOpacity
@@ -412,22 +370,18 @@ const FriendRequestWidget = () => {
   );
 };
 
-// --- ProfileViewWidget (Fixed version with all state variables intact) ---
-// The notification system now correctly updates the navbar count when:
-// 1. New notifications are added (via useEffect dependencies on the relevant state)
-// 2. Notifications are cleared (via clearNotificationsByType in toggleExpand functions)
+// --- ProfileViewWidget (Keep as is) ---
 interface ProfileView {
   id: string;
   viewerId: string;
   viewerName: string;
   viewerAvatar: string | undefined;
-  realAvatar?: string; // Add a field for storing the real avatar for ghost users
   timestamp: string;
   dateCreated: Date;
   seen: boolean;
   isPremiumViewer: boolean;
   isRevealed: boolean;
-  isGhostMode?: boolean;
+  isGhostMode?: boolean; // Add ghost mode flag
   visitCount: number;
 }
 
@@ -439,22 +393,11 @@ const ProfileViewWidget = () => {
   const [premiumPreviewsUsed, setPremiumPreviewsUsed] = useState(0); // Track preview usage
   const [premiumPreviewActive, setPremiumPreviewActive] = useState(false); // Track if preview is active
   const [revealedPreviewViews, setRevealedPreviewViews] = useState<string[]>([]); // IDs of views revealed in preview
-  const [visibleCount, setVisibleCount] = useState(3); // Initial number of visible views
+  const [visibleCount, setVisibleCount] = useState(3); // Initial number of visible views - reduced to 3
   const [isLoadingMore, setIsLoadingMore] = useState(false); // Track loading state for infinite scroll
-  const [selectedViewId, setSelectedViewId] = useState<string | null>(null);
-  const [showGhostModeInfo, setShowGhostModeInfo] = useState(false); // For Ghost Mode tooltip/info
-  const [isGhostMode, setIsGhostMode] = useState(false); // State for anonymous profile browsing
+  
+  // Custom modal hook
   const ghostModal = useModal();
-  const purchaseModal = useModal();
-  const { updateProfileViewCount, clearNotificationsByType } = useNotifications();
-  
-  // Maximum number of views to store
-  const MAX_STORED_VIEWS = 100;
-  
-  // Debug helper
-  const debug = (action: string) => {
-    console.log(`[VULUGONEW-DEBUG] 🔔 ${action}`);
-  };
   
   // Generate a timestamp string based on date
   const getTimeString = (date: Date) => {
@@ -475,35 +418,18 @@ const ProfileViewWidget = () => {
   // Extended dummy data with 25 profile views and proper dates
   const generateInitialViews = () => {
     const names = [
-      'Max Thompson', 'Sarah Miller', 'Tiffany Roberts', 
-      'Jason Chen', 'Emily Parker', 'Michael Wilson',
+      'Emma Wilson', 'Liam Johnson', 'Olivia Martinez', 
+      'Noah Smith', 'Ava Thompson', 'Lucas Brown',
       'Sophia Davis', 'Ethan Miller', 'Isabella Garcia'
     ];
-    
-    // Predefined avatar URLs for a more personalized look
-    const avatarUrls = [
-      'https://randomuser.me/api/portraits/men/32.jpg',
-      'https://randomuser.me/api/portraits/women/44.jpg',
-      'https://randomuser.me/api/portraits/women/68.jpg',
-      'https://randomuser.me/api/portraits/men/75.jpg',
-      'https://randomuser.me/api/portraits/women/33.jpg',
-      'https://randomuser.me/api/portraits/men/62.jpg',
-      'https://randomuser.me/api/portraits/women/51.jpg',
-      'https://randomuser.me/api/portraits/men/29.jpg',
-      'https://randomuser.me/api/portraits/women/78.jpg'
-    ];
-    
-    // Ghost placeholder with purple background and X
-    const ghostPlaceholder = 'https://ui-avatars.com/api/?background=8A2BE2&color=fff&name=X&size=200&bold=true';
     
     // Ghost users that will always appear in the first few positions
     const ghostUsers: ProfileView[] = [
       {
         id: 'ghost-1',
         viewerId: 'ghost-user-123',
-        viewerName: 'Alexis Mitchell',
-        viewerAvatar: ghostPlaceholder,
-        realAvatar: 'https://randomuser.me/api/portraits/women/42.jpg',
+        viewerName: 'Luna Ghost',
+        viewerAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
         timestamp: '2 hours ago',
         dateCreated: new Date(Date.now() - 2 * 60 * 60 * 1000),
         seen: false,
@@ -515,9 +441,8 @@ const ProfileViewWidget = () => {
       {
         id: 'ghost-2',
         viewerId: 'ghost-user-456',
-        viewerName: 'Zack Peterson',
-        viewerAvatar: ghostPlaceholder,
-        realAvatar: 'https://randomuser.me/api/portraits/men/37.jpg',
+        viewerName: 'Max Stealth',
+        viewerAvatar: 'https://randomuser.me/api/portraits/men/33.jpg',
         timestamp: '1 day ago',
         dateCreated: new Date(Date.now() - 24 * 60 * 60 * 1000),
         seen: true,
@@ -534,8 +459,8 @@ const ProfileViewWidget = () => {
       const id = (i + 2).toString();
       const randomIndex = Math.floor(Math.random() * names.length);
       const name = names[randomIndex];
-      // Use the matching avatar URL for each name
-      const avatarUrl = avatarUrls[randomIndex];
+      const gender = Math.random() > 0.5 ? 'men' : 'women';
+      const avatarNumber = Math.floor(Math.random() * 70) + 1;
       const hoursAgo = Math.floor(Math.random() * 24) + 1;
       const isPremium = Math.random() > 0.7;
       
@@ -543,7 +468,7 @@ const ProfileViewWidget = () => {
         id,
         viewerId: `user-${id}`,
         viewerName: name,
-        viewerAvatar: avatarUrl,
+        viewerAvatar: `https://randomuser.me/api/portraits/${gender}/${avatarNumber}.jpg`,
         timestamp: hoursAgo === 1 ? '1 hour ago' : `${hoursAgo} hours ago`,
         dateCreated: new Date(Date.now() - hoursAgo * 60 * 60 * 1000),
         seen: Math.random() > 0.5,
@@ -563,26 +488,16 @@ const ProfileViewWidget = () => {
 
   const [profileViews, setProfileViews] = useState<ProfileView[]>(generateInitialViews());
 
-  // Apply retention policy - 7 days and enforce maximum views limit
+  // Apply retention policy - 7 days
   useEffect(() => {
     // This would normally run on app startup or when fetching profile views
     const applyRetentionPolicy = () => {
       const now = new Date();
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
-      setProfileViews(currentViews => {
-        // First filter by date
-        const filteredByDate = currentViews.filter(view => view.dateCreated >= sevenDaysAgo);
-        
-        // Then limit total number to MAX_STORED_VIEWS by keeping most recent
-        if (filteredByDate.length > MAX_STORED_VIEWS) {
-          return filteredByDate
-            .sort((a, b) => b.dateCreated.getTime() - a.dateCreated.getTime())
-            .slice(0, MAX_STORED_VIEWS);
-        }
-        
-        return filteredByDate;
-      });
+      setProfileViews(currentViews => 
+        currentViews.filter(view => view.dateCreated >= sevenDaysAgo)
+      );
     };
     
     // Apply retention policy
@@ -599,29 +514,8 @@ const ProfileViewWidget = () => {
     // Function to add a random new profile view
     const addNewProfileView = () => {
       const now = new Date();
-      const names = [
-        'Olivia Johnson', 'Noah Williams', 'Emma Brown', 'Liam Davis', 
-        'Ava Martinez', 'James Taylor', 'Charlotte Anderson', 'Benjamin White'
-      ];
-      
-      // Predefined avatar URLs for a more personalized look
-      const avatarUrls = [
-        'https://randomuser.me/api/portraits/women/52.jpg',
-        'https://randomuser.me/api/portraits/men/41.jpg',
-        'https://randomuser.me/api/portraits/women/22.jpg',
-        'https://randomuser.me/api/portraits/men/18.jpg',
-        'https://randomuser.me/api/portraits/women/67.jpg',
-        'https://randomuser.me/api/portraits/men/55.jpg',
-        'https://randomuser.me/api/portraits/women/90.jpg',
-        'https://randomuser.me/api/portraits/men/36.jpg'
-      ];
-      
-      // Ghost placeholder with purple background and X
-      const ghostPlaceholder = 'https://ui-avatars.com/api/?background=8A2BE2&color=fff&name=X&size=200&bold=true';
-      
+      const names = ['NewViewer', 'JustJoined', 'FreshLook', 'RecentView'];
       const randomIndex = Math.floor(Math.random() * names.length);
-      const name = names[randomIndex];
-      const avatarUrl = avatarUrls[randomIndex]; // Use the matching personalized avatar
       const isPremium = Math.random() > 0.7;
       const isGhost = isPremium && Math.random() > 0.5; // Only premium users can be in ghost mode
       
@@ -631,9 +525,8 @@ const ProfileViewWidget = () => {
       const newView: ProfileView = {
         id: `pv-new-${Date.now()}`,
         viewerId: `user-new-${Date.now()}`,
-        viewerName: name,
-        viewerAvatar: isGhost ? ghostPlaceholder : avatarUrl, // Ghost placeholder for ghost users
-        ...(isGhost && { realAvatar: avatarUrl }), // Store real avatar for ghost users
+        viewerName: names[randomIndex],
+        viewerAvatar: `https://randomuser.me/api/portraits/${Math.random() > 0.5 ? 'men' : 'women'}/${Math.floor(Math.random() * 10) + 1}.jpg`,
         timestamp: 'just now',
         dateCreated: now,
         seen: false,
@@ -644,14 +537,7 @@ const ProfileViewWidget = () => {
       };
       
       // Add the new view at the beginning of the array (most recent)
-      // and enforce the maximum limit
-      setProfileViews(prevViews => {
-        const updatedViews = [newView, ...prevViews];
-        if (updatedViews.length > MAX_STORED_VIEWS) {
-          return updatedViews.slice(0, MAX_STORED_VIEWS);
-        }
-        return updatedViews;
-      });
+      setProfileViews(prevViews => [newView, ...prevViews]);
     };
     
     // For demo purposes, add a new view every 30-60 seconds
@@ -679,56 +565,66 @@ const ProfileViewWidget = () => {
     );
     
     // Handle navigation based on subscription and reveal status
-    if (view.isGhostMode && !view.isRevealed) {
-      promptPurchaseReveal(view);
-    } else if (view.viewerId) {
-      router.push({ pathname: '/profile', params: { userId: view.viewerId } });
+    if (hasGemPlus || premiumPreviewActive) {
+      // If it's a premium viewer who was browsing anonymously and hasn't been revealed
+      if (view.isPremiumViewer && !view.isRevealed) {
+        promptPurchaseReveal(view);
+      } else if (view.viewerId) {
+        router.push({ pathname: '/profile', params: { userId: view.viewerId } });
+      }
     }
   };
   
   // Prompt for purchase of identity reveal
   const promptPurchaseReveal = (view: ProfileView) => {
-    debug(`Profile view selected: ${view.viewerName}`);
-    
-    // For demo purposes
-    const gemCost = 100;
-    const currentGemBalance = 1500; // Would come from user state in real app
-    
-    ghostModal.showPurchaseConfirmation(
-      'Reveal Identity?',
-      `Spend ${gemCost} Gems to reveal this ghost viewer's identity`,
-      gemCost,
-      currentGemBalance,
-      () => purchaseReveal(view),
-      undefined,
-      'Reveal Now',
-      'Cancel'
+    // First confirmation step with warning and explanation
+    Alert.alert(
+      "💎 Confirm Purchase 💎",
+      `Are you sure you want to reveal this ghost's identity?\n\n⚠️ This will cost 100 Gems\n\n⚠️ This is a one-time reveal. If they visit your profile again using Ghost Mode, you'll need to pay again to see who they are.`,
+      [
+        {
+          text: "Yes, Continue",
+          onPress: () => {
+            // Second confirmation with gem balance and final warning
+            Alert.alert(
+              "💎 Confirm Payment 💎",
+              `Your current balance: 1,200 Gems\nCost to reveal: 100 Gems\nNew balance will be: 1,100 Gems\n\nAre you sure you want to proceed with this purchase?`,
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel"
+                },
+                {
+                  text: "Confirm Purchase",
+                  style: "destructive", // iOS will show this in red
+                  onPress: () => purchaseReveal(view)
+                }
+              ],
+              { cancelable: true }
+            );
+          }
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ],
+      { cancelable: true }
     );
   };
   
   // Handle identity reveal purchase
   const purchaseReveal = (view: ProfileView) => {
-    // Use custom modal for success message
-    ghostModal.showSuccess(
+    // Show success message
+    Alert.alert(
       "🎉 Identity Revealed!",
       "You've successfully revealed this ghost's identity. You can now view their full profile.",
-      () => {
-        // Navigate to profile after modal is dismissed
-        if (view.viewerId) {
-          router.push({ pathname: '/profile', params: { userId: view.viewerId } });
-        }
-      },
-      "View Profile"
+      [{ text: "View Profile" }]
     );
     
     // For demo purposes, just update the state
     setProfileViews(prev => 
-      prev.map(v => v.id === view.id ? {
-        ...v, 
-        isRevealed: true,
-        // Update the viewerAvatar to show the real avatar when revealed
-        ...(v.realAvatar && { viewerAvatar: v.realAvatar })
-      } : v)
+      prev.map(v => v.id === view.id ? {...v, isRevealed: true} : v)
     );
   };
 
@@ -776,34 +672,10 @@ const ProfileViewWidget = () => {
     );
   };
   
-  // Toggle Ghost Mode info popup
-  const toggleGhostModeInfo = (e: GestureResponderEvent) => {
-    e.stopPropagation();
-    setShowGhostModeInfo(!showGhostModeInfo);
-  };
-  
   // Toggle anonymous browsing (premium feature)
   const toggleAnonymousBrowsing = () => {
     if (hasGemPlus) {
       setIsAnonymousBrowsing(!isAnonymousBrowsing);
-      
-      // Show a confirmation toast when toggling
-      const newState = !isAnonymousBrowsing;
-      if (newState) {
-        ghostModal.showSuccess(
-          "Ghost Mode Activated",
-          "You're now browsing anonymously. Other users won't see when you view their profiles.",
-          undefined,
-          "Got it"
-        );
-      } else {
-        ghostModal.showSuccess(
-          "Ghost Mode Deactivated",
-          "Your profile visits will now be visible to other users.",
-          undefined,
-          "Got it"
-        );
-      }
     } else {
       // Use custom modal instead of Alert
       ghostModal.showConfirmation(
@@ -823,27 +695,16 @@ const ProfileViewWidget = () => {
     const expanding = !isExpanded;
     setIsExpanded(expanding);
     
-    // If expanding, mark all as seen
     if (expanding) {
-      setProfileViews(currentViews => 
-        currentViews.map(view => ({
-          ...view,
-          seen: true
-        }))
+      // Mark all as seen when expanding
+      setProfileViews(prev => 
+        prev.map(v => ({...v, seen: true}))
       );
-      clearNotificationsByType('profileViews');
     } else {
       // Reset visible count when collapsing
       setVisibleCount(3);
     }
   };
-
-  // Update notification count whenever unseen views change
-  useEffect(() => {
-    const unseenViews = profileViews.filter(view => !view.seen);
-    updateProfileViewCount(unseenViews.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileViews]); // Re-run when profileViews changes
 
   return (
     <>
@@ -898,19 +759,14 @@ const ProfileViewWidget = () => {
                       <MaterialIcons name="info-outline" size={16} color="#8F8F8F" />
                     </TouchableOpacity>
                     
-                    {/* Anonymous browsing toggle with info button */}
+                    {/* Anonymous browsing toggle for all users */}
                     <View style={styles.anonymousToggle}>
                       <Text style={styles.anonymousText}>
                         Ghost Mode
                       </Text>
                       
-                      {/* Ghost Mode Info button */}
-                      <TouchableOpacity onPress={toggleGhostModeInfo}>
-                        <MaterialIcons name="help-outline" size={14} color="#8F8F8F" style={{ marginLeft: 4, marginRight: 8 }} />
-                      </TouchableOpacity>
-                      
                       {!hasGemPlus && (
-                        <MaterialIcons name="lock" size={12} color="#8F8F8F" style={{ marginRight: 8 }} />
+                        <MaterialIcons name="lock" size={12} color="#8F8F8F" style={{ marginLeft: 4, marginRight: 8 }} />
                       )}
                       
                       <Switch
@@ -934,23 +790,10 @@ const ProfileViewWidget = () => {
                           }
                         }}
                         value={isAnonymousBrowsing && hasGemPlus}
-        />
-      </View>
+                      />
+                    </View>
                   </View>
                 </View>
-                
-                {/* Ghost Mode info tooltip */}
-                {showGhostModeInfo && (
-                  <View style={styles.ghostModeTooltip}>
-                    <MaterialIcons name="visibility-off" size={16} color="#B768FB" style={{ marginRight: 8 }} />
-                    <Text style={styles.ghostModeTooltipText}>
-                      Ghost Mode lets you browse profiles completely anonymously. Your identity (name and avatar) will be hidden from everyone, including Gem Plus users. They must spend Gems to reveal who you are.
-                    </Text>
-                    <TouchableOpacity style={styles.tooltipCloseButton} onPress={(e) => toggleGhostModeInfo(e)}>
-                      <MaterialIcons name="close" size={16} color="#8F8F8F" />
-                    </TouchableOpacity>
-                  </View>
-                )}
                 
                 {/* Scrollable view list with infinite scrolling */}
                 <ScrollView
@@ -1003,11 +846,18 @@ const ProfileViewWidget = () => {
                         activeOpacity={0.8}
                       >
                         <View style={styles.viewAvatarContainer}>
-                          {/* Show the appropriate avatar based on ghost mode and reveal status */}
-                          <Image 
-                            source={{ uri: view.viewerAvatar || 'https://via.placeholder.com/40/000000/FFFFFF/?text=?' }} 
-                            style={styles.viewAvatar} 
-                          />
+                          {/* Show app icon for premium viewers who haven't been revealed */}
+                          {view.isPremiumViewer && !view.isRevealed && (hasGemPlus || (premiumPreviewActive && revealedPreviewViews.includes(view.id))) ? (
+                            <Image 
+                              source={{ uri: 'https://i.imgur.com/6dTZI83.png' }} // Ghost icon placeholder
+                              style={styles.viewAvatar} 
+                            />
+                          ) : (
+                            <Image 
+                              source={{ uri: view.viewerAvatar || 'https://via.placeholder.com/40/000000/FFFFFF/?text=?' }} 
+                              style={styles.viewAvatar} 
+                            />
+                          )}
                           
                           {/* Apply blur for non-premium users unless this view was part of free preview */}
                           {!hasGemPlus && !(premiumPreviewActive && revealedPreviewViews.includes(view.id)) && (
@@ -1017,27 +867,17 @@ const ProfileViewWidget = () => {
                         
                         <View style={styles.viewInfo}>
                           {/* Handle different name display scenarios */}
-                          {view.isGhostMode && !view.isRevealed ? (
-                            // Show "Ghost" for all ghost users, regardless of Gem Plus status, unless revealed
-                            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                              <Text style={styles.viewName}>Ghost</Text>
-                              <View style={{marginLeft: 6, backgroundColor: '#8A2BE2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4}}>
-                                <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold'}}>GHOST</Text>
-                              </View>
-                            </View>
-                          ) : hasGemPlus || (premiumPreviewActive && revealedPreviewViews.includes(view.id)) ? (
-                            // For non-ghost users or revealed ghost users, show real name
+                          {hasGemPlus || view.isRevealed ? (
                             <View style={{flexDirection: 'row', alignItems: 'center'}}>
                               <Text style={styles.viewName}>{view.viewerName}</Text>
-                              {view.isGhostMode && view.isRevealed && (
-                                <View style={{marginLeft: 6, backgroundColor: '#8A2BE2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4}}>
+                              {view.isGhostMode && (
+                                <View style={{marginLeft: 6, backgroundColor: '#5D3FD3', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4}}>
                                   <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold'}}>GHOST</Text>
                                 </View>
                               )}
                             </View>
                           ) : (
-                            // Non-premium users see "Ghost" for all users
-                            <Text style={styles.viewName}>Ghost</Text>
+                            <Text style={styles.viewName}>Someone</Text>
                           )}
                           
                           {/* Show time and visit count */}
@@ -1054,14 +894,14 @@ const ProfileViewWidget = () => {
                           </View>
                         </View>
                         
-                        {/* Show appropriate icon based on status - Add gem icon */}
-                        {view.isGhostMode && !view.isRevealed ? (
+                        {/* Show appropriate icon based on status */}
+                        {view.isPremiumViewer && !view.isRevealed && (hasGemPlus || (premiumPreviewActive && revealedPreviewViews.includes(view.id))) ? (
                           <TouchableOpacity
                             style={styles.revealButton}
                             onPress={() => promptPurchaseReveal(view)}
                           >
-                            <MaterialIcons name="diamond" size={14} color="#B768FB" style={{ marginRight: 2 }} />
                             <Text style={styles.revealButtonText}>100</Text>
+                            <MaterialIcons name="diamond" size={14} color="#B768FB" />
                           </TouchableOpacity>
                         ) : !hasGemPlus && !(premiumPreviewActive && revealedPreviewViews.includes(view.id)) ? (
                           <View>
@@ -1115,7 +955,6 @@ const ProfileViewWidget = () => {
                         <Text style={styles.upgradeButtonText}>Upgrade to Gem Plus</Text>
                       </TouchableOpacity>
                       
-                      {/* Updated preview button with clearer remaining count */}
                       <TouchableOpacity 
                         style={[
                           styles.upgradeButton, 
@@ -1136,7 +975,7 @@ const ProfileViewWidget = () => {
                             color: '#A0C0FF' 
                           }
                         ]}>
-                          Preview ({3 - premiumPreviewsUsed} left)
+                          Preview ({3 - premiumPreviewsUsed})
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1183,9 +1022,8 @@ const ProfileViewWidget = () => {
                         }
                       ]}
                     >
-                      {/* Use the actual avatar image with the proper background color based on ghost status */}
                       <Image 
-                        source={{ uri: view.viewerAvatar }} 
+                        source={{ uri: view.isPremiumViewer && !view.isRevealed ? 'https://i.imgur.com/6dTZI83.png' : view.viewerAvatar }} 
                         style={styles.miniAvatar} 
                       />
                       {/* Blur only for non-premium users */}
@@ -1235,7 +1073,7 @@ const ProfileViewWidget = () => {
             )}
           </View>
         )}
-      </TouchableOpacity>
+      </View>
       
       {/* Render the custom modal */}
       {ghostModal.config && (
@@ -1255,94 +1093,48 @@ const ProfileViewWidget = () => {
 
 const NotificationsScreen = () => {
   const router = useRouter();
-  
-  // Notification data with dummy values
+
+  // Updated dummy data for testing
   const [notifications, setNotifications] = useState<Notification[]>([
-    // Mention with @username highlighting
+    // Test Case 1: Mention with long text
     {
       id: '1',
       type: 'mention',
-      message: 'John: <@>@amen</!@> Did you see the new update? What do you think about the new features?',
+      message: 'John mentioned you in #music-chat about the new synth setup that requires extensive configuration and tuning, how is it going?',
       time: '5m ago',
       seen: false,
       targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
+      targetParams: { chatId: 'music-chat' }
     },
-    // Reply with simplified format
+    // Test Case 2: Reply
     {
       id: '5',
       type: 'reply',
-      message: 'Sarah replied: "Sounds great! Let me know when you\'re free to meet up."',
+      message: 'Sarah replied to your message: \"Sounds great! Let me know when works.\"',
       time: '2h ago',
       seen: false,
       targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
+      targetParams: { userId: 'sarah' }
     },
-    // Mention with an image in global chat
-    {
-      id: '6',
-      type: 'mention',
-      message: 'Mike: <@>@amen</!@> Check out this meme!',
-      mediaType: 'image',
-      mediaUrl: 'https://picsum.photos/200',
-      time: '3h ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Reply with an image in global chat
-    {
-      id: '8',
-      type: 'reply',
-      message: 'Alex replied with an image:',
-      mediaType: 'image',
-      mediaUrl: 'https://picsum.photos/200/300',
-      time: '6h ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Gold Sent - keep the format
+    // Test Case 3: Gold Sent
     {
       id: '7',
       type: 'gold_sent',
-      message: 'Jessica sent you 50 Gold!',
+      message: 'PixelPrincess sent you 50 Gold!',
       time: '4h ago',
       seen: false
       // No targetRoute for gold sent for now
     },
   ]);
-  
-  const { updateAllNotificationsCount, clearNotificationsByType } = useNotifications();
-  const { counts } = useNotifications();
-
-  // Replace the markNotificationsAsSeen and updateNotificationCount with simpler effects
-  
-  // Mark all as seen on mount
-  useEffect(() => {
-    // Mark all notifications as seen
-    setNotifications(prevNotifications => 
-      prevNotifications.map(notif => ({
-        ...notif,
-        seen: true
-      }))
-    );
-    
-    // Update the notification count in the context
-    updateAllNotificationsCount(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means this only runs once on mount
 
   // Handle notification press
   const handleNotificationPress = (item: Notification) => {
-    // Mark this notification as seen
     setNotifications(prevNotifications =>
       prevNotifications.map(notif =>
         notif.id === item.id ? { ...notif, seen: true } : notif
       )
     );
 
-    // If there's a target route, navigate to it
     if (item.targetRoute) {
       router.push({ pathname: item.targetRoute, params: item.targetParams || {} });
     } else {
@@ -1355,79 +1147,17 @@ const NotificationsScreen = () => {
     setNotifications(prevNotifications =>
       prevNotifications.filter(notif => notif.id !== id)
     );
+    console.log('Deleted notification:', id); // Optional: for debugging
   };
 
-  // Use the NotificationItem component in renderItem
-  const renderItem = ({ item }: { item: Notification }) => {
-    // For mention notifications with @username highlighting
-    if (item.type === 'mention' && item.message.includes('<@>')) {
-      // Extract parts: before tag, tag content, after tag
-      const parts = item.message.split(/<@>|<\/!@>/);
-      
-      return (
-        <NotificationItem
-          item={{
-            ...item,
-            // Override the message renderer with our custom renderer
-            customRenderer: () => (
-              <View style={styles.contentContainer}>
-                <View>
-                  <Text style={styles.message}>
-                    {parts[0]}
-                    <Text style={styles.mentionTag}>{parts[1]}</Text>
-                    {parts[2]}
-                  </Text>
-                  {item.mediaType === 'image' && (
-                    <View style={styles.mediaIndicator}>
-                      <MaterialIcons name="image" size={16} color="#A0A0A0" />
-                      <Text style={styles.mediaText}>Image</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.time}>{item.time}</Text>
-              </View>
-            )
-          }}
-          onPress={handleNotificationPress}
-          onDelete={handleDeleteNotification}
-        />
-      );
-    }
-    
-    // For reply notifications with images
-    if (item.type === 'reply' && item.mediaType === 'image') {
-      return (
-        <NotificationItem
-          item={{
-            ...item,
-            customRenderer: () => (
-              <View style={styles.contentContainer}>
-                <View>
-                  <Text style={styles.message}>{item.message}</Text>
-                  <View style={styles.mediaIndicator}>
-                    <MaterialIcons name="image" size={16} color="#A0A0A0" />
-                    <Text style={styles.mediaText}>Image</Text>
-                  </View>
-                </View>
-                <Text style={styles.time}>{item.time}</Text>
-              </View>
-            )
-          }}
-          onPress={handleNotificationPress}
-          onDelete={handleDeleteNotification}
-        />
-      );
-    }
-    
-    // For regular notifications, use the standard renderer
-    return (
-      <NotificationItem
-        item={item}
-        onPress={handleNotificationPress}
-        onDelete={handleDeleteNotification}
-      />
-    );
-  };
+  // Use the new NotificationItem component in renderItem
+  const renderItem = ({ item }: { item: Notification }) => (
+    <NotificationItem
+      item={item}
+      onPress={handleNotificationPress}
+      onDelete={handleDeleteNotification}
+    />
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -1443,18 +1173,15 @@ const NotificationsScreen = () => {
       />
       
       <ScrollView style={styles.scrollView}> 
+        {/* Restore AnnouncementWidget rendering */}
         <AnnouncementWidget />
         <FriendRequestWidget />
         <ProfileViewWidget />
 
-        <View style={styles.listHeaderContainer}>
-          <Text style={styles.listHeader}>All Notifications</Text>
-          {/* Add a badge with a fixed count of 3 */}
-          <View style={styles.widgetCountBadge}>
-            <Text style={styles.widgetCountText}>3</Text>
-          </View>
-        </View>
+        {/* Separator/Title */}
+        <Text style={styles.listHeader}>All Notifications</Text> 
 
+        {/* General Notifications List */}
         {notifications.length > 0 ? (
           <FlatList
             data={notifications}
@@ -1516,7 +1243,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   widgetCountText: { // Style for the text inside the badge
-    color: '#FFFFFF',
+      color: '#FFFFFF',
       fontSize: 11,           // Small font size
       fontWeight: 'bold',
       includeFontPadding: false, // Try to remove extra padding
@@ -1583,16 +1310,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F23535', // Red
   },
   // --- End Widget Item Styles ---
-  listHeaderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-  },
   listHeader: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginTop: 8,
+    marginBottom: 12,
   },
   list: {
     width: '100%',
@@ -2005,50 +1728,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     marginRight: 2,
-  },
-  ghostModeTooltip: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(40, 40, 45, 0.95)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#B768FB',
-  },
-  ghostModeTooltipText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    lineHeight: 18,
-    flex: 1,
-  },
-  tooltipCloseButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  mentionTag: {
-    backgroundColor: 'rgba(88, 101, 242, 0.3)',
-    color: '#A7B0F5',
-    borderRadius: 99,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  mediaIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    backgroundColor: 'rgba(160, 160, 160, 0.1)',
-    borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignSelf: 'flex-start',
-  },
-  mediaText: {
-    color: '#A0A0A0',
-    fontSize: 12,
-    marginLeft: 4,
   },
 });
 

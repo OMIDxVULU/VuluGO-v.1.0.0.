@@ -344,7 +344,7 @@ const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
   return { scrollToBottom };
 };
 
-const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScreenProps) => {
+const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScreenProps) => {
   // Use the imported router
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [renderError, setRenderError] = useState(false);
@@ -612,6 +612,34 @@ const ChatScreen = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScree
     </View>
   );
 };
+
+// New wrapper component to handle route props
+const ChatScreen = (props: any) => {
+  // Extract params from route - might need adjustment depending on navigator version
+  const { userId, name, avatar, goBack, goToDMs, source } = props.route?.params || {};
+
+  // Basic validation or default values
+  if (!userId || !name || !goBack) {
+    // Handle missing required props - maybe show an error or return null
+    console.error("ChatScreen received invalid props:", props.route?.params);
+    // You might want a more user-friendly error display here
+    return <View><Text>Error loading chat.</Text></View>; 
+  }
+
+  return (
+    <ChatScreenInternal 
+      userId={userId}
+      name={name}
+      avatar={avatar || defaultAvatarUrl} // Provide a default avatar if needed
+      goBack={goBack}
+      goToDMs={goToDMs}
+      source={source}
+    />
+  );
+};
+
+// Need to define defaultAvatarUrl or remove if not needed
+const defaultAvatarUrl = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
 // Update the styles to match our modern design
 const styles = StyleSheet.create({

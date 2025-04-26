@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useNotifications } from '../context/NotificationContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -16,6 +17,7 @@ import MiningScreen from '../screens/MiningScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ShopScreen from '../screens/ShopScreen';
 import SpotlightDurationDemoScreen from '../screens/SpotlightDurationDemoScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 
 // Import components
 import CustomTabBar from '../components/CustomTabBar';
@@ -43,6 +45,7 @@ export type RootStackParamList = {
   Account: undefined;
   Profile: undefined;
   SpotlightDurationDemo: undefined;
+  NotificationSettings: undefined;
   Chat: {
     userId: string;
     name: string;
@@ -58,6 +61,8 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 // Main tab navigator
 const MainTabNavigator = () => {
+  const { counts } = useNotifications();
+  
   return (
     <Tab.Navigator
       tabBar={props => <CustomTabBar {...props} />}
@@ -99,7 +104,7 @@ const MainTabNavigator = () => {
         name="Notifications" 
         component={NotificationsScreen} 
         options={{
-          tabBarBadge: 9,
+          tabBarBadge: counts.total > 0 ? counts.total : undefined,
         }}
       />
       <Tab.Screen 
@@ -144,6 +149,7 @@ const MainNavigator = () => {
           />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="SpotlightDurationDemo" component={SpotlightDurationDemoScreen} />
+          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
         </Stack.Navigator>
       </View>
       

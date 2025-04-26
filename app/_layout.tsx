@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import { UserProfileProvider } from '../src/context/UserProfileContext';
 import { UserStatusProvider } from '../src/context/UserStatusContext';
 import { LiveStreamProvider } from '../src/context/LiveStreamContext';
+import { NotificationProvider } from '../src/context/NotificationContext';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import PerformanceMonitor from '../src/components/PerformanceMonitor';
 import { analyticsService } from '../src/services/AnalyticsService';
@@ -120,37 +121,39 @@ export default function RootLayout() {
         <UserStatusProvider>
           <UserProfileProvider>
             <LiveStreamProvider>
-              <AppContext.Provider value={{ fontsLoaded }}>
-                <MenuPositionProvider>
-                  <SafeAreaProvider>
-                    <PaperProvider theme={paperTheme}>
-                      <StatusBar style="light" />
-                      <Stack screenOptions={{ 
-                        headerShown: false, 
-                        gestureEnabled: true, // Explicitly enable swipe gesture
-                        contentStyle: { backgroundColor: '#131318' },
-                        animation: Platform.OS === 'ios' ? 'default' : 'fade',
-                      }}>
-                        <Stack.Screen name="index" />
-                        <Stack.Screen name="login" />
-                        <Stack.Screen name="signup" />
-                        <Stack.Screen name="(main)" />
-                      </Stack>
-                      
-                      {/* Performance Monitor */}
-                      {showPerformanceMonitor && (
-                        <PerformanceMonitor 
-                          position="bottom-right"
-                          backgroundColor="rgba(0, 0, 0, 0.7)"
-                          textColor="#FFFFFF"
-                          fontSize={10}
-                          enabled={true}
-                        />
-                      )}
-                    </PaperProvider>
-                  </SafeAreaProvider>
-                </MenuPositionProvider>
-              </AppContext.Provider>
+              <NotificationProvider>
+                <AppContext.Provider value={{ fontsLoaded }}>
+                  <MenuPositionProvider>
+                    <SafeAreaProvider>
+                      <PaperProvider theme={paperTheme}>
+                        <StatusBar style="light" />
+                        <Stack screenOptions={{ 
+                          headerShown: false, 
+                          gestureEnabled: true, // Explicitly enable swipe gesture
+                          contentStyle: { backgroundColor: '#131318' },
+                          animation: Platform.OS === 'ios' ? 'default' : 'fade',
+                        }}>
+                          <Stack.Screen name="index" />
+                          <Stack.Screen name="login" />
+                          <Stack.Screen name="signup" />
+                          <Stack.Screen name="(main)" />
+                        </Stack>
+                        
+                        {/* Performance Monitor */}
+                        {showPerformanceMonitor && (
+                          <PerformanceMonitor 
+                            position="bottom-right"
+                            backgroundColor="rgba(0, 0, 0, 0.7)"
+                            textColor="#FFFFFF"
+                            fontSize={10}
+                            enabled={true}
+                          />
+                        )}
+                      </PaperProvider>
+                    </SafeAreaProvider>
+                  </MenuPositionProvider>
+                </AppContext.Provider>
+              </NotificationProvider>
             </LiveStreamProvider>
           </UserProfileProvider>
         </UserStatusProvider>

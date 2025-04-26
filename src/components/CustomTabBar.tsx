@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeIcon, NotificationIcon, PersonIcon } from './icons/AppIcons';
 import { useUserStatus, getStatusColor } from '../context/UserStatusContext';
+import { useNotifications } from '../context/NotificationContext';
 
 interface CustomTabBarProps extends BottomTabBarProps {
   profileImage?: string;
@@ -20,6 +21,14 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
   statusColor = '#7ADA72' // Default to online green color
 }) => {
   const insets = useSafeAreaInsets();
+  // Use the dynamic notification context instead of a fixed value
+  const { counts } = useNotifications();
+  
+  // Get current user status for profile tab indicator
+  const { userStatus: currentUserStatus } = useUserStatus();
+  
+  // Get the current status color for the profile tab indicator
+  const profileStatusColor = getStatusColor(currentUserStatus);
   
   // Get options for the *currently active* route
   const activeRouteKey = state.routes[state.index].key;
@@ -31,20 +40,24 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     return null;
   }
   
-  // Filter routes to only include index, notifications, and profile for display
-  const allowedRoutes = ['index', 'notifications', 'profile'];
-  const visibleRoutes = state.routes.filter(route => allowedRoutes.includes(route.name));
-  const visibleRouteIndices = visibleRoutes.map(route => state.routes.findIndex(r => r.key === route.key));
+  // Memoize routes filtering to reduce calculations on re-renders
+  const { visibleRoutes, visibleRouteIndices } = useMemo(() => {
+    const allowedRoutes = ['index', 'notifications', 'profile'];
+    const filtered = state.routes.filter(route => allowedRoutes.includes(route.name));
+    const indices = filtered.map(route => state.routes.findIndex(r => r.key === route.key));
+    return { visibleRoutes: filtered, visibleRouteIndices: indices };
+  }, [state.routes]);
   
-  // Get current user status for profile tab indicator
-  const { userStatus: currentUserStatus } = useUserStatus();
-  
-  // Get the current status color for the profile tab indicator
-  const profileStatusColor = getStatusColor(currentUserStatus);
-  
-  const getIconComponent = (routeName: string, isFocused: boolean, badge: number | undefined) => {
+  // Memoize the icon component generator to prevent recreating functions on every render
+  const getIconComponent = useMemo(() => (routeName: string, isFocused: boolean, badge: number | undefined) => {
     const color = isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)";
     const size = 22;
+
+    // Use dynamic badge count from the context for notifications tab
+    let badgeCount = badge;
+    if (routeName === 'notifications') {
+      badgeCount = counts.total > 0 ? counts.total : undefined;
+    }
 
     switch (routeName) {
       case 'index':
@@ -57,9 +70,9 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
         return (
           <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
             <NotificationIcon color={color} size={size} active={isFocused} />
-            {badge && (
+            {badgeCount && (
               <View style={styles.notificationsBadge}>
-                <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+                <Text style={styles.notificationsBadgeValue}>{badgeCount}</Text>
               </View>
             )}
           </View>
@@ -83,9 +96,9 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
             ) : (
               <PersonIcon color={color} size={size} active={isFocused} />
             )}
-            {badge && (
+            {badgeCount && (
               <View style={styles.notificationsBadge}>
-                <Text style={styles.notificationsBadgeValue}>{badge}</Text>
+                <Text style={styles.notificationsBadgeValue}>{badgeCount}</Text>
               </View>
             )}
           </View>
@@ -93,7 +106,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
       default:
         return null;
     }
-  };
+  }, [profileImage, profileStatusColor, counts]);
   
   return (
     <View style={styles.container}>

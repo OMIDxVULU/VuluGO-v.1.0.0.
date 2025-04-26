@@ -993,16 +993,16 @@ const HomeScreen = () => {
           activeOpacity={0.9} // Maintain high opacity
         >
           {/* Content is now directly inside TouchableOpacity */}
-          <View style={styles.spotlightAvatarWrapper}>
-            <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.spotlightAvatar} />
-            <View style={styles.spotlightIndicator} />
-          </View>
-          <View style={styles.spotlightInfo}>
-            <Text style={styles.spotlightTitle}>Friday Night Live Stream</Text>
-            <Text style={styles.viewersText}>{viewersCount} Viewers watching</Text>
-            <Text style={styles.spotlightTimer}>{formatTime(yourSpotlightTimeLeft)}</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={styles.spotlightAvatarWrapper}>
+          <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.spotlightAvatar} />
+          <View style={styles.spotlightIndicator} />
+        </View>
+        <View style={styles.spotlightInfo}>
+          <Text style={styles.spotlightTitle}>Friday Night Live Stream</Text>
+          <Text style={styles.viewersText}>{viewersCount} Viewers watching</Text>
+          <Text style={styles.spotlightTimer}>{formatTime(yourSpotlightTimeLeft)}</Text>
+        </View>
+      </TouchableOpacity>
       </View>
     );
   };
@@ -1035,16 +1035,16 @@ const HomeScreen = () => {
           activeOpacity={0.9} // Maintain high opacity
         >
            {/* Content is now directly inside TouchableOpacity */}
-          <View style={[styles.spotlightAvatarWrapper, { borderColor: '#FFC107', borderWidth: 2 }]}>  
-            <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.spotlightAvatar} />
-            <View style={[styles.spotlightIndicator, { backgroundColor: '#FFC107' }]} />
-          </View>
-          <View style={styles.spotlightInfo}>
-            <Text style={styles.spotlightTitle}>Weekend Gaming Session</Text>
-            <Text style={styles.viewersText}>{Math.floor(viewersCount * 0.8)} Viewers watching</Text>
-            <Text style={styles.spotlightTimer}>{formatTime(otherSpotlightTimeLeft)}</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={[styles.spotlightAvatarWrapper, { borderColor: '#FFC107', borderWidth: 2 }]}>  
+          <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.spotlightAvatar} />
+          <View style={[styles.spotlightIndicator, { backgroundColor: '#FFC107' }]} />
+        </View>
+        <View style={styles.spotlightInfo}>
+          <Text style={styles.spotlightTitle}>Weekend Gaming Session</Text>
+          <Text style={styles.viewersText}>{Math.floor(viewersCount * 0.8)} Viewers watching</Text>
+          <Text style={styles.spotlightTimer}>{formatTime(otherSpotlightTimeLeft)}</Text>
+        </View>
+      </TouchableOpacity>
       </View>
     );
   };
@@ -1121,7 +1121,7 @@ const HomeScreen = () => {
             <View style={styles.pillContainer}>
               <TouchableOpacity
                 style={[
-                  styles.squareWidget, 
+                  styles.squareWidget,
                   yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget,
                   yourSpotlightTimeLeft > 0 && styles.activeShadow,
                   yourSpotlightTimeLeft > 0 && yourAnimatedShadowStyle
@@ -1143,19 +1143,19 @@ const HomeScreen = () => {
                 )}
                 {/* Content with higher zIndex */}
                 <View style={styles.pillContentWrapper}>
-                  <View style={[
-                    styles.avatarContainer,
-                    { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
-                  ]}>  
-                    <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
-                  </View>
-                  <Text style={styles.nameLabel}>You</Text>
-                  <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
-                    Spotlight
-                  </Text>
-                  {yourSpotlightTimeLeft > 0 && (
-                    <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
-                  )}
+                <View style={[
+                  styles.avatarContainer,
+                  { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
+                ]}>  
+                  <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
+                </View>
+                <Text style={styles.nameLabel}>You</Text>
+                <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
+                  Spotlight
+                </Text>
+                {yourSpotlightTimeLeft > 0 && (
+                  <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
+                )}
                 </View>
               </TouchableOpacity>
             </View>
@@ -1164,7 +1164,7 @@ const HomeScreen = () => {
               <View style={styles.pillContainer}>
                 <TouchableOpacity
                   style={[
-                    styles.squareWidget, 
+                    styles.squareWidget,
                     styles.activeWidget,
                     otherSpotlightTimeLeft > 0 && styles.otherActiveShadow,
                     otherSpotlightTimeLeft > 0 && otherAnimatedShadowStyle
@@ -1185,11 +1185,11 @@ const HomeScreen = () => {
                   {/* Content with higher zIndex */}
                   <View style={styles.pillContentWrapper}>
                     <View style={[styles.avatarContainer, { borderColor: '#FFC107' }]}>  
-                      <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.gridAvatar} />
-                    </View>
-                    <Text style={styles.nameLabel}>{otherSpotlightCandidate.name}</Text>
-                    <Text style={styles.statusLabel}>Spotlight</Text>
-                    <Text style={styles.timerLabel}>{formatTime(otherSpotlightTimeLeft)}</Text>
+                    <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.gridAvatar} />
+                  </View>
+                  <Text style={styles.nameLabel}>{otherSpotlightCandidate.name}</Text>
+                  <Text style={styles.statusLabel}>Spotlight</Text>
+                  <Text style={styles.timerLabel}>{formatTime(otherSpotlightTimeLeft)}</Text>
                   </View>
                 </TouchableOpacity>
               </View>
