@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
-import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5, AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import CommonHeader from '../components/CommonHeader';
+import GoldBalanceDisplay from '../components/GoldBalanceDisplay';
 import ActivityModal from '../components/ActivityModal';
 import PersonGroupIcon from '../components/PersonGroupIcon';
 import { useLiveStreams } from '../context/LiveStreamContext';
@@ -1471,23 +1472,314 @@ const HomeScreen = () => {
     );
   };
 
+  // Additional state for gem balance
+  const [gemBalance, setGemBalance] = useState<number>(50);
+
+  // Handle gem to gold conversion
+  const handleConvertGemToGold = (gems: number) => {
+    const conversionRate = 5; // 1 gem = 5 gold
+    const goldToAdd = gems * conversionRate;
+    
+    setGoldBalance(prev => prev + goldToAdd);
+    setGemBalance(prev => prev - gems);
+    
+    // Add any additional logic like API calls here
+  };
+
+  // Additional state for gold currency popup
+  const [showGoldPopup, setShowGoldPopup] = useState(false);
+  const [sliderValue, setSliderValue] = useState(10); // Default gems to convert
+  const [sliderActive, setSliderActive] = useState(false);
+  
+  // Animation values for gold popup
+  const goldPopupOpacity = useRef(new Animated.Value(0)).current;
+  const goldPopupTranslateY = useRef(new Animated.Value(50)).current;
+  const sliderWidth = useRef(new Animated.Value(0)).current;
+  const sliderPosition = useRef(new Animated.Value(0)).current;
+  const sliderContainerWidth = useRef(0);
+  
+  // Conversion rate: 1 gem = 36 gold
+  const conversionRate = 36;
+  
+  // Calculate gold to receive based on gems
+  const goldToReceive = sliderValue * conversionRate;
+  
+  // Maximum gems that can be converted (fixed upper limit regardless of balance)
+  // Use a constant value for slider range, not dependent on gem balance
+  const maxSliderValue = 100; // Set a fixed maximum value for the slider
+  
+  // Show the gold conversion popup
+  const showGoldConversionPopup = () => {
+    setShowGoldPopup(true);
+    setSliderValue(Math.min(10, maxSliderValue)); // Default to 10 gems
+    
+    Animated.parallel([
+      Animated.timing(goldPopupOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true
+      }),
+      Animated.timing(goldPopupTranslateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      })
+    ]).start();
+  };
+  
+  // Hide the gold conversion popup
+  const hideGoldConversionPopup = () => {
+    Animated.parallel([
+      Animated.timing(goldPopupOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true
+      }),
+      Animated.timing(goldPopupTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true
+      })
+    ]).start(() => {
+      setShowGoldPopup(false);
+    });
+  };
+  
+  // Convert gems to gold with the current slider value
+  const convertGemToGold = () => {
+    // Check if the user has enough gems
+    if (sliderValue <= gemBalance) {
+      // Conversion logic here
+      const newGemBalance = gemBalance - sliderValue;
+      const newGoldBalance = goldBalance + goldToReceive;
+      
+      // Update balances
+      setGemBalance(newGemBalance);
+      setGoldBalance(newGoldBalance);
+      
+      // Hide the popup
+      hideGoldConversionPopup();
+    }
+  };
+  
+  // Additional ref for tracking current position
+  const startPositionRef = useRef(0);
+
+  // Additional refs for tracking the slider position
+  const sliderContainerRef = useRef(null);
+
+  // Additional state to track initial touch position
+  const [initialTouchX, setInitialTouchX] = useState(0);
+  const [sliderContainerX, setSliderContainerX] = useState(0);
+
+  // Set up the slider pan responder
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setSliderActive(true);
+      },
+      onPanResponderMove: (evt) => {
+        // Get absolute touch position
+        const pageX = evt.nativeEvent.pageX;
+        
+        // Calculate slider position relative to the container's left edge
+        const relativePosition = pageX - sliderContainerX;
+        
+        // Ensure the position stays within bounds
+        const boundedPosition = Math.max(0, Math.min(relativePosition, sliderContainerWidth.current));
+        
+        // Update both slider position and fill width
+        sliderPosition.setValue(boundedPosition);
+        sliderWidth.setValue(boundedPosition);
+        
+        // Calculate corresponding slider value
+        const percentage = boundedPosition / sliderContainerWidth.current;
+        const newValue = Math.round(percentage * maxSliderValue);
+        setSliderValue(Math.max(1, Math.min(newValue, maxSliderValue)));
+      },
+      onPanResponderRelease: () => {
+        setSliderActive(false);
+      },
+    })
+  ).current;
+  
+  // Measure the slider container width and position
+  const measureSliderWidth = (event: LayoutChangeEvent) => {
+    const { width, x } = event.nativeEvent.layout;
+    sliderContainerWidth.current = width;
+    setSliderContainerX(x);
+  };
+  
+  // Update slider position when value changes
+  useEffect(() => {
+    if (sliderContainerWidth.current > 0) {
+      const percentage = sliderValue / maxSliderValue;
+      const newPosition = percentage * sliderContainerWidth.current;
+      sliderPosition.setValue(newPosition);
+      sliderWidth.setValue(newPosition);
+    }
+  }, [sliderValue, maxSliderValue]);
+  
+  // Update container position when popup is shown
+  useEffect(() => {
+    if (showGoldPopup) {
+      // Give time for layout to complete
+      setTimeout(() => {
+        if (sliderContainerWidth.current > 0) {
+          // Reset slider value when opening popup
+          const percentage = sliderValue / maxSliderValue;
+          const newPosition = percentage * sliderContainerWidth.current;
+          sliderPosition.setValue(newPosition);
+          sliderWidth.setValue(newPosition);
+        }
+      }, 50);
+    }
+  }, [showGoldPopup]);
+  
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <CommonHeader 
-        title="Home" 
-        rightIcons={[
-          {
-            name: 'attach-money',
-            color: '#FFD700',
-            onPress: () => console.log('Balance pressed')
-          },
-          {
-            name: 'add',
-            color: '#FFFFFF',
-            onPress: () => console.log('Add pressed')
-          }
-        ]}
-      />
+      <View style={styles.header}>
+        <CommonHeader 
+          title="Home" 
+          rightIcons={[
+            {
+              name: 'add',
+              color: '#FFFFFF',
+              onPress: () => console.log('Add pressed')
+            }
+          ]}
+        />
+        <TouchableOpacity 
+          style={styles.goldBalanceContainer}
+          onPress={showGoldConversionPopup}
+        >
+          <MaterialCommunityIcons name="gold" size={18} color="#FFD700" />
+          <Text style={styles.goldBalanceText}>{goldBalance}</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Gold Conversion Popup Modal */}
+      <Modal
+        visible={showGoldPopup}
+        transparent
+        animationType="none"
+        onRequestClose={hideGoldConversionPopup}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalOverlayTouchable}
+            activeOpacity={1}
+            onPress={hideGoldConversionPopup}
+          />
+          
+          <Animated.View 
+            style={[
+              styles.goldPopupContainer,
+              {
+                transform: [{ translateY: goldPopupTranslateY }],
+                opacity: goldPopupOpacity,
+              }
+            ]}
+          >
+            <View style={styles.goldPopupHandle} />
+            
+            <LinearGradient
+              colors={['#1C1D23', '#232429']}
+              style={styles.goldPopupContent}
+            >
+              <Text style={styles.goldPopupTitle}>Convert Gems to Gold</Text>
+              
+              <View style={styles.conversionContainer}>
+                <LinearGradient
+                  colors={['rgba(16, 17, 28, 0.8)', 'rgba(33, 34, 46, 0.8)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.balanceCardsContainer}
+                >
+                  <View style={styles.balanceCard}>
+                    <Text style={styles.balanceLabel}>Gems</Text>
+                    <Text style={styles.balanceValue}>{gemBalance}</Text>
+                  </View>
+                  
+                  <View style={styles.balanceSeparator} />
+                  
+                  <View style={styles.balanceCard}>
+                    <Text style={styles.balanceLabel}>Gold</Text>
+                    <Text style={styles.balanceValue}>{goldBalance}</Text>
+                  </View>
+                </LinearGradient>
+                
+                <View style={styles.receiveContainer}>
+                  <Text style={styles.receiveLabel}>You'll receive</Text>
+                  <Text style={styles.receiveValue}>{goldToReceive}</Text>
+                </View>
+              </View>
+
+              <View style={styles.sliderSection}>
+                <View 
+                  ref={sliderContainerRef}
+                  style={styles.sliderContainer}
+                  onLayout={measureSliderWidth}
+                >
+                  <View style={styles.sliderBackground} />
+                  <Animated.View 
+                    style={[
+                      styles.sliderFill,
+                      { width: sliderWidth }
+                    ]}
+                  />
+                  <Animated.View 
+                    style={[
+                      styles.sliderHandle,
+                      sliderActive && styles.sliderHandleActive,
+                      { transform: [{ translateX: sliderPosition }] }
+                    ]}
+                    {...panResponder.panHandlers}
+                  >
+                    <View style={styles.handleInner}>
+                      <MaterialCommunityIcons 
+                        name="diamond-stone" 
+                        size={14} 
+                        color="#FFFFFF" 
+                      />
+                    </View>
+                  </Animated.View>
+                </View>
+                
+                <View style={styles.sliderLabels}>
+                  <Text style={styles.sliderMinLabel}>1</Text>
+                  <Text style={styles.sliderValueLabel}>{sliderValue}</Text>
+                  <Text style={styles.sliderMaxLabel}>{maxSliderValue}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.convertButtonContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.convertButton,
+                    sliderValue > gemBalance && styles.convertButtonDisabled
+                  ]}
+                  onPress={convertGemToGold}
+                  disabled={sliderValue > gemBalance}
+                >
+                  <LinearGradient
+                    colors={sliderValue > gemBalance ? 
+                      ['#35383F', '#35383F'] : 
+                      ['#6B7CFF', '#8166FF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.convertButtonGradient}
+                  >
+                    <Text style={styles.convertButtonText}>Convert Now</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </View>
+      </Modal>
 
       <ScrollableContentContainer
         style={styles.content}
@@ -1621,10 +1913,13 @@ const HomeScreen = () => {
         <View style={styles.spotlightModalOverlay}>
           <View style={styles.spotlightModalContent}>
             <Text style={styles.spotlightModalTitle}>Manage Your Spotlight</Text>
-            <View style={styles.goldBalanceContainer}>
-              <MaterialIcons name="attach-money" size={18} color="#FFD700" />
-              <Text style={styles.goldBalanceText}>{goldBalance} Gold Available</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.goldBalanceContainer}
+              onPress={showGoldConversionPopup}
+            >
+              <MaterialCommunityIcons name="gold" size={18} color="#FFD700" />
+              <Text style={styles.goldBalanceText}>{goldBalance}</Text>
+            </TouchableOpacity>
             <Text style={styles.spotlightModalSubtitle}>Select Duration</Text>
             <TouchableOpacity style={styles.spotlightOption} onPress={() => purchaseSpotlight(2, 5)}>
               <Text style={[styles.spotlightOptionText, goldBalance < 5 && styles.disabledOption]}>
@@ -1687,13 +1982,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#131318',
   },
   header: {
+    position: 'relative',
+    width: '100%',
+  },
+  goldBalanceContainer: {
+    position: 'absolute',
+    right: 16,
+    top: 12,
+    zIndex: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  goldBalanceText: {
+    color: '#FFD700',
+    fontWeight: 'bold',
+    marginLeft: 4,
+    fontSize: 14,
   },
   headerTitle: {
     fontSize: 28,
@@ -2395,21 +2703,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     opacity: 0.7,
   },
-  goldBalanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  goldBalanceText: {
-    color: '#FFD700',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
   disabledOption: {
     color: 'rgba(255,255,255,0.4)',
   },
@@ -2417,6 +2710,13 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: 12,
     marginTop: 2,
+  },
+  insufficientGemsText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 8,
   },
   spotlightWrapper: {
     width: 320,
@@ -2649,6 +2949,202 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: '#6E69F4',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlayTouchable: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  goldPopupContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 15,
+  },
+  goldPopupContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 16,
+  },
+  goldPopupHandle: {
+    width: 36,
+    height: 5,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.3,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginVertical: 10,
+  },
+  goldPopupTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  conversionContainer: {
+    marginBottom: 32,
+  },
+  balanceCardsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 28,
+  },
+  balanceCard: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  balanceLabel: {
+    color: '#9BA1A6',
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  balanceValue: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  balanceSeparator: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: 12,
+  },
+  receiveContainer: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  receiveLabel: {
+    color: '#9BA1A6',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  receiveValue: {
+    color: '#FFD700',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  sliderSection: {
+    marginBottom: 36,
+  },
+  sliderContainer: {
+    height: 36,
+    position: 'relative',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  sliderBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+  },
+  sliderFill: {
+    position: 'absolute',
+    left: 0,
+    height: 8,
+    backgroundColor: '#6E69F4',
+    borderRadius: 4,
+  },
+  sliderHandle: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6E69F4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+    marginLeft: -18,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  handleInner: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#8166FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sliderHandleActive: {
+    transform: [{ scale: 1.1 }],
+    borderColor: '#FFFFFF',
+  },
+  sliderHandleDisabled: {
+    backgroundColor: '#6E6E6E',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  handleInnerDisabled: {
+    backgroundColor: '#888888',
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  sliderMinLabel: {
+    color: '#9BA1A6',
+    fontSize: 14,
+  },
+  sliderValueLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  sliderMaxLabel: {
+    color: '#9BA1A6',
+    fontSize: 14,
+  },
+  convertButton: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  convertButtonDisabled: {
+    opacity: 0.5,
+  },
+  convertButtonGradient: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  convertButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  convertButtonTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  convertButtonContainer: {
+    marginTop: 16,
+  },
+  sliderFillDisabled: {
+    backgroundColor: '#6E6E6E',
+    opacity: 0.6,
   },
 });
 
