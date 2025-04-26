@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -855,41 +855,95 @@ const HomeScreen = () => {
     return randomWidgets;
   };
 
+  // Add new state for event expansion
+  const [isEventExpanded, setIsEventExpanded] = useState(false);
+
+  // Add a new animation value for smooth transitions
+  const eventExpandAnim = useSharedValue(0);
+
+  // Add animated styles for the event widget
+  const eventAnimatedStyle = useAnimatedStyle(() => {
+    const minHeight = 60; // Just enough height for title and progress bar
+    const maxHeight = 200; // Full expanded height
+    
+    return {
+      height: withTiming(
+        isEventExpanded ? maxHeight : minHeight, 
+        { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
+      ),
+      overflow: 'hidden'
+    };
+  });
+
+  // Add animated styles for the event content
+  const eventContentAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(
+        isEventExpanded ? 1 : 0, 
+        { duration: 250, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
+      ),
+      transform: [{ 
+        translateY: withTiming(
+          isEventExpanded ? 0 : 10, 
+          { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
+        ) 
+      }]
+    };
+  });
+
+  // Update the renderEventWidget function to make it clickable and support minimized state
   const renderEventWidget = () => {
     return (
-      <View style={styles.tournamentContainer}>
-        <View style={styles.eventContent}>
-          <Text style={styles.eventTitle}>Event</Text>
-          
-          <View style={styles.eventProgressTrack}>
-            <View style={styles.eventProgressFill} />
+      <TouchableWithoutFeedback 
+        onPress={() => setIsEventExpanded(prev => !prev)}
+        style={{width: '100%'}}
+      >
+        <Animated.View style={[styles.tournamentContainer, eventAnimatedStyle]}>
+          <View style={styles.eventHeader}>
+            <Text style={styles.eventTitle}>Event</Text>
           </View>
           
-          <View style={styles.eventInfoGrid}>
-            <View style={styles.eventInfoBox}>
-              <Text style={styles.eventInfoValue}>00:23:06</Text>
-              <Text style={styles.eventInfoLabel}>Time Left</Text>
+          {/* Always visible progress track */}
+          <View style={styles.progressContainer}>
+            <View style={styles.eventProgressTrack}>
+              <View style={styles.eventProgressFill} />
             </View>
-            
-            <View style={styles.eventInfoBox}>
-              <View style={styles.prizeContainer}>
-                <View style={styles.eventCoinIcon} />
-                <Text style={styles.eventInfoValue}>1350</Text>
+          </View>
+          
+          {/* Content that shows/hides based on expanded state */}
+          <Animated.View style={[styles.eventContent, eventContentAnimatedStyle]}>
+            <View style={styles.eventInfoGrid}>
+              <View style={styles.eventInfoBox}>
+                <Text style={styles.eventInfoValue}>00:23:06</Text>
+                <Text style={styles.eventInfoLabel}>Time Left</Text>
               </View>
-              <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+              
+              <View style={styles.eventInfoBox}>
+                <View style={styles.prizeContainer}>
+                  <View style={styles.eventCoinIcon} />
+                  <Text style={styles.eventInfoValue}>1350</Text>
+                </View>
+                <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+              </View>
+              
+              <View style={styles.eventInfoBox}>
+                <Text style={styles.eventInfoValue}>7</Text>
+                <Text style={styles.eventInfoLabel}>Entries</Text>
+              </View>
             </View>
             
-            <View style={styles.eventInfoBox}>
-              <Text style={styles.eventInfoValue}>7</Text>
-              <Text style={styles.eventInfoLabel}>Entries</Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity style={styles.enterButton}>
-            <Text style={styles.enterButtonText}>Enter</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <TouchableOpacity 
+              style={styles.enterButton} 
+              onPress={(e) => {
+                e.stopPropagation();
+                console.log('Enter button pressed');
+              }}
+            >
+              <Text style={styles.enterButtonText}>Enter</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
+      </TouchableWithoutFeedback>
     );
   };
 
@@ -2213,6 +2267,15 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 10,
     marginRight: 10,
+  },
+  eventHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  progressContainer: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
 });
 
