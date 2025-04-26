@@ -18,6 +18,7 @@ export interface Notification {
   customRenderer?: () => React.ReactNode; // Custom renderer for special formatting
   mediaType?: 'image' | 'video' | 'audio'; // Type of media in the notification
   mediaUrl?: string; // URL to the media file
+  createdAt?: Date; // Timestamp when notification was created
 }
 
 interface NotificationItemProps {
@@ -120,7 +121,12 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ item, onPress, onDe
         item.customRenderer()
       ) : (
         <View style={styles.contentContainer}>
-          <Text style={styles.message}>{item.message}</Text>
+          <Text style={[
+            styles.message,
+            !item.seen && { color: '#FFFFFF', fontWeight: 'bold' }
+          ]}>
+            {item.message}
+          </Text>
           <Text style={styles.time}>{item.time}</Text>
         </View>
       )}
@@ -135,66 +141,65 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#2C2D35',
-    borderRadius: 10,
-    marginBottom: 12,
+    borderRadius: 8,
+    marginBottom: 6,
     position: 'relative',
   },
   unseenNotification: {
-    backgroundColor: '#22232A',
-    opacity: 0.7,
+    backgroundColor: '#2A2D3A',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 8,
   },
   contentContainer: {
     flex: 1,
     zIndex: 1,
   },
   message: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 14,
+    color: '#8F8F8F',
+    marginBottom: 1,
   },
   time: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#8F8F8F',
   },
   deleteConfirm: {
     flexDirection: 'column',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   deleteText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#FFFFFF',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   deleteActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   deleteButton: {
-    padding: 15,
+    padding: 12,
     backgroundColor: '#F23535',
     borderRadius: 5,
-    marginRight: 10,
+    marginRight: 8,
   },
   deleteButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
   },
   cancelButton: {
-    padding: 15,
+    padding: 12,
     backgroundColor: '#8F8F8F',
     borderRadius: 5,
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
   },
 });

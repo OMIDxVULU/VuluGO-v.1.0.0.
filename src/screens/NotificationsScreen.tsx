@@ -212,7 +212,7 @@ const AnnouncementWidget = () => {
                   onPress={() => handleAnnouncementPress(item)}
                   activeOpacity={0.7}
                 >
-                  <Image source={{ uri: item.adminAvatar }} style={styles.announcementAvatar} />
+                  <Image source={{ uri: item.adminAvatar }} style={styles.announcementAvatarImg} />
                   <View style={styles.announcementTextContainer}>
                     {messageContent}
                     <Text style={styles.announcementTime}>{item.time}</Text>
@@ -371,7 +371,7 @@ const FriendRequestWidget = () => {
               > 
                 {/* Wrap avatar/info in Touchable for profile navigation */}
                 <TouchableOpacity onPress={() => handleProfilePress(req.userId)} style={styles.requestProfileTouchable}> 
-                  <Image source={{ uri: req.avatar }} style={styles.requestAvatar} />
+                  <Image source={{ uri: req.avatar }} style={styles.requestAvatarImg} />
                   <View style={styles.requestInfo}>
                     <Text style={styles.requestName}>{req.name}</Text>
                     {req.mutual > 0 && (
@@ -472,96 +472,19 @@ const ProfileViewWidget = () => {
     return date.toLocaleDateString();
   };
   
-  // Extended dummy data with 25 profile views and proper dates
+  // Replace the existing useState for profileViews with empty initializer
+  const [profileViews, setProfileViews] = useState<ProfileView[]>([]);
+
+  // Replace the existing generateInitialViews function
   const generateInitialViews = () => {
-    const names = [
-      'Max Thompson', 'Sarah Miller', 'Tiffany Roberts', 
-      'Jason Chen', 'Emily Parker', 'Michael Wilson',
-      'Sophia Davis', 'Ethan Miller', 'Isabella Garcia'
-    ];
-    
-    // Predefined avatar URLs for a more personalized look
-    const avatarUrls = [
-      'https://randomuser.me/api/portraits/men/32.jpg',
-      'https://randomuser.me/api/portraits/women/44.jpg',
-      'https://randomuser.me/api/portraits/women/68.jpg',
-      'https://randomuser.me/api/portraits/men/75.jpg',
-      'https://randomuser.me/api/portraits/women/33.jpg',
-      'https://randomuser.me/api/portraits/men/62.jpg',
-      'https://randomuser.me/api/portraits/women/51.jpg',
-      'https://randomuser.me/api/portraits/men/29.jpg',
-      'https://randomuser.me/api/portraits/women/78.jpg'
-    ];
-    
-    // Ghost placeholder with purple background and X
-    const ghostPlaceholder = 'https://ui-avatars.com/api/?background=8A2BE2&color=fff&name=X&size=200&bold=true';
-    
-    // Ghost users that will always appear in the first few positions
-    const ghostUsers: ProfileView[] = [
-      {
-        id: 'ghost-1',
-        viewerId: 'ghost-user-123',
-        viewerName: 'Alexis Mitchell',
-        viewerAvatar: ghostPlaceholder,
-        realAvatar: 'https://randomuser.me/api/portraits/women/42.jpg',
-        timestamp: '2 hours ago',
-        dateCreated: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        seen: false,
-        isPremiumViewer: true,
-        isGhostMode: true,
-        isRevealed: false,
-        visitCount: 3
-      },
-      {
-        id: 'ghost-2',
-        viewerId: 'ghost-user-456',
-        viewerName: 'Zack Peterson',
-        viewerAvatar: ghostPlaceholder,
-        realAvatar: 'https://randomuser.me/api/portraits/men/37.jpg',
-        timestamp: '1 day ago',
-        dateCreated: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        seen: true,
-        isPremiumViewer: true,
-        isGhostMode: true,
-        isRevealed: false,
-        visitCount: 5
-      }
-    ];
-    
-    // Generate random views
-    const randomViews: ProfileView[] = [];
-    for (let i = 0; i < 8; i++) {
-      const id = (i + 2).toString();
-      const randomIndex = Math.floor(Math.random() * names.length);
-      const name = names[randomIndex];
-      // Use the matching avatar URL for each name
-      const avatarUrl = avatarUrls[randomIndex];
-      const hoursAgo = Math.floor(Math.random() * 24) + 1;
-      const isPremium = Math.random() > 0.7;
-      
-      randomViews.push({
-        id,
-        viewerId: `user-${id}`,
-        viewerName: name,
-        viewerAvatar: avatarUrl,
-        timestamp: hoursAgo === 1 ? '1 hour ago' : `${hoursAgo} hours ago`,
-        dateCreated: new Date(Date.now() - hoursAgo * 60 * 60 * 1000),
-        seen: Math.random() > 0.5,
-        isPremiumViewer: isPremium,
-        isGhostMode: false, // Most regular users aren't in ghost mode
-        isRevealed: false,
-        visitCount: Math.floor(Math.random() * 5) + 1 // Random 1-5 visits
-      });
-    }
-    
-    // Combine ghost users with random views
-    const allViews = [...ghostUsers, ...randomViews];
-    
-    // Sort by dateCreated (newest first)
-    return allViews.sort((a, b) => b.dateCreated.getTime() - a.dateCreated.getTime());
+    // Function now does nothing - no automatic view generation
   };
 
-  const [profileViews, setProfileViews] = useState<ProfileView[]>(generateInitialViews());
+  // Later in the useEffect that calls this function, ensure it's also not generating views
+  useEffect(() => {
+    // Leave this empty or remove the call to generateInitialViews
+    // generateInitialViews();
+  }, []);
 
   // Apply retention policy - 7 days and enforce maximum views limit
   useEffect(() => {
@@ -594,73 +517,6 @@ const ProfileViewWidget = () => {
     return () => clearInterval(retentionInterval);
   }, []);
 
-  // Simulate new profile views for demo purposes
-  useEffect(() => {
-    // Function to add a random new profile view
-    const addNewProfileView = () => {
-      const now = new Date();
-      const names = [
-        'Olivia Johnson', 'Noah Williams', 'Emma Brown', 'Liam Davis', 
-        'Ava Martinez', 'James Taylor', 'Charlotte Anderson', 'Benjamin White'
-      ];
-      
-      // Predefined avatar URLs for a more personalized look
-      const avatarUrls = [
-        'https://randomuser.me/api/portraits/women/52.jpg',
-        'https://randomuser.me/api/portraits/men/41.jpg',
-        'https://randomuser.me/api/portraits/women/22.jpg',
-        'https://randomuser.me/api/portraits/men/18.jpg',
-        'https://randomuser.me/api/portraits/women/67.jpg',
-        'https://randomuser.me/api/portraits/men/55.jpg',
-        'https://randomuser.me/api/portraits/women/90.jpg',
-        'https://randomuser.me/api/portraits/men/36.jpg'
-      ];
-      
-      // Ghost placeholder with purple background and X
-      const ghostPlaceholder = 'https://ui-avatars.com/api/?background=8A2BE2&color=fff&name=X&size=200&bold=true';
-      
-      const randomIndex = Math.floor(Math.random() * names.length);
-      const name = names[randomIndex];
-      const avatarUrl = avatarUrls[randomIndex]; // Use the matching personalized avatar
-      const isPremium = Math.random() > 0.7;
-      const isGhost = isPremium && Math.random() > 0.5; // Only premium users can be in ghost mode
-      
-      // Random visit count for new viewers (1-5)
-      const visitCount = Math.floor(Math.random() * 5) + 1;
-      
-      const newView: ProfileView = {
-        id: `pv-new-${Date.now()}`,
-        viewerId: `user-new-${Date.now()}`,
-        viewerName: name,
-        viewerAvatar: isGhost ? ghostPlaceholder : avatarUrl, // Ghost placeholder for ghost users
-        ...(isGhost && { realAvatar: avatarUrl }), // Store real avatar for ghost users
-        timestamp: 'just now',
-        dateCreated: now,
-        seen: false,
-        isPremiumViewer: isPremium,
-        isGhostMode: isGhost,
-        isRevealed: false,
-        visitCount: visitCount
-      };
-      
-      // Add the new view at the beginning of the array (most recent)
-      // and enforce the maximum limit
-      setProfileViews(prevViews => {
-        const updatedViews = [newView, ...prevViews];
-        if (updatedViews.length > MAX_STORED_VIEWS) {
-          return updatedViews.slice(0, MAX_STORED_VIEWS);
-        }
-        return updatedViews;
-      });
-    };
-    
-    // For demo purposes, add a new view every 30-60 seconds
-    const randomInterval = Math.floor(Math.random() * 30000) + 30000;
-    const interval = setInterval(addNewProfileView, randomInterval);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
   const totalViewCount = profileViews.length;
   const newViewCount = profileViews.filter(view => !view.seen).length;
 
@@ -1006,7 +862,7 @@ const ProfileViewWidget = () => {
                           {/* Show the appropriate avatar based on ghost mode and reveal status */}
                           <Image 
                             source={{ uri: view.viewerAvatar || 'https://via.placeholder.com/40/000000/FFFFFF/?text=?' }} 
-                            style={styles.viewAvatar} 
+                            style={styles.viewAvatarImg} 
                           />
                           
                           {/* Apply blur for non-premium users unless this view was part of free preview */}
@@ -1186,7 +1042,7 @@ const ProfileViewWidget = () => {
                       {/* Use the actual avatar image with the proper background color based on ghost status */}
                       <Image 
                         source={{ uri: view.viewerAvatar }} 
-                        style={styles.miniAvatar} 
+                        style={styles.miniAvatarImg} 
                       />
                       {/* Blur only for non-premium users */}
                       {!hasGemPlus && !(premiumPreviewActive && revealedPreviewViews.includes(view.id)) && (
@@ -1257,140 +1113,64 @@ const ProfileViewWidget = () => {
 const AllNotificationsWidget = () => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
-  const { clearNotificationsByType } = useNotifications();
-  const clearModal = useModal(); // Add modal for clear confirmation
+  const { clearNotificationsByType, updateAllNotificationsCount } = useNotifications();
+  const clearModal = useModal();
+  const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   
-  // Notification data with dummy values
-  const [notifications, setNotifications] = useState<Notification[]>([
-    // Mention with @username highlighting
-    {
-      id: '1',
-      type: 'mention',
-      message: 'John: <@>@amen</!@> Did you see the new update? What do you think about the new features?',
-      time: '5m ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Reply with simplified format
-    {
-      id: '5',
-      type: 'reply',
-      message: 'Sarah replied: "Sounds great! Let me know when you\'re free to meet up."',
-      time: '2h ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Mention with an image in global chat
-    {
-      id: '6',
-      type: 'mention',
-      message: 'Mike: <@>@amen</!@> Check out this meme!',
-      mediaType: 'image',
-      mediaUrl: 'https://picsum.photos/200',
-      time: '3h ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Reply with an image in global chat
-    {
-      id: '8',
-      type: 'reply',
-      message: 'Alex replied with an image:',
-      mediaType: 'image',
-      mediaUrl: 'https://picsum.photos/200/300',
-      time: '6h ago',
-      seen: false,
-      targetRoute: '/chat',
-      targetParams: { chatId: 'global' }
-    },
-    // Gold Sent - keep the format
-    {
-      id: '7',
-      type: 'gold_sent',
-      message: 'Jessica sent you 50 Gold!',
-      time: '4h ago',
-      seen: false
-      // No targetRoute for gold sent for now
-    },
-  ]);
+  // Initialize with an empty array instead of seed data
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Get notification count
   const notificationCount = notifications.filter(n => !n.seen).length;
 
-  // Add demo functionality to periodically add new notifications
+  // Initialize notification count once on component mount
   useEffect(() => {
-    // Sample notification templates for demo
-    const demoNotifications: Array<Omit<Notification, 'id' | 'time' | 'seen'>> = [
-      {
-        type: 'mention',
-        message: 'Alex: <@>@amen</!@> Have you checked out the new Spotlight feature?',
-        targetRoute: '/chat',
-        targetParams: { chatId: 'global' }
-      },
-      {
-        type: 'reply',
-        message: 'Jamie replied: "Thanks for sharing that! I\'ll check it out."',
-        targetRoute: '/chat',
-        targetParams: { chatId: 'global' }
-      },
-      {
-        type: 'mention',
-        message: 'Taylor: <@>@amen</!@> What do you think of these new profile backgrounds?',
-        mediaType: 'image',
-        mediaUrl: 'https://picsum.photos/200/300',
-        targetRoute: '/chat',
-        targetParams: { chatId: 'global' }
-      },
-      {
-        type: 'gold_sent',
-        message: 'Chris sent you 25 Gold!'
-      }
-    ];
+    if (!notificationsInitialized) {
+      // Only update the global count once
+      updateAllNotificationsCount(notificationCount);
+      setNotificationsInitialized(true);
+    }
+  }, [notificationCount, notificationsInitialized, updateAllNotificationsCount]);
 
-    // Function to add a new random notification
-    const addRandomNotification = () => {
-      const randomIndex = Math.floor(Math.random() * demoNotifications.length);
-      const template = demoNotifications[randomIndex];
-      
-      // Generate time strings
-      const times = ['just now', '1m ago', '2m ago'];
-      const randomTimeIndex = Math.floor(Math.random() * times.length);
-      
-      const newNotification: Notification = {
-        ...template,
-        id: `demo-${Date.now()}`,
-        time: times[randomTimeIndex],
-        seen: false
-      };
+  // Remove the auto-generating useEffect completely
+  
+  // Keep the timestamp update functionality
+  useEffect(() => {
+    // Skip if no notifications exist yet
+    if (!notifications || notifications.length === 0) return;
 
-      // Add notification to the beginning of the array
-      setNotifications(prev => [newNotification, ...prev]);
+    const updateTimestamps = () => {
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notif => {
+          // Skip if notification doesn't have createdAt timestamp
+          if (!notif.createdAt) return notif;
+          
+          // Calculate how old the notification is
+          const now = new Date();
+          const diffMs = now.getTime() - notif.createdAt.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          
+          // Update the time display based on age
+          let timeDisplay = 'just now';
+          if (diffMins === 1) timeDisplay = '1m ago';
+          else if (diffMins > 1) timeDisplay = `${diffMins}m ago`;
+          
+          return {
+            ...notif,
+            time: timeDisplay
+          };
+        })
+      );
     };
-
-    // Demo: Add notification every 20-40 seconds
-    const minInterval = 20000;
-    const maxInterval = 40000;
-    const getRandomInterval = () => Math.floor(Math.random() * (maxInterval - minInterval)) + minInterval;
     
-    // Add first notification after a short delay
-    const initialTimeout = setTimeout(() => {
-      addRandomNotification();
-      
-      // Then set up recurring notifications at random intervals
-      const intervalId = setInterval(() => {
-        addRandomNotification();
-      }, getRandomInterval());
-      
-      return () => clearInterval(intervalId);
-    }, 5000); // First notification appears after 5 seconds
+    // Update timestamps immediately and then every 60 seconds
+    updateTimestamps();
+    const intervalId = setInterval(updateTimestamps, 60000);
     
-    return () => clearTimeout(initialTimeout);
-  }, []); // Empty dependency array means this runs once on mount
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array to prevent infinite loops
 
-  // Toggle expansion
+  // Make sure the notification count is updated when toggling expansion
   const toggleExpand = () => {
     LayoutAnimation.configureNext(animationConfig);
     const expanding = !isExpanded;
@@ -1398,13 +1178,21 @@ const AllNotificationsWidget = () => {
     
     // If expanding, mark all as seen
     if (expanding) {
-      setNotifications(prevNotifications => 
-        prevNotifications.map(notif => ({
+      setNotifications(prevNotifications => {
+        const updatedNotifications = prevNotifications.map(notif => ({
           ...notif,
           seen: true
-        }))
-      );
-      clearNotificationsByType('allNotifications');
+        }));
+        
+        // Update global notification count to 0 since all are now seen
+        // Move state update outside of render cycle with setTimeout
+        setTimeout(() => {
+          updateAllNotificationsCount(0);
+          clearNotificationsByType('allNotifications');
+        }, 0);
+        
+        return updatedNotifications;
+      });
     }
   };
 
@@ -1432,8 +1220,66 @@ const AllNotificationsWidget = () => {
     );
   };
 
-  // Use the NotificationItem component in renderItem
-  const renderItem = ({ item }: { item: Notification }) => {
+  // Add helper functions to match NotificationItem
+  const getIconName = (type: string): string => {
+    switch(type) {
+      case 'mention':
+        return 'alternate-email';
+      case 'reply':
+        return 'reply';
+      case 'gold_sent':
+        return 'monetization-on';
+      case 'friend_request':
+        return 'person-add';
+      default:
+        return 'notifications';
+    }
+  };
+
+  const getIconBackground = (type: string): string => {
+    switch(type) {
+      case 'mention':
+        return '#5865F2'; // Discord blue
+      case 'reply':
+        return '#4CAF50'; // Green
+      case 'gold_sent':
+        return '#FFC107'; // Gold
+      case 'friend_request':
+        return '#2196F3'; // Blue
+      default:
+        return '#9C27B0'; // Purple for unknown types
+    }
+  };
+
+  // Update the renderItem function to only show one profile picture per notification
+  const renderItem = ({ item, index }: { item: Notification; index: number }) => (
+    <View>
+      <TouchableOpacity 
+        style={[
+          styles.notificationItem,
+          !item.seen && styles.unseenNotification
+        ]} 
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
+      >
+        {/* Blue line indicator as an absolute positioned element */}
+        {!item.seen && (
+          <View style={styles.blueLineIndicator} />
+        )}
+        
+        {/* Content container - directly use the renderNotificationContent which already has profile pictures */}
+        {renderNotificationContent({ item })}
+      </TouchableOpacity>
+      
+      {/* Add separator line after each item except the last one */}
+      {index < notifications.length - 1 && (
+        <View style={styles.notificationSeparator} />
+      )}
+    </View>
+  );
+
+  // Original renderItem function renamed to renderNotificationContent
+  const renderNotificationContent = ({ item }: { item: Notification }) => {
     // For mention notifications with @username highlighting
     if (item.type === 'mention' && item.message.includes('<@>')) {
       // Extract parts: before tag, tag content, after tag
@@ -1459,7 +1305,7 @@ const AllNotificationsWidget = () => {
                     </View>
                   )}
                 </View>
-                <Text style={styles.timeRight}>{item.time}</Text>
+                <Text style={item.seen ? styles.timeRight : styles.unseenTimeRight}>{item.time}</Text>
               </View>
             )
           }}
@@ -1484,7 +1330,7 @@ const AllNotificationsWidget = () => {
                     <Text style={styles.mediaText}>Image</Text>
                   </View>
                 </View>
-                <Text style={styles.timeRight}>{item.time}</Text>
+                <Text style={item.seen ? styles.timeRight : styles.unseenTimeRight}>{item.time}</Text>
               </View>
             )
           }}
@@ -1502,7 +1348,7 @@ const AllNotificationsWidget = () => {
           customRenderer: () => (
             <View style={styles.contentContainer}>
               <Text style={[styles.message, { flex: 1 }]}>{item.message}</Text>
-              <Text style={styles.timeRight}>{item.time}</Text>
+              <Text style={item.seen ? styles.timeRight : styles.unseenTimeRight}>{item.time}</Text>
             </View>
           )
         }}
@@ -1568,15 +1414,7 @@ const AllNotificationsWidget = () => {
             {notifications.length > 0 ? (
               <FlatList
                 data={notifications}
-                renderItem={({ item, index }) => (
-                  <View>
-                    {renderItem({ item })}
-                    {/* Add separator line after each item except the last one */}
-                    {index < notifications.length - 1 && (
-                      <View style={styles.notificationSeparator} />
-                    )}
-                  </View>
-                )}
+                renderItem={renderItem}
                 keyExtractor={item => item.id}
                 scrollEnabled={false} 
                 style={styles.list}
@@ -1735,22 +1573,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  widgetCountBadge: { // Style for the count badge
+  widgetCountBadge: {
     backgroundColor: '#F23535', // Red background
-    borderRadius: 9,          // Make it circular
-    paddingHorizontal: 5,     // Horizontal padding for number
-    minWidth: 18,             // Minimum width to maintain circle for single digits
-    height: 18,               // Fixed height
-    justifyContent: 'center', // Center text vertically
-    alignItems: 'center',     // Center text horizontally
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 8,
   },
-  widgetCountText: { // Style for the text inside the badge
+  widgetCountText: {
     color: '#FFFFFF',
-      fontSize: 11,           // Small font size
-      fontWeight: 'bold',
-      includeFontPadding: false, // Try to remove extra padding
-      textAlignVertical: 'center', // Try to center vertically
+    fontSize: 11,
+    fontWeight: 'bold',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   widgetContent: {
     paddingTop: 8,
@@ -1778,10 +1616,10 @@ const styles = StyleSheet.create({
       marginRight: 8, // Space before potential buttons
   },
   requestAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
   },
   requestInfo: {
     flex: 1, // Allow text to take space within the touchable
@@ -1833,19 +1671,32 @@ const styles = StyleSheet.create({
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: '#2C2D35',
-    borderRadius: 10,
-    marginBottom: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    position: 'relative',
+    overflow: 'hidden', // Ensure blue line doesn't overflow
+  },
+  unseenNotification: {
+    backgroundColor: '#22232A',
+  },
+  blueLineIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: '#5865F2',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#5865F2',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 10,
   },
   contentContainer: {
     flex: 1,
@@ -1854,12 +1705,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   message: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   time: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#8F8F8F',
   },
   emptyText: {
@@ -1887,6 +1738,7 @@ const styles = StyleSheet.create({
   viewAvatar: {
     width: '100%',
     height: '100%',
+    borderRadius: 16,
   },
   viewInfo: {
     flex: 1,
@@ -1977,7 +1829,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginRight: 4,
     fontWeight: '500',
-    overflow: 'hidden',
   },
   announcementTime: {
     color: '#8F8F8F',
@@ -2312,6 +2163,99 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     textAlign: 'right',
     minWidth: 35, // Ensure consistent width for timestamps
+  },
+  
+  // Add new style for unseen notification time with blue bubble
+  unseenTimeRight: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    marginLeft: 8,
+    textAlign: 'center',
+    backgroundColor: '#5865F2', // Blue bubble background
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  
+  notificationItemContainer: {
+    // Empty object instead of undefined
+  },
+  
+  unreadNotificationContainer: {
+    // Empty object instead of undefined
+  },
+  
+  newIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 100, // Position further left to avoid timestamps
+    backgroundColor: '#5865F2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    zIndex: 5,
+  },
+  
+  newIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  
+  outerNotificationContainer: {
+    flexDirection: 'row',
+    position: 'relative',
+    marginBottom: 6,
+  },
+  
+  notificationContentContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  
+  unreadIndicator: {
+    width: 4,
+    backgroundColor: '#5865F2',
+    alignSelf: 'stretch',
+  },
+  
+  notificationWrapper: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    borderRadius: 8,
+  },
+  
+  notificationContainer: {
+    flex: 1,
+  },
+  
+  notificationMainContent: {
+    flex: 1,
+    backgroundColor: '#2C2D35',
+    borderRadius: 10,
+    position: 'relative',
+  },
+
+  // Image specific styles that don't include incompatible ViewStyle properties
+  announcementAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+  },
+  requestAvatarImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+  },
+  viewAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  miniAvatarImg: {
+    width: '100%',
+    height: '100%',
   },
 });
 
