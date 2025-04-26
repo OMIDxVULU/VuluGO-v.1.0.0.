@@ -26,7 +26,6 @@ import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { useUserProfile } from '../context/UserProfileContext';
-import ProfileViewersSection from '../components/ProfileViewers';
 import { useUserStatus, STATUS_TYPES, StatusType } from '../context/UserStatusContext';
 
 const { width } = Dimensions.get('window');
@@ -42,17 +41,13 @@ const ProfileScreen = () => {
   const { 
     profileImage, 
     setProfileImage, 
-    totalViews,
-    dailyViews,
-    resetDailyViews,
-    incrementViews,
     hasGemPlus,
     setHasGemPlus
   } = useUserProfile();
   
   // Use UserStatusContext instead of local state
   const { 
-    userStatus, 
+    userStatus,
     setUserStatus,
     contextStatusData,
     closefriendsOnly,
@@ -61,7 +56,6 @@ const ProfileScreen = () => {
   
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [statusCategory, setStatusCategory] = useState(STATUS_CATEGORIES.DEFAULT);
-  const [showProfileViewers, setShowProfileViewers] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [previewCurrentPage, setPreviewCurrentPage] = useState(0);
   const [previewTotalPages, setPreviewTotalPages] = useState(3); // 2 images + 1 bio page
@@ -173,39 +167,26 @@ const ProfileScreen = () => {
   const handleFriendSearch = (text: string) => {
     setFriendSearchQuery(text);
   };
-  
-  // Increment views when the profile is opened
-  useEffect(() => {
-    incrementViews();
-    
-    // Simulate periodic views coming in (every 10-30 seconds)
-    const viewsInterval = setInterval(() => {
-      // Random chance to get a view (30% chance)
-      if (Math.random() < 0.3) {
-        incrementViews();
-      }
-    }, 5000); // Check every 5 seconds
-    
-    return () => clearInterval(viewsInterval);
-  }, []);
 
   const navigateToAccount = () => {
     router.push('/(main)/account');
   };
 
   const handleAddPhoto = () => {
-    setShowPhotoOptions(true);
-    Animated.timing(photoOptionsAnim, {
+    photoOptionsAnim.setValue(0);
+    Animated.spring(photoOptionsAnim, {
       toValue: 1,
-      duration: 300,
+      tension: 50,
+      friction: 7,
       useNativeDriver: true,
     }).start();
+    setShowPhotoOptions(true);
   };
 
   const hidePhotoOptions = () => {
     Animated.timing(photoOptionsAnim, {
       toValue: 0,
-      duration: 300,
+      duration: 250,
       useNativeDriver: true,
     }).start(() => {
       setShowPhotoOptions(false);
@@ -279,12 +260,6 @@ const ProfileScreen = () => {
   // Toggle Gem+ status for demo purposes
   const toggleGemPlus = () => {
     setHasGemPlus(!hasGemPlus);
-  };
-
-  // Function to open ProfileViewers and reset daily counter
-  const openProfileViewers = () => {
-    resetDailyViews();
-    setShowProfileViewers(true);
   };
 
   // Function to handle preview navigation
@@ -572,35 +547,10 @@ const ProfileScreen = () => {
               </TouchableOpacity>
               <View style={styles.profileInfoTextContainer}>
                 <Text style={styles.profileName}>Sophia Jack</Text>
-                <Text style={styles.profileUsername}>@Sophia93</Text>
               </View>
             </Animated.View>
           </LinearGradient>
         </View>
-        
-        {/* Profile Views Counter - Single Clean Component */}
-        <TouchableOpacity 
-          style={styles.viewsCounterContainer}
-          onPress={openProfileViewers}
-        >
-          <LinearGradient
-            colors={['#6E69F4', '#5865F2']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.viewsCounter}
-          >
-            <View style={styles.viewsIconBox}>
-              <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
-            </View>
-            <View style={styles.viewsTextContainer}>
-              <Text style={styles.viewsLabel}>Today's Profile Views</Text>
-              <Text style={styles.viewsValue}>{dailyViews}</Text>
-            </View>
-            <View style={styles.viewersArrowContainer}>
-              <Feather name="chevron-right" size={20} color="#FFFFFF" />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
         
         {/* Photos Section */}
         <View style={styles.photoSection}>
@@ -739,7 +689,7 @@ const ProfileScreen = () => {
         </View>
         
         {/* Spacing for bottom of screen */}
-        <View style={{ height: 70 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Status Selector Modal */}
@@ -1020,24 +970,6 @@ const ProfileScreen = () => {
         </View>
       </Modal>
       
-      {/* Profile Viewers Modal */}
-      <Modal
-        visible={showProfileViewers}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => {
-          setShowProfileViewers(false);
-        }}
-      >
-        <ProfileViewersSection 
-          title="Profile Viewers" 
-          subtitle="See who's viewing your profile"
-          onClose={() => {
-            setShowProfileViewers(false);
-          }} 
-        />
-      </Modal>
-      
       {/* Profile Preview Modal */}
       <Modal
         visible={showProfilePreview}
@@ -1165,9 +1097,6 @@ const ProfileScreen = () => {
                   
                   <View style={styles.previewNameContainer}>
                     <Text style={styles.previewDisplayNameImage}>Sophia Jack</Text>
-                    <View style={styles.previewUsernameWrapper}>
-                      <Text style={styles.previewUsername}>@Sophia93</Text>
-                    </View>
                   </View>
                   
                   <TouchableOpacity style={styles.previewMoreButton}>
@@ -1317,7 +1246,6 @@ const ProfileScreen = () => {
                   
                   <View style={styles.friendInfo}>
                     <Text style={styles.friendName}>{friend.name}</Text>
-                    <Text style={styles.friendUsername}>{friend.username}</Text>
                   </View>
                   
                   <View style={styles.friendActions}>
@@ -1950,55 +1878,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },
-  viewersArrowContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewsCounterContainer: {
-    marginHorizontal: 12,
-    marginBottom: 15,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  viewsCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 15,
-    borderRadius: 16,
-  },
-  viewsIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  viewsTextContainer: {
-    flex: 1,
-  },
-  viewsLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  viewsValue: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-  },
   previewOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -2044,7 +1923,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     position: 'absolute',
-    top: 0,
+    top: 35,
     left: 0,
     right: 0,
     zIndex: 20,
@@ -2108,17 +1987,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
     marginBottom: 4,
   },
-  previewUsernameWrapper: {
-    flexDirection: 'row',
+  previewBackButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  previewUsername: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   previewMoreButton: {
     width: 32,
@@ -2187,12 +2060,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '60%',
     zIndex: 10,
-  },
-  previewBackButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   photoOptionsContainer: {
     position: 'absolute',
@@ -2353,10 +2220,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 2,
-  },
-  friendUsername: {
-    color: '#A8B3BD',
-    fontSize: 14,
   },
   friendActions: {
     flexDirection: 'row',

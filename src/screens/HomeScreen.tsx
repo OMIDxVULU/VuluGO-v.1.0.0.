@@ -364,7 +364,7 @@ const HomeScreen = () => {
         
         {/* Right section with broadcaster avatar */}
         <View style={styles.broadcasterContainerWrapper}>
-          <View style={styles.broadcasterContainerRed}>
+          <View style={styles.broadcasterAvatarContainer}>
             <Image 
               source={{ uri: friendHost.avatar }} 
               style={styles.broadcasterAvatar}
@@ -795,7 +795,7 @@ const HomeScreen = () => {
         </View>
         
         <View style={styles.broadcasterContainerWrapper}>
-          <View style={styles.broadcasterContainerRed}>
+          <View style={styles.broadcasterAvatarContainer}>
             <Image 
               source={{ uri: 'https://randomuser.me/api/portraits/women/91.jpg' }} 
               style={styles.broadcasterAvatar}
@@ -841,7 +841,7 @@ const HomeScreen = () => {
         </View>
         
         <View style={styles.broadcasterContainerWrapper}>
-          <View style={styles.broadcasterContainer}>
+          <View style={styles.broadcasterAvatarContainer}>
             <Image 
               source={{ uri: 'https://randomuser.me/api/portraits/women/99.jpg' }} 
               style={styles.broadcasterAvatar}
@@ -1429,7 +1429,7 @@ const styles = StyleSheet.create({
   avatarWrapper: {
     width: 40,
     height: 40,
-    borderRadius: 22,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: '#4B8BFF',
     overflow: 'hidden',
@@ -1438,21 +1438,21 @@ const styles = StyleSheet.create({
   avatarWrapperRed: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#FF4B4B',
     overflow: 'hidden',
     margin: 3,
   },
   gridAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 18,
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
   },
   plusMoreContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     backgroundColor: 'rgba(67, 71, 81, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1496,7 +1496,7 @@ const styles = StyleSheet.create({
   broadcasterContainer: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#4CAF50',
     position: 'relative',
@@ -1505,7 +1505,7 @@ const styles = StyleSheet.create({
   broadcasterContainerRed: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FF4B4B',
     position: 'relative',
@@ -1514,7 +1514,16 @@ const styles = StyleSheet.create({
   broadcasterAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 10,
+  },
+  broadcasterAvatarContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FF5252',
+    position: 'relative',
+    overflow: 'visible',
   },
   liveIndicator: {
     position: 'absolute',
@@ -1606,7 +1615,7 @@ const styles = StyleSheet.create({
   musicAvatarContainer: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#1DB954',
     position: 'relative',
@@ -1615,7 +1624,7 @@ const styles = StyleSheet.create({
   musicAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 24,
+    borderRadius: 10,
   },
   musicIndicator: {
     position: 'absolute',
@@ -2087,7 +2096,7 @@ const styles = StyleSheet.create({
   spotlightAvatarWrapper: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: 12,
     overflow: 'hidden',
     marginRight: 12,
     borderWidth: 2,
@@ -2097,6 +2106,7 @@ const styles = StyleSheet.create({
   spotlightAvatar: {
     width: '100%',
     height: '100%',
+    borderRadius: 10,
   },
   spotlightIndicator: {
     position: 'absolute',
@@ -2182,6 +2192,27 @@ const styles = StyleSheet.create({
   },
   inactiveWidget: {
     opacity: 0.7,
+  },
+  actionCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(54, 57, 63, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImageContainer: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    marginRight: 10,
   },
 });
 
