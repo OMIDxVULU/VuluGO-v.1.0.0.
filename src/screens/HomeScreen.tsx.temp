@@ -892,6 +892,97 @@ const HomeScreen = () => {
   });
 
   /* First declaration of renderMinimalEventWidget removed */
+    // Progress percent (0-100) - can be changed to reflect actual event progress
+    const progressPercent = 45;
+    
+    const toggleExpanded = () => {
+      setIsMinimalEventExpanded(!isMinimalEventExpanded);
+      console.log('Toggled minimal event:', !isMinimalEventExpanded);
+    };
+    
+    return (
+      <View style={{position: 'relative', marginBottom: 16}}>
+        {/* Expand tutorial bubble for new users (when collapsed) */}
+        {showExpandTutorial && !isMinimalEventExpanded && (
+          <View style={styles.tutorialBubble}>
+            <Text style={styles.tutorialText}>
+              Tap to expand event details
+            </Text>
+            <View style={styles.tutorialArrow} />
+          </View>
+        )}
+        
+        {/* Minimize tutorial bubble (when expanded) */}
+        {showMinimizeTutorial && isMinimalEventExpanded && (
+          <View style={[styles.tutorialBubble, styles.minimizeBubble]}>
+            <Text style={styles.tutorialText}>
+              Tap again to minimize
+            </Text>
+            <View style={styles.tutorialArrow} />
+          </View>
+        )}
+        
+        <TouchableOpacity 
+          onPress={toggleExpanded}
+          activeOpacity={0.7}
+          style={styles.minimalEventContainer}
+        >
+          <View style={{width: '100%'}}>
+            <View style={styles.minimalEventHeader}>
+              <Text style={styles.eventTitle}>Event</Text>
+            </View>
+            
+            <View style={styles.minimalProgressContainer}>
+              <View style={styles.minimalProgressTrack}>
+                <View 
+                  style={[
+                    styles.minimalProgressFill, 
+                    { width: `${progressPercent}%` }
+                  ]} 
+                />
+              </View>
+            </View>
+            
+            {/* Content that shows/hides based on expanded state */}
+            {isMinimalEventExpanded && (
+              <View style={styles.minimalEventContent}>
+                <View style={styles.eventInfoGrid}>
+                  <View style={styles.eventInfoBox}>
+                    <Text style={styles.eventInfoValue}>01:23:45</Text>
+                    <Text style={styles.eventInfoLabel}>Time Left</Text>
+                  </View>
+                  
+                  <View style={styles.eventInfoBox}>
+                    <View style={styles.prizeContainer}>
+                      <View style={styles.eventCoinIcon} />
+                      <Text style={styles.eventInfoValue}>2200</Text>
+                    </View>
+                    <Text style={styles.eventInfoLabel}>Prize Pool</Text>
+                  </View>
+                  
+                  <View style={styles.eventInfoBox}>
+                    <Text style={styles.eventInfoValue}>18</Text>
+                    <Text style={styles.eventInfoLabel}>Entries</Text>
+                  </View>
+                </View>
+                
+                <TouchableOpacity 
+                  style={[styles.enterButton, {backgroundColor: '#FFC107'}]} 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    console.log('Event enter button pressed');
+                  }}
+                >
+                  <Text style={styles.enterButtonText}>Enter</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const openSpotlightModal = () => setSpotlightModalVisible(true);
   const closeSpotlightModal = () => setSpotlightModalVisible(false);
   const purchaseSpotlight = (minutes: number, cost: number) => {
@@ -1141,336 +1232,6 @@ const HomeScreen = () => {
     );
   };
 
-  // Add animated styles for the expanded content
-  const minimalGemsContentAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(
-        isMinimalGemsExpanded ? 1 : 0, 
-        { duration: 250, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-      ),
-      transform: [{ 
-        translateY: withTiming(
-          isMinimalGemsExpanded ? 0 : 10, 
-          { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-        ) 
-      }]
-    };
-  });
-
-  // Add state for the new minimal gems widget
-  const [isMinimalGemsExpanded, setIsMinimalGemsExpanded] = useState(false);
-  // Add states to track if the tutorials have been shown for gems widget
-  const [showGemsExpandTutorial, setShowGemsExpandTutorial] = useState(true);
-  const [showGemsMinimizeTutorial, setShowGemsMinimizeTutorial] = useState(true);
-
-  // Add logging to track gems state changes
-  useEffect(() => {
-    console.log('isMinimalGemsExpanded changed to:', isMinimalGemsExpanded);
-    // Hide appropriate tutorial after user has interacted with the widget
-    if (isMinimalGemsExpanded) {
-      setShowGemsExpandTutorial(false);
-    } else if (!isMinimalGemsExpanded && !showGemsExpandTutorial) {
-      // User has minimized after expanding, so hide minimize tutorial
-      setShowGemsMinimizeTutorial(false);
-    }
-  }, [isMinimalGemsExpanded, showGemsExpandTutorial]);
-
-  // Add animated styles for the minimal gems content
-  const minimalGemsAnimatedStyle = useAnimatedStyle(() => {
-    const minHeight = 50; // Just enough for title and basic info
-    const maxHeight = 200; // Full expanded height
-    
-    return {
-      height: withTiming(
-        isMinimalGemsExpanded ? maxHeight : minHeight, 
-        { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-      ),
-      overflow: 'hidden'
-    };
-  });
-
-  // Render a minimal Gems+ widget with expand/minimize functionality
-  const renderMinimalGemsWidget = () => {
-    const gemsBalance = 940; // For demo, could be a state variable
-    const dailyGems = 200; // For demo, could be a state variable
-    const daysUntilRenewal = 3; // For demo, could be a state variable
-    
-    const toggleExpanded = () => {
-      setIsMinimalGemsExpanded(!isMinimalGemsExpanded);
-      console.log('Toggled minimal gems:', !isMinimalGemsExpanded);
-    };
-    
-    return (
-      <View style={{position: 'relative', marginBottom: 16}}>
-        {/* Expand tutorial bubble for new users (when collapsed) */}
-        {showGemsExpandTutorial && !isMinimalGemsExpanded && (
-          <View style={styles.tutorialBubble}>
-            <Text style={styles.tutorialText}>
-              Tap to expand Gem+ details
-            </Text>
-            <View style={styles.tutorialArrow} />
-          </View>
-        )}
-        
-        {/* Minimize tutorial bubble (when expanded) */}
-        {showGemsMinimizeTutorial && isMinimalGemsExpanded && (
-          <View style={[styles.tutorialBubble, styles.minimizeBubble]}>
-            <Text style={styles.tutorialText}>
-              Tap again to minimize
-            </Text>
-            <View style={styles.tutorialArrow} />
-          </View>
-        )}
-        
-        <TouchableOpacity 
-          onPress={toggleExpanded}
-          activeOpacity={0.7}
-          style={[styles.minimalEventContainer, {
-            backgroundColor: '#1C1D23',
-            paddingVertical: 14,
-            paddingHorizontal: 16
-          }]}
-        >
-          {/* Collapsed state */}
-          {!isMinimalGemsExpanded && (
-            <View style={{
-              flexDirection: 'row', 
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%'
-            }}>
-              {/* Left side - Title and badge */}
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <MaterialCommunityIcons 
-                  name="diamond-stone" 
-                  size={20} 
-                  color="#B768FB" 
-                  style={{marginRight: 8}}
-                />
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                  marginRight: 8
-                }}>Gem+</Text>
-                <View style={{
-                  backgroundColor: '#B768FB',
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 10
-                }}>
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: 10,
-                    fontWeight: 'bold'
-                  }}>ACTIVE</Text>
-                </View>
-              </View>
-              
-              {/* Right side - Balance info */}
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <View style={{alignItems: 'flex-end', marginRight: 10}}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={{
-                      color: '#FFFFFF', 
-                      fontWeight: 'bold', 
-                      fontSize: 18
-                    }}>{gemsBalance}</Text>
-                    <MaterialCommunityIcons 
-                      name="diamond-stone" 
-                      size={14} 
-                      color="rgba(183, 104, 251, 0.7)" 
-                      style={{marginLeft: 4}}
-                    />
-                  </View>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.5)', 
-                    fontSize: 10
-                  }}>
-                    {dailyGems}/day
-                  </Text>
-                </View>
-                <View style={{
-                  backgroundColor: 'rgba(183, 104, 251, 0.15)',
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6
-                }}>
-                  <Text style={{
-                    color: '#B768FB', 
-                    fontSize: 10, 
-                    fontWeight: '500'
-                  }}>
-                    {daysUntilRenewal}d
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-            
-          {/* Expanded state */}
-          {isMinimalGemsExpanded && (
-            <View>
-              {/* Header section with Gem+ title and badge */}
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 16
-              }}>
-                <MaterialCommunityIcons 
-                  name="diamond-stone" 
-                  size={20} 
-                  color="#B768FB" 
-                  style={{marginRight: 8}}
-                />
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                  marginRight: 8
-                }}>Gem+</Text>
-                <View style={{
-                  backgroundColor: '#B768FB',
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 10
-                }}>
-                  <Text style={{
-                    color: '#FFFFFF',
-                    fontSize: 10,
-                    fontWeight: 'bold'
-                  }}>ACTIVE</Text>
-                </View>
-              </View>
-              
-              {/* Daily gems section */}
-              <View style={{
-                flexDirection: 'row', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                paddingVertical: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-                marginBottom: 16
-              }}>
-                <View>
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.6)', 
-                    fontSize: 12,
-                    marginBottom: 4
-                  }}>Daily Gems</Text>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={{
-                      color: 'rgba(255, 255, 255, 0.9)', 
-                      fontWeight: 'bold', 
-                      fontSize: 16
-                    }}>{dailyGems}</Text>
-                    <MaterialCommunityIcons 
-                      name="diamond-stone" 
-                      size={14} 
-                      color="rgba(183, 104, 251, 0.7)" 
-                      style={{marginLeft: 4}}
-                    />
-                  </View>
-                </View>
-                
-                <View style={{
-                  backgroundColor: 'rgba(183, 104, 251, 0.15)',
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                  borderRadius: 10
-                }}>
-                  <Text style={{
-                    color: '#B768FB', 
-                    fontSize: 11, 
-                    fontWeight: '500'
-                  }}>
-                    Renews in {daysUntilRenewal} days
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Available balance section */}
-              <LinearGradient
-                colors={['rgba(183, 104, 251, 0.1)', 'rgba(110, 105, 244, 0.1)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{
-                  padding: 16,
-                  borderRadius: 12,
-                  marginBottom: 16
-                }}
-              >
-                <Text style={{
-                  color: '#B768FB', 
-                  fontSize: 12, 
-                  fontWeight: '600', 
-                  marginBottom: 8,
-                  textAlign: 'center'
-                }}>
-                  YOUR AVAILABLE BALANCE
-                </Text>
-                <View style={{
-                  flexDirection: 'row', 
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Text style={{
-                    fontSize: 28, 
-                    fontWeight: 'bold', 
-                    color: '#FFFFFF', 
-                    marginRight: 12
-                  }}>
-                    {gemsBalance}
-                  </Text>
-                  <LinearGradient
-                    colors={['#B768FB', '#6E69F4']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      justifyContent: 'center',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <MaterialCommunityIcons 
-                      name="diamond-stone" 
-                      size={18}
-                      color="#FFFFFF"
-                    />
-                  </LinearGradient>
-                </View>
-              </LinearGradient>
-              
-              {/* Buy button */}
-              <TouchableOpacity 
-                style={{
-                  backgroundColor: '#6E69F4',
-                  borderRadius: 100,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  console.log('Buy more gems pressed');
-                }}
-              >
-                <Text style={{
-                  color: '#FFFFFF', 
-                  fontWeight: 'bold', 
-                  fontSize: 14
-                }}>Buy More</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <CommonHeader 
@@ -1608,9 +1369,6 @@ const HomeScreen = () => {
           
         {/* Event Widget */}
         {/* REMOVE renderEventWidget function */}
-        
-        {/* New Minimal Gems Widget */}
-        {renderMinimalGemsWidget()}
         
         {/* Improved Gems Widget */}
         {/* REMOVE renderGemsWidget call */}
