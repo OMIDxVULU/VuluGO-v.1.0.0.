@@ -1253,8 +1253,12 @@ const ProfileViewWidget = () => {
   );
 };
 
-const NotificationsScreen = () => {
+// --- AllNotificationsWidget ---
+const AllNotificationsWidget = () => {
   const router = useRouter();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { clearNotificationsByType } = useNotifications();
+  const clearModal = useModal(); // Add modal for clear confirmation
   
   // Notification data with dummy values
   const [notifications, setNotifications] = useState<Notification[]>([
@@ -1312,26 +1316,97 @@ const NotificationsScreen = () => {
       // No targetRoute for gold sent for now
     },
   ]);
-  
-  const { updateAllNotificationsCount, clearNotificationsByType } = useNotifications();
-  const { counts } = useNotifications();
 
-  // Replace the markNotificationsAsSeen and updateNotificationCount with simpler effects
-  
-  // Mark all as seen on mount
+  // Get notification count
+  const notificationCount = notifications.filter(n => !n.seen).length;
+
+  // Add demo functionality to periodically add new notifications
   useEffect(() => {
-    // Mark all notifications as seen
-    setNotifications(prevNotifications => 
-      prevNotifications.map(notif => ({
-        ...notif,
-        seen: true
-      }))
-    );
+    // Sample notification templates for demo
+    const demoNotifications: Array<Omit<Notification, 'id' | 'time' | 'seen'>> = [
+      {
+        type: 'mention',
+        message: 'Alex: <@>@amen</!@> Have you checked out the new Spotlight feature?',
+        targetRoute: '/chat',
+        targetParams: { chatId: 'global' }
+      },
+      {
+        type: 'reply',
+        message: 'Jamie replied: "Thanks for sharing that! I\'ll check it out."',
+        targetRoute: '/chat',
+        targetParams: { chatId: 'global' }
+      },
+      {
+        type: 'mention',
+        message: 'Taylor: <@>@amen</!@> What do you think of these new profile backgrounds?',
+        mediaType: 'image',
+        mediaUrl: 'https://picsum.photos/200/300',
+        targetRoute: '/chat',
+        targetParams: { chatId: 'global' }
+      },
+      {
+        type: 'gold_sent',
+        message: 'Chris sent you 25 Gold!'
+      }
+    ];
+
+    // Function to add a new random notification
+    const addRandomNotification = () => {
+      const randomIndex = Math.floor(Math.random() * demoNotifications.length);
+      const template = demoNotifications[randomIndex];
+      
+      // Generate time strings
+      const times = ['just now', '1m ago', '2m ago'];
+      const randomTimeIndex = Math.floor(Math.random() * times.length);
+      
+      const newNotification: Notification = {
+        ...template,
+        id: `demo-${Date.now()}`,
+        time: times[randomTimeIndex],
+        seen: false
+      };
+
+      // Add notification to the beginning of the array
+      setNotifications(prev => [newNotification, ...prev]);
+    };
+
+    // Demo: Add notification every 20-40 seconds
+    const minInterval = 20000;
+    const maxInterval = 40000;
+    const getRandomInterval = () => Math.floor(Math.random() * (maxInterval - minInterval)) + minInterval;
     
-    // Update the notification count in the context
-    updateAllNotificationsCount(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array means this only runs once on mount
+    // Add first notification after a short delay
+    const initialTimeout = setTimeout(() => {
+      addRandomNotification();
+      
+      // Then set up recurring notifications at random intervals
+      const intervalId = setInterval(() => {
+        addRandomNotification();
+      }, getRandomInterval());
+      
+      return () => clearInterval(intervalId);
+    }, 5000); // First notification appears after 5 seconds
+    
+    return () => clearTimeout(initialTimeout);
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Toggle expansion
+  const toggleExpand = () => {
+    LayoutAnimation.configureNext(animationConfig);
+    const expanding = !isExpanded;
+    setIsExpanded(expanding);
+    
+    // If expanding, mark all as seen
+    if (expanding) {
+      setNotifications(prevNotifications => 
+        prevNotifications.map(notif => ({
+          ...notif,
+          seen: true
+        }))
+      );
+      clearNotificationsByType('allNotifications');
+    }
+  };
 
   // Handle notification press
   const handleNotificationPress = (item: Notification) => {
@@ -1371,7 +1446,7 @@ const NotificationsScreen = () => {
             // Override the message renderer with our custom renderer
             customRenderer: () => (
               <View style={styles.contentContainer}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.message}>
                     {parts[0]}
                     <Text style={styles.mentionTag}>{parts[1]}</Text>
@@ -1384,7 +1459,7 @@ const NotificationsScreen = () => {
                     </View>
                   )}
                 </View>
-                <Text style={styles.time}>{item.time}</Text>
+                <Text style={styles.timeRight}>{item.time}</Text>
               </View>
             )
           }}
@@ -1402,14 +1477,14 @@ const NotificationsScreen = () => {
             ...item,
             customRenderer: () => (
               <View style={styles.contentContainer}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.message}>{item.message}</Text>
                   <View style={styles.mediaIndicator}>
                     <MaterialIcons name="image" size={16} color="#A0A0A0" />
                     <Text style={styles.mediaText}>Image</Text>
                   </View>
                 </View>
-                <Text style={styles.time}>{item.time}</Text>
+                <Text style={styles.timeRight}>{item.time}</Text>
               </View>
             )
           }}
@@ -1419,16 +1494,191 @@ const NotificationsScreen = () => {
       );
     }
     
-    // For regular notifications, use the standard renderer
+    // For regular notifications, use the standard renderer but with time right-aligned
     return (
       <NotificationItem
-        item={item}
+        item={{
+          ...item,
+          customRenderer: () => (
+            <View style={styles.contentContainer}>
+              <Text style={[styles.message, { flex: 1 }]}>{item.message}</Text>
+              <Text style={styles.timeRight}>{item.time}</Text>
+            </View>
+          )
+        }}
         onPress={handleNotificationPress}
         onDelete={handleDeleteNotification}
       />
     );
   };
 
+  // Handle clear all notifications with confirmation
+  const handleClearAll = (e: GestureResponderEvent) => {
+    e.stopPropagation(); // Prevent widget from expanding/collapsing
+    
+    clearModal.showConfirmation(
+      "Clear All Notifications?",
+      "Are you sure you want to delete all notifications? This action cannot be undone.",
+      () => {
+        // Clear all notifications when confirmed
+        setNotifications([]);
+        clearNotificationsByType('allNotifications');
+      },
+      undefined,
+      "Clear All",
+      "Cancel",
+      { name: "delete", background: "#F23535" }
+    );
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        style={[styles.widgetContainer]}
+        onPress={toggleExpand}
+        activeOpacity={0.9}
+      >
+        <View style={styles.widgetHeader}>
+          <View style={styles.widgetTitleContainer}>
+            <Text style={styles.widgetTitle}>All Notifications</Text>
+            {/* Render count badge if count > 0 */}
+            {notificationCount > 0 && (
+              <View style={styles.widgetCountBadge}>
+                <Text style={styles.widgetCountText}>{notificationCount}</Text>
+              </View>
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Clear button - only show if there are notifications */}
+            {notifications.length > 0 && (
+              <TouchableOpacity 
+                onPress={handleClearAll} 
+                style={styles.clearButton}
+              >
+                <MaterialIcons name="delete-sweep" size={14} color="#FFFFFF" />
+                <Text style={styles.clearButtonText}>Clear</Text>
+              </TouchableOpacity>
+            )}
+            <MaterialIcons name={isExpanded ? 'expand-less' : 'expand-more'} size={24} color="#FFFFFF" />
+          </View>
+        </View>
+
+        {isExpanded ? (
+          <View style={styles.widgetContent}>
+            {notifications.length > 0 ? (
+              <FlatList
+                data={notifications}
+                renderItem={({ item, index }) => (
+                  <View>
+                    {renderItem({ item })}
+                    {/* Add separator line after each item except the last one */}
+                    {index < notifications.length - 1 && (
+                      <View style={styles.notificationSeparator} />
+                    )}
+                  </View>
+                )}
+                keyExtractor={item => item.id}
+                scrollEnabled={false} 
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+              />
+            ) : (
+              <Text style={styles.emptyText}>No notifications yet</Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.miniPreview}>
+            {notifications.length > 0 ? (
+              <>
+                {/* Show a row of profile pictures or fallback icons */}
+                <View style={styles.miniAvatarRow}>
+                  {notifications.slice(0, Math.min(3, notifications.length)).map((notif, index) => {
+                    // Determine avatar URL or fallback to notification type icon
+                    // Mock avatar URLs based on notification type (in a real app, these would come from the notification data)
+                    const mockAvatars = {
+                      'mention': 'https://randomuser.me/api/portraits/men/32.jpg',
+                      'reply': 'https://randomuser.me/api/portraits/women/44.jpg',
+                      'gold_sent': 'https://randomuser.me/api/portraits/women/68.jpg'
+                    };
+                    
+                    // Use mock avatar based on notification type 
+                    const avatarUrl = mockAvatars[notif.type as keyof typeof mockAvatars];
+                    
+                    // Fallback icon if no avatar is available
+                    let iconName: "notifications" | "alternate-email" | "reply" | "monetization-on" = "notifications";
+                    if (notif.type === 'mention') iconName = "alternate-email";
+                    if (notif.type === 'reply') iconName = "reply";
+                    if (notif.type === 'gold_sent') iconName = "monetization-on";
+                    
+                    return (
+                      <View 
+                        key={notif.id} 
+                        style={[
+                          styles.miniAvatarContainer,
+                          { 
+                            marginLeft: index > 0 ? -10 : 0, 
+                            zIndex: 3 - index // First has highest z-index
+                          }
+                        ]}
+                      >
+                        {avatarUrl ? (
+                          <Image 
+                            source={{ uri: avatarUrl }} 
+                            style={{ width: 36, height: 36, borderRadius: 18 }} 
+                          />
+                        ) : (
+                          <View style={[styles.iconContainer, { width: 36, height: 36 }]}>
+                            <MaterialIcons name={iconName} size={18} color="#FFFFFF" />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {/* If there are more than 3 notifications, show the count bubble */}
+                  {notifications.length > 3 && (
+                    <View style={[
+                      styles.miniAvatarMoreContainer, 
+                      { 
+                        marginLeft: -10, 
+                        zIndex: 0 // Lowest z-index
+                      }
+                    ]}>
+                      <Text style={styles.miniAvatarMoreText}>+{notifications.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.miniPreviewText}>
+                  {notificationCount > 0 
+                    ? `${notificationCount} new notification${notificationCount > 1 ? 's' : ''}` 
+                    : `${notifications.length} notification${notifications.length > 1 ? 's' : ''}`
+                  }
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.miniPreviewText}>No notifications</Text>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+      
+      {/* Render the clear confirmation modal */}
+      {clearModal.config && (
+        <CustomModal
+          visible={clearModal.visible}
+          title={clearModal.config.title}
+          message={clearModal.config.message}
+          buttons={clearModal.config.buttons}
+          icon={clearModal.config.icon}
+          onClose={clearModal.hideModal}
+        />
+      )}
+    </>
+  );
+};
+
+const NotificationsScreen = () => {
+  const router = useRouter();
+  
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <CommonHeader 
@@ -1446,27 +1696,7 @@ const NotificationsScreen = () => {
         <AnnouncementWidget />
         <FriendRequestWidget />
         <ProfileViewWidget />
-
-        <View style={styles.listHeaderContainer}>
-          <Text style={styles.listHeader}>All Notifications</Text>
-          {/* Add a badge with a fixed count of 3 */}
-          <View style={styles.widgetCountBadge}>
-            <Text style={styles.widgetCountText}>3</Text>
-          </View>
-        </View>
-
-        {notifications.length > 0 ? (
-          <FlatList
-            data={notifications}
-            renderItem={renderItem}
-            keyExtractor={item => item.id}
-            scrollEnabled={false} 
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-          />
-        ) : (
-          <Text style={styles.emptyText}>No notifications yet</Text>
-        )}
+        <AllNotificationsWidget />
       </ScrollView>
     </SafeAreaView>
   );
@@ -1619,6 +1849,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   message: {
     fontSize: 16,
@@ -2049,6 +2282,36 @@ const styles = StyleSheet.create({
     color: '#A0A0A0',
     fontSize: 12,
     marginLeft: 4,
+  },
+  notificationSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 6,
+  },
+  
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(242, 53, 53, 0.15)',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginRight: 12,
+  },
+  
+  clearButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  
+  timeRight: {
+    fontSize: 14,
+    color: '#8F8F8F',
+    marginLeft: 8,
+    textAlign: 'right',
+    minWidth: 35, // Ensure consistent width for timestamps
   },
 });
 
