@@ -1192,7 +1192,7 @@ const HomeScreen = () => {
 
   // Render a minimal Gems+ widget with expand/minimize functionality
   const renderMinimalGemsWidget = () => {
-    const gemsBalance = 940; // For demo, could be a state variable
+    // Use the shared state variable instead of hardcoded values
     const dailyGems = 200; // For demo, could be a state variable
     const daysUntilRenewal = 3; // For demo, could be a state variable
     
@@ -1276,7 +1276,7 @@ const HomeScreen = () => {
                       color: '#FFFFFF', 
                       fontWeight: 'bold', 
                       fontSize: 18
-                    }}>{gemsBalance}</Text>
+                    }}>{gemBalance}</Text>
                     <MaterialCommunityIcons 
                       name="diamond-stone" 
                       size={14} 
@@ -1422,7 +1422,7 @@ const HomeScreen = () => {
                     color: '#FFFFFF', 
                     marginRight: 12
                   }}>
-                    {gemsBalance}
+                    {gemBalance}
                   </Text>
                   <LinearGradient
                     colors={['#B768FB', '#6E69F4']}
