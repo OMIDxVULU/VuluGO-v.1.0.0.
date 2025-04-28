@@ -8,16 +8,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 const { width } = Dimensions.get('window');
 
 // Fixed padding values - reduced horizontal padding to use more screen space
-const HORIZONTAL_PADDING = 12; // Reduced from 20
-const ITEM_GAP = 12; // Reduced from 16
+const HORIZONTAL_PADDING = 8; // Reduced from 12 to get closer to edges
+const ITEM_GAP = 10; // Reduced from 12 for tighter spacing
 // Calculate width based on available space - wider items
 const STREAM_ITEM_WIDTH = (width - (HORIZONTAL_PADDING * 2 + ITEM_GAP)) / 2;
-// Height components - increased for more visual impact
-const RANK_SECTION_HEIGHT = 36; // Increased from 30
+// Height components - adjust sizes
+const RANK_SECTION_HEIGHT = 30; // Reduced from 36 
 const IMAGE_HEIGHT = 180; // Increased from 160
 const INFO_SECTION_HEIGHT = 50; // Increased from 40
 // Total stream item height
-const STREAM_ITEM_HEIGHT = RANK_SECTION_HEIGHT + IMAGE_HEIGHT + INFO_SECTION_HEIGHT; // Now 266px total
+const STREAM_ITEM_HEIGHT = RANK_SECTION_HEIGHT + IMAGE_HEIGHT + INFO_SECTION_HEIGHT; // Now 260px total
 
 interface LiveStreamItemProps {
   stream: LiveStream;
@@ -41,6 +41,9 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
     if (rank === 3) return styles.thirdRank;
     return styles.defaultRank;
   };
+
+  // Check if stream is boosted
+  const isBoosted = (stream.boost || 0) > 0;
 
   // Render hosts grid based on number of hosts
   const renderHostsGrid = () => {
@@ -131,16 +134,27 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
     >
       {/* Rank Section - Above pictures */}
       <View style={styles.rankSection}>
-        <View style={[styles.rankBadge, getRankBadgeStyle(rank)]}>
-          <Text style={styles.rankText}>{getRankText(rank)}</Text>
-        </View>
-        
-        {/* Featured indicator if needed */}
-        {rank <= 3 && (
-          <View style={styles.featuredBadge}>
-            <MaterialIcons name="auto-awesome" size={16} color="#FFF" />
+        {isBoosted ? (
+          // Combined boost and rank badge for boosted streams
+          <View style={[styles.combinedBadge, getRankBadgeStyle(rank)]}>
+            <MaterialIcons name="auto-awesome" size={14} color="#FFF" />
+            <View style={styles.badgeDivider} />
+            <Text style={styles.rankText}>{getRankText(rank)}</Text>
+          </View>
+        ) : (
+          // Regular rank badge for non-boosted streams
+          <View style={[styles.rankBadge, getRankBadgeStyle(rank)]}>
+            <Text style={styles.rankText}>{getRankText(rank)}</Text>
           </View>
         )}
+        
+        {/* Viewer count bubble */}
+        <View style={styles.viewerBubble}>
+          <Ionicons name="eye-outline" size={12} color="#FFFFFF" />
+          <Text style={styles.viewerBubbleText}>
+            {formatViewCount(stream.views)}
+          </Text>
+        </View>
       </View>
       
       {/* Profile Pictures Section */}
@@ -161,14 +175,6 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
         >
           {stream.title || 'Live Stream'}
         </Text>
-        
-        {/* Viewer count */}
-        <View style={styles.viewerContainer}>
-          <Ionicons name="eye-outline" size={14} color="rgba(255, 255, 255, 0.7)" />
-          <Text style={styles.viewerCount}>
-            {formatViewCount(stream.views)}
-          </Text>
-        </View>
       </View>
     </TouchableOpacity>
   );
@@ -367,11 +373,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  rankBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: '#2D2E38',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  combinedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+    paddingLeft: 6,
+    paddingRight: 8,
+    borderRadius: 10,
+    backgroundColor: '#2D2E38',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  badgeDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: 6,
   },
   profileContainer: {
     width: '100%',
@@ -437,13 +468,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
-  rankBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#2D2E38',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+  rankText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   firstRank: {
     backgroundColor: '#FFD700', // Gold
@@ -461,44 +492,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#2D2E38',
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  rankText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  featuredBadge: {
-    backgroundColor: 'rgba(110, 86, 247, 0.8)',
-    borderRadius: 50,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(110, 86, 247, 0.4)',
-    shadowColor: 'rgba(110, 86, 247, 0.5)',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   streamTitle: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  viewerContainer: {
+  viewerBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  viewerCount: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 13,
-    marginLeft: 5,
+  viewerBubbleText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginLeft: 3,
   },
   startStreamButton: {
     overflow: 'hidden',
