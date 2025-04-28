@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Image, ScrollView, Dimensions } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, Image, ScrollView, Dimensions, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLiveStreams, LiveStream } from '../context/LiveStreamContext';
@@ -19,6 +19,12 @@ const INFO_SECTION_HEIGHT = 50; // Increased from 40
 // Total stream item height
 const STREAM_ITEM_HEIGHT = RANK_SECTION_HEIGHT + IMAGE_HEIGHT + INFO_SECTION_HEIGHT; // Now 260px total
 
+// Create a context for tutorial visibility
+const TutorialContext = React.createContext({ 
+  showTutorial: true, 
+  hideTutorial: () => {} 
+});
+
 interface LiveStreamItemProps {
   stream: LiveStream;
   rank: number;
@@ -26,6 +32,56 @@ interface LiveStreamItemProps {
 }
 
 const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
+  const [isPressing, setIsPressing] = useState(false);
+  const pressAnimation = useRef(new Animated.Value(0)).current;
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use the tutorial context
+  const { showTutorial, hideTutorial } = React.useContext(TutorialContext);
+
+  // Function to handle press start
+  const handlePressIn = () => {
+    setIsPressing(true);
+    // Reset animation value
+    pressAnimation.setValue(0);
+    
+    // Start animation to grow from 0 to 1 over 1000ms (1 second)
+    Animated.timing(pressAnimation, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+    
+    // Set a timer to trigger the action after 1 second
+    pressTimer.current = setTimeout(() => {
+      onPress(stream);
+      setIsPressing(false);
+    }, 1000);
+
+    // Hide tutorial after first interaction
+    hideTutorial();
+  };
+  
+  // Function to handle press cancel
+  const handlePressOut = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+    setIsPressing(false);
+    // Stop the animation by resetting
+    pressAnimation.setValue(0);
+  };
+  
+  // Clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pressTimer.current) {
+        clearTimeout(pressTimer.current);
+      }
+    };
+  }, []);
+
   // Function to get the rank text
   const getRankText = (rank: number) => {
     if (rank === 1) return '1st';
@@ -128,8 +184,9 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
 
   return (
     <TouchableOpacity 
-      style={styles.streamItem} 
-      onPress={() => onPress(stream)}
+      style={styles.streamItem}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       activeOpacity={0.7}
     >
       {/* Rank Section - Above pictures */}
@@ -176,6 +233,23 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
           {stream.title || 'Live Stream'}
         </Text>
       </View>
+      
+      {/* Press indicator overlay */}
+      {isPressing && (
+        <View style={styles.pressIndicatorContainer}>
+          <Animated.View 
+            style={[
+              styles.pressIndicator,
+              {
+                width: pressAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%']
+                })
+              }
+            ]}
+          />
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -196,6 +270,14 @@ const LiveStreamGrid = () => {
   const router = useRouter();
   const { streams } = useLiveStreams();
   
+  // Create a global state for controlling the tutorial visibility
+  const [showTutorialState, setShowTutorialState] = useState(true);
+  
+  // Create a function to hide the tutorial
+  const hideTutorial = () => {
+    setShowTutorialState(false);
+  };
+
   // Handle stream selection
   const handleStreamPress = (stream: LiveStream) => {
     router.push({
@@ -278,20 +360,32 @@ const LiveStreamGrid = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <SectionHeader title="Lives" count={sortedStreams.length} />
-        <StartStreamButton />
+    <TutorialContext.Provider value={{ showTutorial: showTutorialState, hideTutorial }}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <SectionHeader title="Lives" count={sortedStreams.length} />
+          <StartStreamButton />
+        </View>
+        
+        {/* Global tutorial bubble - positioned at a fixed place in the UI */}
+        {showTutorialState && sortedStreams.length > 0 && (
+          <View style={styles.globalTutorialContainer}>
+            <View style={styles.tutorialBubble}>
+              <Text style={styles.tutorialText}>Hold to join a live stream</Text>
+              <View style={styles.tutorialArrow} />
+            </View>
+          </View>
+        )}
+        
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderStreamRows()}
+        </ScrollView>
       </View>
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {renderStreamRows()}
-      </ScrollView>
-    </View>
+    </TutorialContext.Provider>
   );
 };
 
@@ -300,6 +394,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingBottom: 24,
+    position: 'relative',
   },
   header: {
     flexDirection: 'row',
@@ -365,6 +460,53 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 2, // Small margin to make shadow visible
+    position: 'relative', // Added for absolute positioning of tutorial
+  },
+  // Global tutorial container - positioned to cover the whole grid area
+  globalTutorialContainer: {
+    position: 'absolute',
+    top: 65, // Place below the header
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999, // Ensure it's above everything
+  },
+  // Tutorial bubble styles - matching the app's existing tutorial bubbles
+  tutorialBubble: {
+    backgroundColor: '#6E69F4',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    maxWidth: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+    marginBottom: 12,
+  },
+  tutorialText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  tutorialArrow: {
+    position: 'absolute',
+    bottom: -16,
+    left: '50%',
+    marginLeft: -8,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderTopWidth: 16,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#6E69F4',
   },
   rankSection: {
     width: '100%',
@@ -529,6 +671,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginLeft: 6,
+  },
+  pressIndicatorContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    overflow: 'hidden',
+  },
+  pressIndicator: {
+    height: '100%',
+    backgroundColor: 'rgb(110, 86, 247)',
   },
 });
 
