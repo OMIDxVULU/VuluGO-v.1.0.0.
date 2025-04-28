@@ -13,6 +13,7 @@ import PersonGroupIcon from '../components/PersonGroupIcon';
 import { useLiveStreams } from '../context/LiveStreamContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import SpotlightProgressBar from '../components/SpotlightProgressBar';
+import LiveStreamGrid from '../components/LiveStreamGrid';
 import { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -1638,6 +1639,11 @@ const HomeScreen = () => {
     }
   }, [showGoldPopup]);
   
+  // Add the navigateToProfile function if it doesn't exist
+  const navigateToProfile = () => {
+    router.push('/profile');
+  };
+  
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -1898,14 +1904,11 @@ const HomeScreen = () => {
         {/* New Minimal Event Widget */}
         {renderMinimalEventWidget()}
         
-        {/* Event Widget */}
-        {/* REMOVE renderEventWidget function */}
-        
         {/* New Minimal Gems Widget */}
         {renderMinimalGemsWidget()}
         
-        {/* Improved Gems Widget */}
-        {/* REMOVE renderGemsWidget call */}
+        {/* LiveStream Grid Section */}
+        <LiveStreamGrid />
       </ScrollableContentContainer>
       
       {/* Spotlight management modal */}
