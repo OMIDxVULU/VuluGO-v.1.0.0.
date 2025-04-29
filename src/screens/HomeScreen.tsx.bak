@@ -65,7 +65,7 @@ const HomeScreen = () => {
 
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [spotlightQueuePosition, setSpotlightQueuePosition] = useState<number>(0);
-  const [goldBalance, setGoldBalance] = useState<number>(1000); // Updated from 100 to 1000
+  const [goldBalance, setGoldBalance] = useState<number>(100);
   const [eventEntryCost, setEventEntryCost] = useState(100); // Fixed entry cost of 100 gold
   const [eventEntries, setEventEntries] = useState(0); // Number of entries, starting at 0
   const [eventTimeLeft, setEventTimeLeft] = useState(180); // 3 minutes for demonstration (would be 3 hours in production)
@@ -73,11 +73,10 @@ const HomeScreen = () => {
   const [wonEventCycle, setWonEventCycle] = useState(-1); // Track which event cycle the user won in
   const [hasEnteredEvent, setHasEnteredEvent] = useState(false); // Track if user has entered the current event
   const [hasWonEvent, setHasWonEvent] = useState(false); // Track if user has won but not claimed
+  const [justClaimed, setJustClaimed] = useState(false); // Track if user just claimed a reward
   const [viewersCount, setViewersCount] = useState<number>(35);
   const [showYourPill, setShowYourPill] = useState<boolean>(true);
   const [showOtherPill, setShowOtherPill] = useState<boolean>(true);
-  // Add record of entries for each event cycle
-  const [eventEntriesRecord, setEventEntriesRecord] = useState<{[key: number]: number}>({});
   
   // --- Animation Setup for Your Spotlight Shadow ---
   const yourShadowOpacity = useSharedValue(0.7); // Initial opacity
@@ -991,9 +990,7 @@ const HomeScreen = () => {
     };
     
     // Calculate prize pool based on number of entries
-    const prizePool = eventEntries === 0 ? 0 : eventEntries === 1 ? 
-      eventEntryCost : // Show full refund amount for 1 entry
-      Math.floor(eventEntries * eventEntryCost * 0.7); // 70% of all entries for 2+ entries
+    const prizePool = eventEntries * eventEntryCost;
     
     return (
       <View style={{position: 'relative', marginBottom: 16}}>
@@ -1069,43 +1066,39 @@ const HomeScreen = () => {
                   </View>
                 </View>
                 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.enterButton, 
-                    // Change button color based on state
-                    hasWonEvent ? styles.claimButton : styles.enterButton,
-                    // Disable button styling if needed
-                    (!hasWonEvent && hasEnteredEvent) && styles.enteredButton,
-                    (!hasWonEvent && !hasEnteredEvent && goldBalance < eventEntryCost) && styles.disabledButton
-                  ]} 
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleEventEntry();
+                    styles.eventButton,
+                    hasWonEvent && styles.claimButton,
+                    hasEnteredEvent && !hasWonEvent && styles.enteredButton,
+                    ((!hasWonEvent && hasEnteredEvent) || 
+                     (!hasWonEvent && !hasEnteredEvent && goldBalance < eventEntryCost)) && 
+                      styles.disabledButton
+                  ]}
+                  onPress={() => {
+                    if (hasWonEvent) {
+                      claimEventPrize();
+                    } else {
+                      handleEventEntry();
+                    }
                   }}
-                  // Only disable if:
-                  // 1. User has entered but not won yet
-                  // 2. User doesn't have enough gold to enter
                   disabled={
-                    (!hasWonEvent && hasEnteredEvent) || 
-                    (!hasWonEvent && !hasEnteredEvent && goldBalance < eventEntryCost)
+                    // Enable button if user has won
+                    // Also enable if user just claimed (for smoother UX)
+                    // Disable if already entered and not won
+                    // Disable if not enough gold
+                    !hasWonEvent && !justClaimed && (hasEnteredEvent || goldBalance < eventEntryCost)
                   }
                 >
-                  <View style={styles.buttonContent}>
-                    {/* Show cost info if not entered yet */}
-                    {!hasWonEvent && !hasEnteredEvent && (
-                      <View style={styles.costContainer}>
-                        <View style={styles.eventCoinIcon} />
-                        <Text style={styles.costText}>{eventEntryCost}</Text>
-                      </View>
-                    )}
-                    <Text style={styles.enterButtonText}>
-                      {hasWonEvent 
-                        ? 'Claim Reward' 
-                        : hasEnteredEvent 
-                          ? 'Entered' 
-                          : 'Enter'}
-                    </Text>
-                  </View>
+                  <Text style={styles.eventButtonText}>
+                    {hasWonEvent
+                      ? 'Claim Reward'
+                      : justClaimed
+                      ? 'Auto-entering...'
+                      : hasEnteredEvent
+                      ? 'Entered'
+                      : 'Enter'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1697,7 +1690,13 @@ const HomeScreen = () => {
   
   // Update the useEffect for the automatic event timer to properly detect winners
   useEffect(() => {
-    console.log('Setting up event timer with state:', { hasEnteredEvent, hasWonEvent, eventTimeLeft });
+    console.log('EVENT TIMER SETUP with state:', { 
+      hasEnteredEvent, 
+      hasWonEvent, 
+      eventTimeLeft,
+      eventCycleCount,
+      wonEventCycle
+    });
     
     // Always run the timer, regardless of user participation
     const timer = setInterval(() => {
@@ -1706,35 +1705,48 @@ const HomeScreen = () => {
         
         // When timer reaches zero, determine winners and reset
         if (newValue === 0) {
-          console.log('Timer reached zero. Current state:', { hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount });
+          console.log('TIMER REACHED ZERO. Current state:', { 
+            hasEnteredEvent, 
+            hasWonEvent, 
+            eventEntries, 
+            eventCycleCount,
+            wonEventCycle 
+          });
           
           // GUARANTEED WIN: If user has entered this cycle and hasn't won yet, they win
           if (hasEnteredEvent && !hasWonEvent) {
-            console.log('User has entered and wins!');
-            // Force this to happen synchronously before any state updates
+            console.log('USER HAS ENTERED AND WINS!');
+            // Synchronously set the win state, but defer notification
+            setHasWonEvent(true);
+            setWonEventCycle(eventCycleCount); // Track which cycle they won in
+            
+            // Add notification after a small delay to avoid state updates during render
             setTimeout(() => {
-              setHasWonEvent(true);
-              setWonEventCycle(eventCycleCount); // Track which cycle they won in
-              
-              // Add notification
               const winAmount = calculateWinAmount();
               addEventWinNotification(winAmount);
-            }, 0);
+            }, 10);
           } else {
-            console.log('No active entries or already won.');
+            console.log('NO ACTIVE ENTRIES OR ALREADY WON. Entry status:', {
+              hasEnteredEvent,
+              hasWonEvent,
+              eventCycleCount,
+              wonEventCycle
+            });
           }
           
           // Always start a new cycle after a delay
           setTimeout(() => {
-            console.log('Starting new event cycle');
+            console.log('STARTING NEW EVENT CYCLE #', eventCycleCount + 1);
             setEventTimeLeft(180); // Reset to 3 minutes
             setEventCycleCount(prev => prev + 1); // Increment cycle count
             
-            // Reset event entries for the new cycle
-            setEventEntries(0);
-            
             // Don't modify hasEnteredEvent or hasWonEvent here
             // These should only be reset when user claims their reward
+            console.log('NEW CYCLE STARTED with state:', {
+              hasEnteredEvent,
+              hasWonEvent,
+              eventCycleCount: eventCycleCount + 1
+            });
           }, 2000); // Small delay before starting new cycle
           
           return 0;
@@ -1746,119 +1758,105 @@ const HomeScreen = () => {
     
     // Clean up on unmount
     return () => {
-      console.log('Clearing event timer');
+      console.log('CLEARING EVENT TIMER');
       clearInterval(timer);
     };
-  }, [hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount]); // Add eventCycleCount dependency
+  }, [hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount, wonEventCycle]); // Include wonEventCycle dependency
 
   // Helper function to calculate win amount
   const calculateWinAmount = () => {
-    // Special case: If only one entry, refund the full entry fee
-    if (eventEntries === 1) {
-      return eventEntryCost; // Full refund of 100 gold
-    }
-    
-    // Otherwise, winner gets the prize pool (70% of all entries)
-    // 70% of each 100 gold entry goes to prize pool
-    return Math.floor(eventEntries * eventEntryCost * 0.7);
+    // Winner gets 20% of the prize pool
+    return Math.floor(eventEntries * eventEntryCost * 0.2);
   };
 
-  // Update the handleEventEntry function
+  // Simplify the handleEventEntry function for better reliability
   const handleEventEntry = () => {
+    // If user has won, handle claiming the prize
     if (hasWonEvent) {
-      // If user has won, handle claiming the prize
       claimEventPrize();
-    } else if (!hasEnteredEvent) {
-      // Make sure the event isn't expired (timer at 0)
-      if (eventTimeLeft <= 0) {
-        console.log('Cannot enter an expired event, wait for the next cycle');
-        return;
-      }
-      
-      // If user hasn't entered current cycle
-      if (goldBalance >= eventEntryCost) {
-        // Deduct entry cost from balance
-        setGoldBalance(prev => prev - eventEntryCost);
-        setHasEnteredEvent(true);
-        console.log('Event entered for', eventEntryCost, 'gold. Waiting for results...');
-        
-        // Increment entries
-        const newEntryCount = eventEntries + 1;
-        setEventEntries(newEntryCount);
-        
-        // Record the entry count for this event cycle
-        setEventEntriesRecord(prev => ({
-          ...prev,
-          [eventCycleCount]: newEntryCount
-        }));
-      } else {
-        // Not enough gold
-        console.log('Insufficient gold to enter event');
-      }
-    } else {
-      console.log('Already entered this event cycle. Wait for results.');
+      return;
     }
+    
+    // If already entered, do nothing
+    if (hasEnteredEvent) {
+      return;
+    }
+    
+    // Can't enter if timer is at 0
+    if (eventTimeLeft <= 0) {
+      return;
+    }
+    
+    // Check if user has enough gold
+    if (goldBalance < eventEntryCost) {
+      return;
+    }
+    
+    // All checks passed, enter the event
+    setGoldBalance(prev => prev - eventEntryCost);
+    setHasEnteredEvent(true);
+    setEventEntries(prev => prev + 1);
+    console.log('Successfully entered event');
   };
 
-  // Update the claimEventPrize function
+  // Completely rewritten claimEventPrize function using immediate cleanup approach
   const claimEventPrize = () => {
-    // Get the stored number of entries from when the user won
-    const entriesWhenWon = eventEntriesRecord[wonEventCycle] || 0;
+    // Calculate win amount
+    const winAmount = calculateWinAmount();
     
-    // Calculate the prize amount
-    let prizeAmount = 0;
+    // Add gold to balance
+    setGoldBalance(prev => prev + winAmount);
     
-    if (entriesWhenWon === 1) {
-      // Full refund case
-      prizeAmount = eventEntryCost;
-      console.log('Claiming prize: Full refund of entry fee');
-    } else {
-      // Normal prize pool (70% of all entries)
-      prizeAmount = Math.floor(entriesWhenWon * eventEntryCost * 0.7);
-      console.log(`Claiming prize: ${prizeAmount} gold from prize pool`);
-    }
-    
-    // Add the prize to user's gold balance
-    setGoldBalance(prevGold => prevGold + prizeAmount);
-    
-    // Reset won status to allow re-entry for next event
-    setWonEventCycle(-1);
+    // Reset participation flags immediately
     setHasWonEvent(false);
     setHasEnteredEvent(false);
+    setWonEventCycle(-1);
     
-    showNotification(`Claimed ${prizeAmount} gold!`);
-    console.log('Prize claimed, wonEventCycle reset to -1');
+    console.log('Claimed reward - user can now re-enter manually');
   };
 
   // Function to add a notification when user wins an event
   const addEventWinNotification = (winAmount: number) => {
-    // Log to console for debugging
-    console.log('Added notification: You won', winAmount, 'gold in the event!');
-    
-    // Get the current count and increment it
-    const newCount = counts.allNotifications + 1;
-    
-    // Update the notification count in the context
-    updateAllNotificationsCount(newCount);
-    
-    // In a real app with proper state management, you would:
-    // 1. Create a function in your NotificationContext to add a new notification
-    // 2. Call that function with the notification details
-    
-    // For demo purposes, this will update the notification badge counter
-    // which is what the user will see in the UI
+    // Use setTimeout to avoid React state update issues during render
+    setTimeout(() => {
+      // Get the current count and increment it
+      const newCount = counts.allNotifications + 1;
+      
+      // Update the notification count in the context
+      updateAllNotificationsCount(newCount);
+      
+      console.log('Added win notification');
+    }, 0);
   };
 
-  // Function to show notification
-  const showNotification = (message: string) => {
-    console.log('Notification:', message);
-    // In a real app, you would use a notification system
-    // For this demo, we'll just log to console
+  // Add a special effect to automatically re-enter after claiming
+  useEffect(() => {
+    if (justClaimed && !hasEnteredEvent && !hasWonEvent && goldBalance >= eventEntryCost) {
+      console.log('AUTO RE-ENTRY TRIGGERED!');
+      
+      // Small delay to ensure all state updates are processed
+      const timer = setTimeout(() => {
+        // Re-enter the event automatically
+        setGoldBalance(prev => prev - eventEntryCost);
+        setHasEnteredEvent(true);
+        setEventEntries(prev => prev + 1);
+        setJustClaimed(false);
+        console.log('AUTO RE-ENTRY SUCCESSFUL!');
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
     
-    // Increment notification count
-    const newCount = counts.allNotifications + 1;
-    updateAllNotificationsCount(newCount);
-  };
+    // Reset justClaimed after a short delay if we didn't auto re-enter
+    if (justClaimed) {
+      const timer = setTimeout(() => {
+        setJustClaimed(false);
+        console.log('Claim flag reset');
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [justClaimed, hasEnteredEvent, hasWonEvent, goldBalance, eventEntryCost]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -3398,6 +3396,18 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#555', // Darker grey when disabled
     opacity: 0.7,
+  },
+  eventButton: {
+    backgroundColor: '#FFD700',
+    borderRadius: 100,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventButtonText: {
+    color: '#1D1E26',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 
