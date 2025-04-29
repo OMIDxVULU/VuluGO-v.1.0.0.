@@ -520,36 +520,31 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Enhanced Profile Info Card */}
+        {/* Profile Info Card with Thin Outline */}
         <View style={styles.profileInfoCard}>
-          <LinearGradient
-            colors={['#6E69F4', '#C549BC']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileInfoCardGradient}
-          >
-            <Animated.View style={[
+          <Animated.View 
+            style={[
               styles.profileInfoContainer,
               { transform: [{ scale: profileScaleAnim }] }
-            ]}>
-              <TouchableOpacity 
-                activeOpacity={0.9}
-                onPress={openPreview}
-                style={styles.profileImageTouchable}
-              >
-                <Image 
-                  source={{ uri: profileImage }} 
-                  style={styles.profileImage} 
-                />
-                <View style={styles.profileImageOverlay}>
-                  <Feather name="eye" size={24} color="#FFFFFF" />
-                </View>
-              </TouchableOpacity>
-              <View style={styles.profileInfoTextContainer}>
-                <Text style={styles.profileName}>Sophia Jack</Text>
+            ]}
+          >
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              onPress={openPreview}
+              style={styles.profileImageTouchable}
+            >
+              <Image 
+                source={{ uri: profileImage }} 
+                style={[styles.profileImage, { borderColor: contextStatusData.color }]} 
+              />
+              <View style={styles.profileImageOverlay}>
+                <Feather name="eye" size={24} color="#FFFFFF" />
               </View>
-            </Animated.View>
-          </LinearGradient>
+            </TouchableOpacity>
+            <View style={styles.profileInfoTextContainer}>
+              <Text style={styles.profileName}>Sophia Jack</Text>
+            </View>
+          </Animated.View>
         </View>
         
         {/* Photos Section */}
@@ -592,7 +587,7 @@ const ProfileScreen = () => {
             
             {/* Profile Photo Display - Shows same image as profile square */}
             <TouchableOpacity style={styles.photoItemContainer}>
-              <View style={[styles.profilePhotoContainer, { borderColor: contextStatusData.color }]}>
+              <View style={styles.profilePhotoContainer}>
                 <Image 
                   source={{ uri: profileImage }} 
                   style={styles.profilePhotoItem}
@@ -1359,23 +1354,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   profileInfoCard: {
-    margin: 12,
+    marginHorizontal: 20,
+    marginVertical: 10,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  profileInfoCardGradient: {
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 10,
-  },
   profileInfoContainer: {
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     alignItems: 'center',
     width: '100%',
+    backgroundColor: 'transparent',
   },
   profileImageTouchable: {
     position: 'relative',
@@ -1392,7 +1381,7 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: 'rgba(156, 132, 239, 1)',
+    // borderColor will be set dynamically based on status
   },
   profileImageOverlay: {
     position: 'absolute',
@@ -1817,8 +1806,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 12,
     backgroundColor: '#1E1F25',
-    borderWidth: 2,
-    borderColor: '#7ADA72', // Default value, will be overridden
   },
   profilePhotoItem: {
     width: '100%',
