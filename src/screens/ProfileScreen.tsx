@@ -427,52 +427,7 @@ const ProfileScreen = () => {
         <Text style={styles.headerTitle}>Profile</Text>
       </Animated.View>
       
-      {/* Game-style currency top bar - moved under the header */}
-      <View style={styles.gameTopBar}>
-        {/* Diamonds currency */}
-        <View style={styles.currencyContainer}>
-          <LinearGradient
-            colors={['#7872F4', '#5865F2']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.currencyPill}
-          >
-            <View style={styles.diamondIconContainer}>
-              <LinearGradient
-                colors={['#9C84EF', '#F47FFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.diamondIcon}
-              >
-                <MaterialCommunityIcons name="diamond-stone" size={18} color="#FFFFFF" />
-              </LinearGradient>
-            </View>
-            <Text style={styles.currencyAmount}>200,012</Text>
-          </LinearGradient>
-        </View>
-        
-        {/* Gold currency */}
-        <View style={styles.currencyContainer}>
-          <LinearGradient
-            colors={['#8B7000', '#614C00']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.currencyPill}
-          >
-            <View style={styles.goldIconContainer}>
-              <LinearGradient
-                colors={['#FFD700', '#FFA500']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.goldIcon}
-              >
-                <FontAwesome name="circle" size={16} color="#FFFFFF" />
-              </LinearGradient>
-            </View>
-            <Text style={styles.currencyAmount}>43,978</Text>
-          </LinearGradient>
-        </View>
-      </View>
+      {/* Removed gem/gold balances at the top */}
       
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -617,44 +572,91 @@ const ProfileScreen = () => {
         </View>
         
         {/* Gem+ Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.gemSection}>
-            <LinearGradient
-              colors={['rgba(110, 105, 244, 0.15)', 'rgba(196, 73, 188, 0.15)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.gemIconContainer}
-            >
-              <LinearGradient
-                colors={['#9C84EF', '#F47FFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gemIcon}
-              >
-                <MaterialCommunityIcons name="diamond-stone" size={24} color="#FFFFFF" />
-              </LinearGradient>
-            </LinearGradient>
-            
-            <View style={styles.gemInfoContainer}>
-              <View style={styles.gemLabelContainer}>
-                <Text style={styles.gemLabel}>Gem+</Text>
-                <View style={styles.inactiveButton}>
-                  <Text style={styles.inactiveText}>Inactive</Text>
+        <View style={{position: 'relative', marginBottom: 16, paddingHorizontal: 12}}>
+          <TouchableOpacity 
+            onPress={() => toggleGemPlus()}
+            activeOpacity={0.7}
+            style={{
+              backgroundColor: '#1C1D23',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 16
+            }}
+          >
+            <View style={{
+              flexDirection: 'row', 
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%'
+            }}>
+              {/* Left side - Title and badge */}
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <MaterialCommunityIcons 
+                  name="diamond-stone" 
+                  size={20} 
+                  color="#B768FB" 
+                  style={{marginRight: 8}}
+                />
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  marginRight: 8
+                }}>Gem+</Text>
+                <View style={{
+                  backgroundColor: '#B768FB',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 10
+                }}>
+                  <Text style={{
+                    color: '#FFFFFF',
+                    fontSize: 10,
+                    fontWeight: 'bold'
+                  }}>ACTIVE</Text>
                 </View>
               </View>
               
-              <TouchableOpacity>
-                <LinearGradient
-                  colors={['#6E69F4', '#5865F2']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.buyButton}
-                >
-                  <Text style={styles.buyText}>Buy</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              {/* Right side - Balance info */}
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View style={{alignItems: 'flex-end', marginRight: 10}}>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Text style={{
+                      color: '#FFFFFF', 
+                      fontWeight: 'bold', 
+                      fontSize: 18
+                    }}>50</Text>
+                    <MaterialCommunityIcons 
+                      name="diamond-stone" 
+                      size={14} 
+                      color="rgba(183, 104, 251, 0.7)" 
+                      style={{marginLeft: 4}}
+                    />
+                  </View>
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.5)', 
+                    fontSize: 10
+                  }}>
+                    200/day
+                  </Text>
+                </View>
+                <View style={{
+                  backgroundColor: 'rgba(183, 104, 251, 0.15)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6
+                }}>
+                  <Text style={{
+                    color: '#B768FB', 
+                    fontSize: 10, 
+                    fontWeight: '500'
+                  }}>
+                    3d
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
         
         {/* Friends Section */}
@@ -1500,71 +1502,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 15,
   },
-  gemSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#1C1D23',
-    borderRadius: 16,
-    gap: 16,
-  },
-  gemIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gemIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  gemInfoContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  gemLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  gemLabel: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  inactiveButton: {
-    backgroundColor: '#535864',
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    marginLeft: 10,
-  },
-  inactiveText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  buyButton: {
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  buyText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  // Styles for Gem+ section removed
+
   friendsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1605,6 +1544,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1812,59 +1752,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 12,
   },
-  gameTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#15151C',
-  },
-  currencyContainer: {
-    flex: 1,
-    paddingHorizontal: 4,
-  },
-  currencyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingRight: 12,
-    paddingLeft: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  diamondIconContainer: {
-    marginRight: 6,
-  },
-  diamondIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  goldIconContainer: {
-    marginRight: 6,
-  },
-  goldIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  currencyAmount: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },
+  // Styles for currency and gem+ section removed
   previewOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
