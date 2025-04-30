@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder, StatusBar, TextInput } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5, AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -1860,6 +1860,166 @@ const HomeScreen = () => {
     updateAllNotificationsCount(newCount);
   };
 
+  // State for Global Chat
+  const [showGlobalChatModal, setShowGlobalChatModal] = useState(false);
+  
+  // Add these lines for handle swipe gesture:
+  // Pan responder for swiping down the chat modal
+  const chatPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to downward gestures
+        return gestureState.dy > 0;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // If user swiped down more than 50px, close the modal
+        if (gestureState.dy > 50) {
+          setShowGlobalChatModal(false);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        // If user swiped down more than 50px, close the modal
+        if (gestureState.dy > 50) {
+          setShowGlobalChatModal(false);
+        }
+      },
+    })
+  ).current;
+
+  // Render the Global Chat button
+  const renderGlobalChatButton = () => {
+    return (
+      <View style={{position: 'relative', marginBottom: 16}}>
+        <TouchableOpacity 
+          onPress={() => setShowGlobalChatModal(true)}
+          activeOpacity={0.7}
+          style={[styles.minimalEventContainer, {
+            backgroundColor: '#1C1D23',
+            paddingVertical: 14,
+            paddingHorizontal: 16
+          }]}
+        >
+          <View style={{
+            flexDirection: 'row', 
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%'
+          }}>
+            {/* Left side - Title and icon */}
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <MaterialCommunityIcons 
+                name="chat" 
+                size={20} 
+                color="#4CAF50" 
+                style={{marginRight: 8}}
+              />
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 16,
+                fontWeight: 'bold',
+              }}>Global Chat</Text>
+            </View>
+            
+            {/* Right side */}
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <MaterialCommunityIcons 
+                name="arrow-up" 
+                size={20} 
+                color="rgba(255,255,255,0.5)" 
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Global Chat Modal
+  const renderGlobalChatModal = () => {
+    return (
+      <Modal
+        visible={showGlobalChatModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowGlobalChatModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          {/* No touchable overlay to prevent dismissing when tapping outside */}
+          <View style={styles.globalChatContainer}>
+            {/* Swipeable area that includes both handle and header */}
+            <View {...chatPanResponder.panHandlers} style={styles.swipeableArea}>
+              {/* Handle for pulling down */}
+              <View style={styles.globalChatHandle} />
+              
+              {/* Chat Header */}
+              <View style={styles.globalChatHeader}>
+                <Text style={styles.globalChatTitle}>Global Chat</Text>
+                <TouchableOpacity onPress={() => setShowGlobalChatModal(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Chat Messages */}
+            <ScrollView style={styles.chatMessagesContainer}>
+              {/* Example messages - in a real app these would be dynamic */}
+              <View style={styles.chatMessageContainer}>
+                <View style={[styles.chatAvatarContainer, {backgroundColor: '#F06292'}]}>
+                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+                </View>
+                <View style={styles.chatMessageContent}>
+                  <View style={styles.chatMessageHeader}>
+                    <Text style={styles.chatMessageSender}>Jessica</Text>
+                    <Text style={styles.chatMessageTime}>2m ago</Text>
+                  </View>
+                  <Text style={styles.chatMessageText}>Hey everyone! Who's watching the stream?</Text>
+                </View>
+              </View>
+              
+              <View style={styles.chatMessageContainer}>
+                <View style={[styles.chatAvatarContainer, {backgroundColor: '#64B5F6'}]}>
+                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+                </View>
+                <View style={styles.chatMessageContent}>
+                  <View style={styles.chatMessageHeader}>
+                    <Text style={styles.chatMessageSender}>Mike</Text>
+                    <Text style={styles.chatMessageTime}>1m ago</Text>
+                  </View>
+                  <Text style={styles.chatMessageText}>I am! The tournament is getting intense!</Text>
+                </View>
+              </View>
+              
+              <View style={styles.chatMessageContainer}>
+                <View style={[styles.chatAvatarContainer, {backgroundColor: '#81C784'}]}>
+                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+                </View>
+                <View style={styles.chatMessageContent}>
+                  <View style={styles.chatMessageHeader}>
+                    <Text style={styles.chatMessageSender}>Sarah</Text>
+                    <Text style={styles.chatMessageTime}>Just now</Text>
+                  </View>
+                  <Text style={styles.chatMessageText}>Can't believe that last play! Amazing!</Text>
+                </View>
+              </View>
+            </ScrollView>
+            
+            {/* Chat Input */}
+            <View style={styles.chatInputContainer}>
+              <TextInput 
+                style={styles.chatInput}
+                placeholderTextColor="rgba(255,255,255,0.4)"
+              />
+              <TouchableOpacity style={styles.sendButton}>
+                <MaterialCommunityIcons name="send" size={24} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -2123,6 +2283,9 @@ const HomeScreen = () => {
         {/* New Minimal Gems Widget */}
         {renderMinimalGemsWidget()}
         
+        {/* Global Chat Button */}
+        {renderGlobalChatButton()}
+
         {/* LiveStream Grid Section */}
         <LiveStreamGrid />
       </ScrollableContentContainer>
@@ -2191,6 +2354,9 @@ const HomeScreen = () => {
         fuelRequired={15}
         fuelAvailable={20}
       />
+      
+      {/* Add Global Chat Modal */}
+      {renderGlobalChatModal()}
     </SafeAreaView>
   );
 };
@@ -2889,12 +3055,12 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   avatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    borderWidth: 2,
-    marginBottom: 8,
-    overflow: "hidden",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   nameLabel: {
     color: "#FFFFFF",
@@ -3398,6 +3564,131 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#555', // Darker grey when disabled
     opacity: 0.7,
+  },
+  // Global Chat styles
+  globalChatContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '80%',
+    backgroundColor: '#1A1B22',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  globalChatHandle: {
+    width: 60,
+    height: 5,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.5,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginVertical: 14,
+    // Add shadow to make it more visible
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  globalChatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  globalChatTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  chatMessagesContainer: {
+    flex: 1,
+    padding: 15,
+  },
+  chatMessageContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  chatMessageAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+    backgroundColor: '#6E69F4', // Example color for avatar background
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatMessageContent: {
+    flex: 1,
+    backgroundColor: '#2D2E38',
+    borderRadius: 12,
+    padding: 12,
+    borderTopLeftRadius: 0,
+  },
+  chatMessageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  chatMessageSender: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  chatMessageTime: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+  },
+  chatMessageText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#2D2E38',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    marginRight: 10,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatAvatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  swipeableArea: {
+    width: '100%',
   },
 });
 
