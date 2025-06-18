@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Animated, P
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { IconButton } from 'react-native-paper';
-import { ChatIcon, LiveIcon, MusicIcon, GoldMinerIcon, SlotsIcon, LeaderboardIcon, ShopIcon } from './icons/SidebarIcons';
+import { ChatIcon, MusicIcon, GoldMinerIcon, SlotsIcon, LeaderboardIcon, ShopIcon } from './icons/SidebarIcons';
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
@@ -99,13 +99,6 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       icon: (color: string, isActive: boolean) => <ChatIcon color={color} active={isActive} />,
       label: 'Messages',
       badge: 5,
-    },
-    {
-      id: 'live',
-      route: 'live',
-      icon: (color: string, isActive: boolean) => <LiveIcon color={color} active={isActive} />,
-      label: 'Live',
-      badge: 2,
     },
     {
       id: 'music',

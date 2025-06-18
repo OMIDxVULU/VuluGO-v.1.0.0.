@@ -50,8 +50,8 @@ export default function Chat() {
   const handleGoBack = () => {
     // Navigate to the direct messages screen instead of home
     if (source === 'live') {
-      // Navigate directly to live screen if that's where user came from
-      router.push('/(main)/live');
+      // Navigate to home screen since live screen has been removed
+      router.push('/(main)');
       return true; // Prevent default behavior
     } else if (source === 'notifications') {
       router.push('/(main)/notifications');

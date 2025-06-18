@@ -701,7 +701,7 @@ const LiveStreamView = () => {
           
           // Replace router.push with router.replace to avoid navigation stack issues
           router.replace({
-            pathname: '/(main)/live',
+            pathname: '/(main)',
             params: {
               minimized: 'true',
               streamId: streamId,

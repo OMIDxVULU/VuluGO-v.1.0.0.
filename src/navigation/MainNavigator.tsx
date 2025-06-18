@@ -11,7 +11,6 @@ import ProfileScreen from '../screens/ProfileScreen';
 import AccountScreen from '../screens/AccountScreen';
 import DirectMessagesScreen from '../screens/DirectMessagesScreen';
 import ChatScreen from '../screens/ChatScreen';
-import LiveScreen from '../screens/LiveScreen';
 import MusicScreen from '../screens/MusicScreen';
 import MiningScreen from '../screens/MiningScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
@@ -137,7 +136,6 @@ const MainNavigator = () => {
         >
           <Stack.Screen name="Main" component={MainTabNavigator} />
           <Stack.Screen name="DirectMessages" component={DirectMessagesScreen} />
-          <Stack.Screen name="Live" component={LiveScreen} />
           <Stack.Screen name="Music" component={MusicScreen} />
           <Stack.Screen name="Mining" component={MiningScreen} />
           <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
