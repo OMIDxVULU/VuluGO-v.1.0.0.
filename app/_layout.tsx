@@ -13,7 +13,7 @@ import { UserStatusProvider } from '../src/context/UserStatusContext';
 import { LiveStreamProvider } from '../src/context/LiveStreamContext';
 import { NotificationProvider } from '../src/context/NotificationContext';
 import ErrorBoundary from '../src/components/ErrorBoundary';
-import PerformanceMonitor from '../src/components/PerformanceMonitor';
+
 import { analyticsService } from '../src/services/AnalyticsService';
 
 // Create a custom Material theme
@@ -86,7 +86,7 @@ export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   // Always set fontsLoaded to false on iOS simulator to skip font loading completely
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(__DEV__);
+
 
   const [loaded] = useFonts({
     // Add any custom fonts here if needed
@@ -139,16 +139,7 @@ export default function RootLayout() {
                           <Stack.Screen name="(main)" />
                         </Stack>
                         
-                        {/* Performance Monitor */}
-                        {showPerformanceMonitor && (
-                          <PerformanceMonitor 
-                            position="bottom-right"
-                            backgroundColor="rgba(0, 0, 0, 0.7)"
-                            textColor="#FFFFFF"
-                            fontSize={10}
-                            enabled={true}
-                          />
-                        )}
+
                       </PaperProvider>
                     </SafeAreaProvider>
                   </MenuPositionProvider>
