@@ -24,6 +24,9 @@ import {
   Easing 
 } from 'react-native-reanimated';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import authService from '../services/authService';
+import FirebaseTest from '../components/FirebaseTest';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -65,7 +68,9 @@ const HomeScreen = () => {
 
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [spotlightQueuePosition, setSpotlightQueuePosition] = useState<number>(0);
-  const [goldBalance, setGoldBalance] = useState<number>(1000); // Updated from 100 to 1000
+  // Get user data from Firebase
+  const { userProfile } = useAuth();
+  const [goldBalance, setGoldBalance] = useState<number>(userProfile?.gold || 1000);
   const [eventEntryCost, setEventEntryCost] = useState(100); // Fixed entry cost of 100 gold
   const [eventEntries, setEventEntries] = useState(0); // Number of entries, starting at 0
   const [eventTimeLeft, setEventTimeLeft] = useState(180); // 3 minutes for demonstration (would be 3 hours in production)
@@ -1530,7 +1535,7 @@ const HomeScreen = () => {
   };
 
   // Additional state for gem balance
-  const [gemBalance, setGemBalance] = useState<number>(50);
+  const [gemBalance, setGemBalance] = useState<number>(userProfile?.gems || 50);
 
   // Handle gem to gold conversion
   const handleConvertGemToGold = (gems: number) => {
@@ -2027,9 +2032,16 @@ const HomeScreen = () => {
           title="Home" 
           rightIcons={[
             {
-              name: 'add',
+              name: 'logout',
               color: '#FFFFFF',
-              onPress: () => console.log('Add pressed')
+              onPress: async () => {
+                try {
+                  await authService.signOut();
+                  router.replace('/auth');
+                } catch (error) {
+                  console.error('Sign out error:', error);
+                }
+              }
             }
           ]}
         />
@@ -2357,6 +2369,9 @@ const HomeScreen = () => {
       
       {/* Add Global Chat Modal */}
       {renderGlobalChatModal()}
+      
+      {/* Firebase Connection Test */}
+      <FirebaseTest />
     </SafeAreaView>
   );
 };
