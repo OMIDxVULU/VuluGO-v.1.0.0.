@@ -98,49 +98,41 @@ const timeAgo = (timestamp: number): string => {
 const MOCK_CHAT_MESSAGES = [
   { 
     id: '1', 
-    user: { name: 'Anim', avatar: 'https://randomuser.me/api/portraits/lego/1.jpg', isAdmin: true }, 
-    message: 'Welcome to the stream! 👋', 
-    timestamp: Date.now() - 360000
+    user: { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
+    message: 'Hey everyone! 👋', 
+    timestamp: Date.now() - 300000 
   },
   { 
     id: '2', 
-    user: { name: 'Sophia', avatar: 'https://randomuser.me/api/portraits/women/56.jpg' }, 
-    message: 'Hello everyone! Excited to be here.', 
-    timestamp: Date.now() - 300000
+    user: { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg' },
+    message: 'Great stream!', 
+    timestamp: Date.now() - 240000 
   },
   { 
     id: '3', 
-    user: { name: 'Your Name', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' }, 
-    message: 'Thanks for having me! This looks great.', 
-    timestamp: Date.now() - 240000
+    user: { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg' },
+    message: 'Love the energy here 💕', 
+    timestamp: Date.now() - 180000 
   },
   { 
     id: '4', 
-    user: { name: 'Jack', avatar: 'https://randomuser.me/api/portraits/men/45.jpg' }, 
-    message: 'The game looks awesome today!', 
-    timestamp: Date.now() - 180000
+    user: { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
+    message: 'Can you play that song again?', 
+    timestamp: Date.now() - 120000 
   },
   { 
     id: '5', 
-    user: { name: 'Anim', avatar: 'https://randomuser.me/api/portraits/lego/1.jpg', isAdmin: true }, 
-    message: 'Thanks for joining us!', 
-    timestamp: Date.now() - 120000
+    user: { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg' },
+    message: 'This is amazing! 🔥', 
+    timestamp: Date.now() - 60000 
   },
-  { 
-    id: '6', 
-    user: { name: 'Emma', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' }, 
-    message: 'First time watching, this is great', 
-    timestamp: Date.now() - 60000
-  }
 ];
 
-// Room stats (matching Figma)
+// Room stats for fallback
 const ROOM_STATS = {
-  boosts: 164,
-  rank: 1,
-  viewers: 105,
-  participants: 105,
-  progress: 70 // Progress bar percentage (approx from Figma)
+  progress: 75,
+  boosts: 210,
+  rank: 3
 };
 
 interface Participant {
@@ -538,13 +530,12 @@ const LiveStreamView = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
   const [messageText, setMessageText] = useState('');
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('info');
   
   // Add reply state
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   
-  // Animation refs with correct initialization
-  const slideAnim = useRef(new Animated.Value(screenWidth)).current;
+  // Animation refs - ALL using useNativeDriver: false to avoid conflicts
+  const infoPanelFadeAnim = useRef(new Animated.Value(0)).current; // Start invisible
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const minimizeAnim = useRef(new Animated.Value(1)).current;
   
@@ -577,356 +568,189 @@ const LiveStreamView = () => {
   type Position = { x: number; y: number };
   
   const currentPanPosition = useRef<Position>({ x: 0, y: 0 });
-  
-  // Function to calculate dynamic widget size and position
-  const calculateWidgetSize = useCallback((numHosts: number) => {
-    // Determine grid dimensions based on host count
-    let columns = 1;
-    let rows = 1;
-    
-    if (numHosts <= 1) {
-      columns = rows = 1;
-    } else if (numHosts <= 4) {
-      columns = rows = 2;
-    } else {
-      columns = rows = 3;
-    }
-    
-    // Calculate required size based on grid dimensions
-    const widgetWidth = (BASE_ITEM_SIZE * columns) + (GRID_GAP * (columns - 1)) + (OUTER_PADDING * 2);
-    const widgetHeight = (BASE_ITEM_SIZE * rows) + (GRID_GAP * (rows - 1)) + (OUTER_PADDING * 2);
-    
-    // Use the larger dimension to ensure a square widget
-    let size = Math.max(widgetWidth, widgetHeight);
-    
-    // Add a bit of extra buffer space
-    size += 10;
-    
-    // Clamp between min and max sizes
-    size = Math.max(MIN_WIDGET_SIZE, Math.min(size, MAX_WIDGET_SIZE));
-    
-    // Position in bottom right with proper spacing
-    return {
-      size,
-      x: screenWidth - size - 20,
-      y: screenHeight - size - 120, // Increased space from bottom to avoid navigation bar
-    };
-  }, [screenWidth, screenHeight]);
-  
-  // Set up a speaking animation that doesn't cause re-renders
-  const animateSpeaking = useCallback(() => {
-    MOCK_PARTICIPANTS.forEach((participant, index) => {
-      if (participant.isSpeaking) {
-        // Create pulse animation
-        Animated.sequence([
-          Animated.timing(speakingAnimationRefs.current[index], {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: false
-          }),
-          Animated.timing(speakingAnimationRefs.current[index], {
-            toValue: 0,
-            duration: 800,
-            useNativeDriver: false
-          })
-        ]).start(() => {
-          // Only continue animation if component is still mounted
-          if (speakingAnimationRefs.current) {
-            animateSpeaking();
-          }
-        });
-      }
-    });
-  }, []);
-  
-  // Run animation once on mount
-  useEffect(() => {
-    animateSpeaking();
-    
-    return () => {
-      // Clean up animations
-      speakingAnimationRefs.current.forEach(anim => anim.stopAnimation());
-    };
-  }, [animateSpeaking]);
-  
-  // Track slideAnim value using useState instead of useRef
-  useEffect(() => {
-    const id = slideAnim.addListener(({ value }) => {
-      setCurrentSlideValue(value);
-    });
-    return () => slideAnim.removeListener(id);
-  }, [slideAnim]);
-  
-  // Toggle info panel visibility with proper native driver support
-  const toggleInfoPanel = useCallback(() => {
-    // Use transform instead of position for native driver
-    const toValue = isInfoPanelVisible ? 1 : 0;
-    setIsInfoPanelVisible(!isInfoPanelVisible);
-    
-    Animated.spring(slideAnim, {
-      toValue,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  }, [isInfoPanelVisible, slideAnim]);
 
-  // Update toggleMinimize to handle animation correctly
-  const toggleMinimize = useCallback(() => {
-    const minimizing = !isMinimized;
-    
-    if (minimizing) {
-      // Calculate widget position before animation starts
-      const { x, y, size } = calculateWidgetSize(participants.filter(p => p.isHost).length);
-      
-      // First, animate the scale down
-      Animated.spring(minimizeAnim, {
-        toValue: 0.7, // Scale down to 70%
-        friction: 7,
-        tension: 40,
-        useNativeDriver: true,
-      }).start(() => {
-        // Then fade out the main view
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          // After animation completes, update state and position widget
-          setIsMinimized(true);
-          widgetPan.setValue({ x, y }); // Position widget at target location
-          
-          // Set the stream as minimized in the context and navigate
-          setStreamMinimized(streamId, true);
-          
-          // Replace router.push with router.replace to avoid navigation stack issues
-          router.replace({
-            pathname: '/(main)',
-            params: {
-              minimized: 'true',
-              streamId: streamId,
-            }
-          });
-        });
-      });
-      
-      // Close info panel if it's open
-      if (isInfoPanelVisible) {
-        setIsInfoPanelVisible(false);
-        slideAnim.setValue(screenWidth); // Directly set value rather than animating
-      }
+  // Calculate widget size based on number of hosts
+  const calculateWidgetSize = (hostCount: number) => {
+    if (hostCount <= 1) {
+      return { size: MIN_WIDGET_SIZE, columns: 1, rows: 1 };
+    } else if (hostCount <= 4) {
+      return { size: MIN_WIDGET_SIZE + 20, columns: 2, rows: 2 };
     } else {
-      // Maximizing - using single animation for better performance
+      return { size: MAX_WIDGET_SIZE, columns: 3, rows: 3 };
+    }
+  };
+
+  // Toggle minimize function
+  const toggleMinimize = () => {
+    if (isMinimized) {
+      // Expand
       setIsMinimized(false);
-      
-      // Use single animation with combined spring for better performance
       Animated.parallel([
-        // Animate scale back to normal
-        Animated.spring(minimizeAnim, {
-          toValue: 1,
-          friction: 7,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-        // Fade in the main view
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        })
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(minimizeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
       ]).start();
-      
-      // Set the stream as not minimized in the context
-      setStreamMinimized(streamId, false);
+    } else {
+      // Minimize
+      setIsMinimized(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0.8,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(minimizeAnim, {
+          toValue: 0.9,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+      ]).start();
     }
-    
-    // Haptic feedback - wrapped in try/catch for better error handling
-    if (Platform.OS === 'ios') {
-      try {
-        const Haptics = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      } catch (error) {
-        console.log('Haptics not available');
-      }
-    }
-  }, [isMinimized, minimizeAnim, fadeAnim, widgetPan, isInfoPanelVisible, slideAnim, participants, router, streamId, setStreamMinimized, calculateWidgetSize, screenWidth]);
+    setStreamMinimized(streamId, !isMinimized);
+  };
 
-  // Pan responder for the main view (minimize and info panel)
-  const mainPanResponder = useMemo(() => 
-    PanResponder.create({
-      onStartShouldSetPanResponder: (evt, gestureState) => {
-        // Only detect horizontal swipes for info panel
-        const isHorizontalSwipe = 
-          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
-          (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
-        
-        // No vertical swipe detection for minimizing
-        return isHorizontalSwipe;
-      },
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only detect horizontal swipes for info panel
-        const isHorizontalSwipe = 
-          (!isInfoPanelVisible && evt.nativeEvent.pageX > screenWidth - 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) ||
-          (isInfoPanelVisible && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5);
-        
-        // No vertical swipe detection for minimizing
-        return isHorizontalSwipe;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        // Horizontal movement for info panel only with native driver
-        if ((!isInfoPanelVisible && gestureState.dx < 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
-            (isInfoPanelVisible && gestureState.dx > 0 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
-          
-          // Normalize the drag to be between 0 and 1 for transform
-          let newValue;
-          if (isInfoPanelVisible) {
-            // When panel is visible, dragging right increases value (0 = fully visible, 1 = hidden)
-            newValue = Math.min(1, Math.max(0, gestureState.dx / screenWidth));
-          } else {
-            // When panel is hidden, dragging left decreases value (0 = fully visible, 1 = hidden)
-            newValue = Math.min(1, Math.max(0, 1 + gestureState.dx / screenWidth));
-          }
-          
-          slideAnim.setValue(newValue);
-        }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        const swipeThresholdHorizontal = screenWidth * 0.25;
-
-        // Check for horizontal swipe completion (info panel)
-        if ((!isInfoPanelVisible && gestureState.dx < -swipeThresholdHorizontal && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) || 
-            (isInfoPanelVisible && gestureState.dx > swipeThresholdHorizontal && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5)) {
-          toggleInfoPanel();
-          // Haptic feedback
-          if (Platform.OS === 'ios') { /* ... Haptics ... */ }
-        } 
-        
-        // Snap back logic for horizontal swipes only
-        else {
-          // Snap back info panel if it was a horizontal attempt
-          if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) { 
-            Animated.spring(slideAnim, {
-              toValue: isInfoPanelVisible ? 0 : screenWidth,
-              useNativeDriver: false,
-            }).start();
-          }
-        }
-        
-        // Ensure info panel snaps back if moved but not enough to toggle
-        Animated.spring(slideAnim, {
-          toValue: isInfoPanelVisible ? 0 : screenWidth,
+  // Toggle info panel
+  const toggleInfoPanel = () => {
+    console.log('toggleInfoPanel called, current state:', isInfoPanelVisible);
+    if (isInfoPanelVisible) {
+      console.log('Closing panel...');
+      Animated.timing(infoPanelFadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsInfoPanelVisible(false);
+      });
+    } else {
+      console.log('Opening panel...');
+      setIsInfoPanelVisible(true);
+      // Small delay to ensure the panel is rendered before animating
+      setTimeout(() => {
+        Animated.timing(infoPanelFadeAnim, {
+          toValue: 1,
+          duration: 200,
           useNativeDriver: false,
         }).start();
-      },
-    }),
-  [isInfoPanelVisible, slideAnim, screenWidth]);
+      }, 50);
+    }
+  };
 
-  // Widget pan responder for minimized mode
-  const widgetPanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
-      // Clone the previously animated values
-      widgetPan.setOffset({
-        x: (widgetPan as any).__getValue().x,
-        y: (widgetPan as any).__getValue().y,
-      });
-      widgetPan.setValue({ x: 0, y: 0 });
-    },
-    onPanResponderMove: (_, gestureState) => {
-      widgetPan.setValue({
-        x: gestureState.dx,
-        y: gestureState.dy,
-      });
-      
-      // Safely update current position ref with number type
-      if (currentPanPosition.current) {
-        currentPanPosition.current = {
-          x: Number(gestureState.dx) + Number(currentPanPosition.current.x || 0),
-          y: Number(gestureState.dy) + Number(currentPanPosition.current.y || 0)
-        };
-      }
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      widgetPan.flattenOffset();
-      setIsDragging(false);
-      
-      // Use the ref for current position
-      const positionX = currentPanPosition.current?.x || 0;
-      const positionY = currentPanPosition.current?.y || 0;
-      
-      // Calculate widget dimensions based on hosts
-      const visibleHostCount = Math.min(
-        participants.filter(p => p.isHost).length,
-        MAX_HOSTS_TO_DISPLAY
-      );
-      
-      // Calculate dimensions
-      const widgetSize = calculateWidgetSize(visibleHostCount);
-      const size = widgetSize.size || 0;
-      const maxX = Dimensions.get('window').width - size;
-      const maxY = Dimensions.get('window').height - size;
-      
-      // Find the nearest edge and snap to it
-      const targetX = positionX > maxX / 2 ? maxX : 0;
-      const targetY = Math.max(0, Math.min(positionY, maxY));
-      
-      // Update the ref with the target position
-      currentPanPosition.current = { x: targetX, y: targetY };
-      
-      // Animate to the target position
-      Animated.spring(widgetPan, {
-        toValue: { x: targetX, y: targetY },
-        useNativeDriver: false,
-        friction: 7,
-      }).start();
-    },
-  }), [participants]);
+     // Info panel pan responder - FIXED to use consistent useNativeDriver: false
+   const infoPanelPanResponder = useMemo(() => PanResponder.create({
+     onStartShouldSetPanResponder: () => true,
+     onMoveShouldSetPanResponder: (_, gestureState) => {
+       return Math.abs(gestureState.dx) > 10;
+     },
+     onPanResponderMove: (_, gestureState) => {
+       if (isInfoPanelVisible) {
+         // When panel is visible, allow dragging to close
+         const opacity = Math.max(0, Math.min(1, 1 - (gestureState.dx / 100)));
+         infoPanelFadeAnim.setValue(opacity);
+       }
+     },
+     onPanResponderRelease: (_, gestureState) => {
+       if (gestureState.dx > 100) {
+         // Swipe right - close panel
+         Animated.timing(infoPanelFadeAnim, {
+           toValue: 0,
+           duration: 200,
+           useNativeDriver: false,
+         }).start(() => {
+           setIsInfoPanelVisible(false);
+         });
+       } else {
+         // Snap back
+         Animated.spring(infoPanelFadeAnim, {
+           toValue: 1,
+           useNativeDriver: false,
+           friction: 7,
+         }).start();
+       }
+     },
+   }), [isInfoPanelVisible, infoPanelFadeAnim]);
+
+     // Widget pan responder for minimized mode - FIXED to use consistent useNativeDriver: false
+   const widgetPanResponder = useMemo(() => PanResponder.create({
+     onStartShouldSetPanResponder: () => true,
+     onPanResponderMove: (_, gestureState) => {
+       const currentX = currentPanPosition.current?.x || 0;
+       const currentY = currentPanPosition.current?.y || 0;
+       
+       const newX = currentX + gestureState.dx;
+       const newY = currentY + gestureState.dy;
+       
+       currentPanPosition.current = { x: newX, y: newY };
+       
+       widgetPan.setValue({
+         x: newX,
+         y: newY,
+       });
+     },
+     onPanResponderRelease: (_, gestureState) => {
+       setIsDragging(false);
+       
+       const positionX = currentPanPosition.current?.x || 0;
+       const positionY = currentPanPosition.current?.y || 0;
+       
+       const visibleHostCount = Math.min(
+         participants.filter(p => p.isHost).length,
+         MAX_HOSTS_TO_DISPLAY
+       );
+       
+       const widgetSize = calculateWidgetSize(visibleHostCount);
+       const size = widgetSize.size || 0;
+       const maxX = Dimensions.get('window').width - size;
+       const maxY = Dimensions.get('window').height - size;
+       
+       const targetX = positionX > maxX / 2 ? maxX : 0;
+       const targetY = Math.max(0, Math.min(positionY, maxY));
+       
+       currentPanPosition.current = { x: targetX, y: targetY };
+       
+       Animated.spring(widgetPan, {
+         toValue: { x: targetX, y: targetY },
+         useNativeDriver: false,
+         friction: 7,
+       }).start();
+     },
+   }), [participants]);
 
   // Define closeWidget before renderMinimizedView uses it
   const closeWidget = useCallback(() => {
-    // First make the widget disappear
     Animated.timing(fadeAnim, {
       toValue: 0,
       duration: 150,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
-      // Then set minimized to false (which will hide the widget)
       setIsMinimized(false);
       setIsHidden(true);
-      
-      // Set the stream as not minimized in the context
       setStreamMinimized(streamId, false);
       
-      // After a brief delay, show the full view again
       setTimeout(() => {
         setIsHidden(false);
-        // Restore the full screen view with animation
         Animated.parallel([
           Animated.spring(minimizeAnim, {
             toValue: 1,
-            useNativeDriver: true,
+            useNativeDriver: false,
             friction: 6,
             tension: 50
           }),
           Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
+            duration: 200,
+            useNativeDriver: false,
           })
         ]).start();
-      }, 50);
+      }, 100);
     });
-    
-    // Provide haptic feedback
-    if (Platform.OS === 'ios' && require('expo-haptics')) {
-      try {
-        const Haptics = require('expo-haptics');
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch (error) {
-        console.log('Haptics not available');
-      }
-    }
-  }, [fadeAnim, minimizeAnim, streamId, setStreamMinimized]);
+  }, [streamId, setStreamMinimized]);
 
   // Define handleReplyToMessage (add basic implementation if missing)
   const handleReplyToMessage = (message: ChatMessage) => {
@@ -1003,13 +827,13 @@ const LiveStreamView = () => {
     if (isMinimized) {
       const hosts = participants.filter(p => p.isHost).slice(0, MAX_HOSTS_TO_DISPLAY);
       const numHosts = hosts.length;
-      const { x: initialX, y: initialY } = calculateWidgetSize(numHosts);
+      const { size: initialSize } = calculateWidgetSize(numHosts);
       
       if (!widgetPan.x.hasListeners()) {
-        widgetPan.setValue({ x: initialX, y: initialY });
+        widgetPan.setValue({ x: initialSize * 0.5, y: screenHeight - initialSize - 120 }); // Center it
       }
     }
-  }, [isMinimized, participants, widgetPan, calculateWidgetSize]);
+  }, [isMinimized, participants, widgetPan, calculateWidgetSize, screenHeight]);
 
   // Render the minimized draggable widget with dynamic sizing
   const renderMinimizedView = () => {
@@ -1130,7 +954,7 @@ const LiveStreamView = () => {
             </LinearGradient>
           </View>
 
-          {/* Add minimize button */}
+          {/* Minimize button */}
           <TouchableOpacity
             style={styles.minimizeButton}
             onPress={toggleMinimize}
@@ -1158,21 +982,18 @@ const LiveStreamView = () => {
         </View>
         
         <View style={styles.rightStatsContainer}>
-          {/* Profile Views */}
-          <View style={styles.statBadge}>
-            <Ionicons name="eye-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.statText}>{formatViewCount(profileViews)}</Text>
-          </View>
-          
-          {/* Live Views - updated to show group of people */}
+          {/* Single Viewer Count Button */}
           <TouchableOpacity 
             style={styles.infoStatBadge}
-            onPress={toggleInfoPanel}
-            activeOpacity={0.7}
+            onPress={() => {
+              console.log('Button pressed!');
+              toggleInfoPanel();
+            }}
+            activeOpacity={0.5}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="people-outline" size={18} color="#FFFFFF" />
             <Text style={styles.statText}>{displayViewCount}</Text>
-            {/* Information icon removed */}
           </TouchableOpacity>
         </View>
       </View>
@@ -1191,10 +1012,13 @@ const LiveStreamView = () => {
     </View>
   ), [participants]);
 
-  // Update the renderChat function to add a fading shadow at the top
+  // COMBINED INFO PANEL - All information in one view, no tabs
   const renderInfoPanel = () => {
     return (
-      <Animated.View style={[styles.infoPanel, { transform: [{ translateX: slideAnim }] }] }>
+      <Animated.View 
+        style={[styles.infoPanel, { opacity: infoPanelFadeAnim }]}
+        {...infoPanelPanResponder.panHandlers}
+      >
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.infoPanelHeader}>
             <Text style={styles.infoPanelTitle}>Stream Details</Text>
@@ -1202,69 +1026,67 @@ const LiveStreamView = () => {
               <MaterialIcons name="close" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          <View style={styles.tabBar}>
-            {['Info', 'Participants', 'Report'].map(tab => (
-              <TouchableOpacity 
-                key={tab}
-                style={[styles.tab, activeTab === tab.toLowerCase() && styles.activeTab]}
-                onPress={() => setActiveTab(tab.toLowerCase())}
-              >
-                <Text style={styles.tabText}>{tab}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <ScrollView style={styles.tabContent}>
-            {activeTab === 'info' && (
-              <View>
-                <Text style={styles.infoSectionTitle}>{streamTitle}</Text>
-                
-                <View style={styles.infoRow}>
-                  <Ionicons name="time-outline" size={18} color="#AAAAAA" />
-                  <Text style={styles.infoText}>Started {stream?.startedAt ? timeAgo(stream.startedAt) : '1 hour ago'}</Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <MaterialIcons name="bolt" size={18} color="#FFD700" />
-                  <Text style={styles.infoText}>Total Boost: {boosts}</Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <Ionicons name="eye-outline" size={18} color="#AAAAAA" />
-                  <Text style={styles.infoText}>Live Viewers: {displayViewCount}</Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <Ionicons name="person-outline" size={18} color="#AAAAAA" />
-                  <Text style={styles.infoText}>Profile Views: {formatViewCount(profileViews)}</Text>
-                </View>
+          
+          <ScrollView style={styles.infoPanelContent} showsVerticalScrollIndicator={false}>
+            {/* Stream Information Section */}
+            <View style={styles.infoSection}>
+              <Text style={styles.infoSectionTitle}>{streamTitle}</Text>
+              
+              <View style={styles.infoRow}>
+                <Ionicons name="time-outline" size={18} color="#AAAAAA" />
+                <Text style={styles.infoText}>Started {stream?.startedAt ? timeAgo(stream.startedAt) : '1 hour ago'}</Text>
               </View>
-            )}
-            {activeTab === 'participants' && (
-              <View>
-                <Text style={styles.infoSectionHeader}>Hosts</Text>
-                {participants.filter(p => p.isHost).map(host => (
-                  <View key={host.id} style={styles.participantRow}>
-                    <Image source={{ uri: host.avatar }} style={styles.participantAvatar} />
+              
+              <View style={styles.infoRow}>
+                <MaterialIcons name="bolt" size={18} color="#FFD700" />
+                <Text style={styles.infoText}>Total Boost: {boosts}</Text>
+              </View>
+              
+
+              
+              <View style={styles.infoRow}>
+                <Ionicons name="person-outline" size={18} color="#AAAAAA" />
+                <Text style={styles.infoText}>Profile Views: {formatViewCount(profileViews)}</Text>
+              </View>
+            </View>
+
+            {/* Hosts Section */}
+            <View style={styles.infoSection}>
+              <Text style={styles.infoSectionHeader}>Hosts ({participants.filter(p => p.isHost).length})</Text>
+              {participants.filter(p => p.isHost).map(host => (
+                <View key={host.id} style={styles.participantRow}>
+                  <Image source={{ uri: host.avatar }} style={styles.participantAvatar} />
+                  <View style={styles.participantInfo}>
                     <Text style={styles.participantRowName}>{host.name}</Text>
+                    {host.isSpeaking && (
+                      <View style={styles.speakingIndicatorSmall}>
+                        <MaterialIcons name="mic" size={12} color="#4CAF50" />
+                      </View>
+                    )}
                   </View>
-                ))}
-                <Text style={styles.infoSectionHeader}>Viewers</Text>
-                {participants.filter(p => !p.isHost).map(viewer => (
-                  <View key={viewer.id} style={styles.participantRow}>
-                    <Image source={{ uri: viewer.avatar }} style={styles.participantAvatar} />
-                    <Text style={styles.participantRowName}>{viewer.name}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            {activeTab === 'report' && (
-              <View>
-                <Text style={styles.reportText}>Report inappropriate content or behavior in this stream.</Text>
-                <TouchableOpacity style={styles.reportButton}>
-                  <Text style={styles.reportButtonText}>Report Stream</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+                </View>
+              ))}
+            </View>
+
+            {/* Viewers Section */}
+            <View style={styles.infoSection}>
+              <Text style={styles.infoSectionHeader}>Viewers ({participants.filter(p => !p.isHost).length})</Text>
+              {participants.filter(p => !p.isHost).map(viewer => (
+                <View key={viewer.id} style={styles.participantRow}>
+                  <Image source={{ uri: viewer.avatar }} style={styles.participantAvatar} />
+                  <Text style={styles.participantRowName}>{viewer.name}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Report Section */}
+            <View style={styles.infoSection}>
+              <Text style={styles.infoSectionHeader}>Report</Text>
+              <Text style={styles.reportText}>Report inappropriate content or behavior in this stream.</Text>
+              <TouchableOpacity style={styles.reportButton}>
+                <Text style={styles.reportButtonText}>Report Stream</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Animated.View>
@@ -1354,11 +1176,10 @@ const LiveStreamView = () => {
       position: 'absolute',
       right: 0,
       top: 0,
-      width: '85%',
-      maxWidth: 400,
+      width: '50%',
       height: '100%',
       backgroundColor: '#262730',
-      zIndex: 10,
+      zIndex: 1000,
       borderTopLeftRadius: 10,
       borderBottomLeftRadius: 10,
       borderLeftWidth: 1,
@@ -1369,9 +1190,11 @@ const LiveStreamView = () => {
       shadowOffset: { width: -2, height: 0 },
       shadowOpacity: 0.3,
       shadowRadius: 5,
-      transform: [{
-        translateX: slideAnim
-      }],
+      // Panel is always positioned correctly, just fade in/out
+    },
+    infoPanelContent: {
+      flex: 1,
+      padding: 12,
     },
     chatHeaderContainer: {
       flexDirection: 'row',
@@ -1642,11 +1465,13 @@ const LiveStreamView = () => {
     infoStatBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
+      backgroundColor: 'rgba(110, 86, 247, 0.2)',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 16,
       marginLeft: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(110, 86, 247, 0.3)',
     },
     gridContainer: {
       flexDirection: 'row',
@@ -1690,6 +1515,10 @@ const LiveStreamView = () => {
       flex: 1,
       padding: 16,
     },
+         infoSection: {
+       marginBottom: 16,
+       paddingBottom: 8,
+     },
     infoSectionTitle: {
       color: '#FFFFFF',
       fontWeight: 'bold',
@@ -1723,9 +1552,23 @@ const LiveStreamView = () => {
       borderRadius: 18,
       marginRight: 12,
     },
+    participantInfo: {
+      flex: 1,
+    },
     participantRowName: {
       color: '#FFFFFF',
       fontSize: 14,
+    },
+    speakingIndicatorSmall: {
+      position: 'absolute',
+      bottom: -4,
+      right: -4,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#4CAF50',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     reportText: {
       color: '#AAAAAA',
@@ -1855,7 +1698,6 @@ const LiveStreamView = () => {
               zIndex: isMinimized ? 0 : 1
             }
           ]}
-          {...(isMinimized ? {} : mainPanResponder.panHandlers)} 
         >
           {renderTopBar()} 
           {renderStatsBar()}
@@ -1881,8 +1723,8 @@ const LiveStreamView = () => {
         </Animated.View>
       )}
 
-      {/* Info Panel - Only shown when not minimized/hidden */} 
-      {!isMinimized && !isHidden && isInfoPanelVisible && renderInfoPanel()}
+      {/* Info Panel - Always rendered, controlled by opacity */} 
+      {!isMinimized && !isHidden && renderInfoPanel()}
     </SafeAreaView>
   );
 };

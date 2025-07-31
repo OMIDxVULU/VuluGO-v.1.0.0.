@@ -45,18 +45,12 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
     // Reset animation value
     pressAnimation.setValue(0);
     
-    // Start animation to grow from 0 to 1 over 1000ms (1 second)
+    // Start animation to grow from 0 to 1 over 150ms (quick feedback)
     Animated.timing(pressAnimation, {
       toValue: 1,
-      duration: 1000,
+      duration: 150,
       useNativeDriver: false,
     }).start();
-    
-    // Set a timer to trigger the action after 1 second
-    pressTimer.current = setTimeout(() => {
-      onPress(stream);
-      setIsPressing(false);
-    }, 1000);
 
     // Hide tutorial after first interaction
     hideTutorial();
@@ -185,6 +179,7 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
   return (
     <TouchableOpacity 
       style={styles.streamItem}
+      onPress={() => onPress(stream)}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={0.7}
@@ -371,7 +366,7 @@ const LiveStreamGrid = () => {
         {showTutorialState && sortedStreams.length > 0 && (
           <View style={styles.globalTutorialContainer}>
             <View style={styles.tutorialBubble}>
-              <Text style={styles.tutorialText}>Hold to join a live stream</Text>
+              <Text style={styles.tutorialText}>Tap to join a live stream</Text>
               <View style={styles.tutorialArrow} />
             </View>
           </View>

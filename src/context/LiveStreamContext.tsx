@@ -4,6 +4,16 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 export interface StreamHost {
   name: string;
   avatar: string;
+  joinOrder: number; // Track join order for power ranking
+  isSpeaking: boolean;
+  isMuted: boolean;
+}
+
+export interface StreamViewer {
+  name: string;
+  avatar: string;
+  isMuted: boolean;
+  isBanned: boolean;
 }
 
 export interface StreamFriend {
@@ -15,6 +25,7 @@ export interface LiveStream {
   id: string;
   title: string;
   hosts: StreamHost[];
+  viewers: StreamViewer[];
   views: number;
   boost?: number;
   rank?: number;
@@ -36,6 +47,13 @@ interface LiveStreamContextType {
   currentlyWatching: string | null; // ID of the stream the user is currently watching
   isMinimized: boolean;
   setStreamMinimized: (streamId: string, minimized: boolean) => void;
+  
+  // New features
+  joinAsHost: (streamId: string, userName: string, userAvatar: string) => void;
+  kickHost: (streamId: string, hostName: string, kickedBy: string) => void;
+  muteViewer: (streamId: string, viewerName: string, mutedBy: string) => void;
+  banViewer: (streamId: string, viewerName: string, bannedBy: string) => void;
+  leaveStream: (streamId: string) => void;
 }
 
 // Create the context with a default value
@@ -47,9 +65,14 @@ const MOCK_STREAMS: LiveStream[] = [
     id: '101',
     title: 'Live title, test test test test test 123',
     hosts: [
-      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
-      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg' },
-      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg' },
+      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'Jessica', avatar: 'https://randomuser.me/api/portraits/women/31.jpg', isMuted: false, isBanned: false },
+      { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg', isMuted: false, isBanned: false },
+      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg', isMuted: true, isBanned: false },
     ],
     views: 2590,
     boost: 0,
@@ -63,9 +86,13 @@ const MOCK_STREAMS: LiveStream[] = [
     id: '102',
     title: 'Friday Night Live Stream',
     hosts: [
-      { name: 'Michael', avatar: 'https://randomuser.me/api/portraits/men/33.jpg' },
-      { name: 'David', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
-      { name: 'Tom', avatar: 'https://randomuser.me/api/portraits/women/33.jpg' },
+      { name: 'Michael', avatar: 'https://randomuser.me/api/portraits/men/33.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'David', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+      { name: 'Tom', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'Sarah', avatar: 'https://randomuser.me/api/portraits/women/36.jpg', isMuted: false, isBanned: false },
+      { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', isMuted: false, isBanned: false },
     ],
     views: 1240,
     boost: 0,
@@ -79,9 +106,14 @@ const MOCK_STREAMS: LiveStream[] = [
     id: '201',
     title: 'Live Stream with Friends',
     hosts: [
-      { name: 'James', avatar: 'https://randomuser.me/api/portraits/men/43.jpg' },
-      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/43.jpg' },
-      { name: 'Kevin', avatar: 'https://randomuser.me/api/portraits/men/44.jpg' },
+      { name: 'James', avatar: 'https://randomuser.me/api/portraits/men/43.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+      { name: 'Kevin', avatar: 'https://randomuser.me/api/portraits/men/44.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'Emma', avatar: 'https://randomuser.me/api/portraits/women/37.jpg', isMuted: false, isBanned: false },
+      { name: 'Alex', avatar: 'https://randomuser.me/api/portraits/men/33.jpg', isMuted: false, isBanned: false },
+      { name: 'Sophie', avatar: 'https://randomuser.me/api/portraits/women/38.jpg', isMuted: false, isBanned: false },
     ],
     views: 1350,
     boost: 210,
@@ -93,61 +125,84 @@ const MOCK_STREAMS: LiveStream[] = [
     id: '202',
     title: 'Live Stream with Friends',
     hosts: [
-      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
-      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg' },
-      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg' },
-      { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
+      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
+      { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', joinOrder: 4, isSpeaking: false, isMuted: false },
     ],
-    views: 1420,
-    boost: 320,
+    viewers: [
+      { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg', isMuted: false, isBanned: false },
+      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg', isMuted: false, isBanned: false },
+    ],
+    views: 2650,
+    boost: 0,
+    rank: 1,
+    isActive: true,
+    startedAt: Date.now() - 900000, // started 15 minutes ago
+  },
+  {
+    id: '203',
+    title: 'Epic gameplay session',
+    hosts: [
+      { name: 'GamerPro', avatar: 'https://randomuser.me/api/portraits/men/45.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'GameGirl', avatar: 'https://randomuser.me/api/portraits/women/39.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'Fan1', avatar: 'https://randomuser.me/api/portraits/men/46.jpg', isMuted: false, isBanned: false },
+      { name: 'Fan2', avatar: 'https://randomuser.me/api/portraits/women/40.jpg', isMuted: false, isBanned: false },
+      { name: 'Fan3', avatar: 'https://randomuser.me/api/portraits/men/47.jpg', isMuted: false, isBanned: false },
+    ],
+    views: 1400,
+    boost: 0,
     rank: 2,
-    friends: [
-      { name: 'Ella', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
-    ],
     isActive: true,
     startedAt: Date.now() - 2700000, // started 45 minutes ago
   },
   {
     id: '301',
-    title: 'Epic gameplay session',
+    title: 'Music & Chill',
     hosts: [
-      { name: 'Alex', avatar: 'https://randomuser.me/api/portraits/men/28.jpg' },
-      { name: 'Sarah', avatar: 'https://randomuser.me/api/portraits/women/29.jpg' },
-      { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/30.jpg' },
+      { name: 'MusicLover', avatar: 'https://randomuser.me/api/portraits/women/41.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/48.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
     ],
-    views: 631,
-    boost: 450,
-    rank: 1,
+    viewers: [
+      { name: 'Listener1', avatar: 'https://randomuser.me/api/portraits/women/42.jpg', isMuted: false, isBanned: false },
+      { name: 'Listener2', avatar: 'https://randomuser.me/api/portraits/men/49.jpg', isMuted: false, isBanned: false },
+    ],
+    views: 890,
+    boost: 0,
+    isActive: true,
+    startedAt: Date.now() - 3600000, // started 1 hour ago
+  },
+  {
+    id: '302',
+    title: 'Late night talks',
+    hosts: [
+      { name: 'NightOwl', avatar: 'https://randomuser.me/api/portraits/men/50.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'Insomniac', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'LateBird', avatar: 'https://randomuser.me/api/portraits/men/51.jpg', isMuted: false, isBanned: false },
+      { name: 'SleepyHead', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', isMuted: false, isBanned: false },
+    ],
+    views: 650,
+    boost: 0,
     isActive: true,
     startedAt: Date.now() - 5400000, // started 1.5 hours ago
   },
   {
-    id: '302',
-    title: 'Late night streaming',
-    hosts: [
-      { name: 'NightOwl', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
-      { name: 'MidnightGamer', avatar: 'https://randomuser.me/api/portraits/men/44.jpg' },
-      { name: 'LateStreamer', avatar: 'https://randomuser.me/api/portraits/women/45.jpg' },
-    ],
-    views: 312,
-    boost: 0,
-    isActive: true,
-    startedAt: Date.now() - 9000000, // started 2.5 hours ago
-  },
-  {
     id: '303',
-    title: 'Competitive matchmaking',
+    title: 'Tech talk & coding',
     hosts: [
-      { name: 'ChampPlayer', avatar: 'https://randomuser.me/api/portraits/men/28.jpg' },
-      { name: 'ProCoach', avatar: 'https://randomuser.me/api/portraits/women/28.jpg' },
-      { name: 'Teammate1', avatar: 'https://randomuser.me/api/portraits/men/29.jpg' },
+      { name: 'TechGuru', avatar: 'https://randomuser.me/api/portraits/men/52.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'CodeQueen', avatar: 'https://randomuser.me/api/portraits/women/45.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
     ],
-    views: 2100,
+    viewers: [
+      { name: 'Dev1', avatar: 'https://randomuser.me/api/portraits/men/53.jpg', isMuted: false, isBanned: false },
+      { name: 'Dev2', avatar: 'https://randomuser.me/api/portraits/women/46.jpg', isMuted: false, isBanned: false },
+    ],
+    views: 1200,
     boost: 0,
-    friends: [
-      { name: 'Friend4', avatar: 'https://randomuser.me/api/portraits/women/24.jpg' },
-      { name: 'Friend5', avatar: 'https://randomuser.me/api/portraits/men/25.jpg' },
-    ],
     isActive: true,
     startedAt: Date.now() - 3600000, // started 1 hour ago
   },
@@ -155,9 +210,13 @@ const MOCK_STREAMS: LiveStream[] = [
     id: '304',
     title: 'Casual gaming & chill vibes',
     hosts: [
-      { name: 'RelaxedGamer', avatar: 'https://randomuser.me/api/portraits/women/22.jpg' },
-      { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/21.jpg' },
-      { name: 'FunFriend', avatar: 'https://randomuser.me/api/portraits/women/21.jpg' },
+      { name: 'RelaxedGamer', avatar: 'https://randomuser.me/api/portraits/women/22.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
+      { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/21.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
+      { name: 'FunFriend', avatar: 'https://randomuser.me/api/portraits/women/21.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
+    ],
+    viewers: [
+      { name: 'Viewer1', avatar: 'https://randomuser.me/api/portraits/men/54.jpg', isMuted: false, isBanned: false },
+      { name: 'Viewer2', avatar: 'https://randomuser.me/api/portraits/women/47.jpg', isMuted: false, isBanned: false },
     ],
     views: 1500,
     boost: 0,
@@ -221,6 +280,90 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // New functions for enhanced live stream features
+  const joinAsHost = (streamId: string, userName: string, userAvatar: string) => {
+    setStreams(prevStreams => 
+      prevStreams.map(stream => {
+        if (stream.id === streamId) {
+          const nextJoinOrder = stream.hosts.length + 1;
+          const newHost: StreamHost = {
+            name: userName,
+            avatar: userAvatar,
+            joinOrder: nextJoinOrder,
+            isSpeaking: false,
+            isMuted: false
+          };
+          return {
+            ...stream,
+            hosts: [...stream.hosts, newHost]
+          };
+        }
+        return stream;
+      })
+    );
+  };
+
+  const kickHost = (streamId: string, hostName: string, kickedBy: string) => {
+    setStreams(prevStreams => 
+      prevStreams.map(stream => {
+        if (stream.id === streamId) {
+          const kickedByHost = stream.hosts.find(h => h.name === kickedBy);
+          const hostToKick = stream.hosts.find(h => h.name === hostName);
+          
+          // Check if the kicker has higher power (lower join order)
+          if (kickedByHost && hostToKick && kickedByHost.joinOrder < hostToKick.joinOrder) {
+            return {
+              ...stream,
+              hosts: stream.hosts.filter(h => h.name !== hostName)
+            };
+          }
+        }
+        return stream;
+      })
+    );
+  };
+
+  const muteViewer = (streamId: string, viewerName: string, mutedBy: string) => {
+    setStreams(prevStreams => 
+      prevStreams.map(stream => {
+        if (stream.id === streamId) {
+          return {
+            ...stream,
+            viewers: stream.viewers.map(viewer => 
+              viewer.name === viewerName 
+                ? { ...viewer, isMuted: !viewer.isMuted }
+                : viewer
+            )
+          };
+        }
+        return stream;
+      })
+    );
+  };
+
+  const banViewer = (streamId: string, viewerName: string, bannedBy: string) => {
+    setStreams(prevStreams => 
+      prevStreams.map(stream => {
+        if (stream.id === streamId) {
+          return {
+            ...stream,
+            viewers: stream.viewers.map(viewer => 
+              viewer.name === viewerName 
+                ? { ...viewer, isBanned: !viewer.isBanned }
+                : viewer
+            )
+          };
+        }
+        return stream;
+      })
+    );
+  };
+
+  const leaveStream = (streamId: string) => {
+    setCurrentlyWatching(null);
+    setIsMinimized(false);
+  };
+
   return (
     <LiveStreamContext.Provider
       value={{
@@ -232,6 +375,11 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
         currentlyWatching,
         isMinimized,
         setStreamMinimized,
+        joinAsHost,
+        kickHost,
+        muteViewer,
+        banViewer,
+        leaveStream,
       }}
     >
       {children}
