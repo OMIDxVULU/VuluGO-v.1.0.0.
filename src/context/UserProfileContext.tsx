@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 // Type for profile viewer data
 interface ProfileViewer {
@@ -27,6 +28,8 @@ interface UserProfileContextType {
   topViewers: ProfileViewer[];
   hasGemPlus: boolean;
   setHasGemPlus: (hasGemPlus: boolean) => void;
+  displayName: string;
+  username: string;
 }
 
 const initialProfileImage = 'https://randomuser.me/api/portraits/women/33.jpg';
@@ -69,6 +72,8 @@ const UserProfileContext = createContext<UserProfileContextType>({
   topViewers: [],
   hasGemPlus: false,
   setHasGemPlus: () => {},
+  displayName: 'User',
+  username: '@user',
 });
 
 export const useUserProfile = () => useContext(UserProfileContext);
@@ -78,6 +83,14 @@ interface UserProfileProviderProps {
 }
 
 export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ children }) => {
+  const { isGuest, userProfile } = useAuth();
+  
+  // Guest profile settings
+  const guestProfileImage = 'https://via.placeholder.com/150/6E69F4/FFFFFF?text=G';
+  const guestDisplayName = 'Guest';
+  const guestUsername = 'guest';
+  
+  // Regular user profile settings
   const [profileImage, setProfileImage] = useState(initialProfileImage);
   const [userStatus, setUserStatus] = useState('online');
   const [statusColor, setStatusColor] = useState('#7ADA72');
@@ -85,6 +98,21 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
   const [dailyViews, setDailyViews] = useState(135);
   const [hasGemPlus, setHasGemPlus] = useState(false);
   const [allViewers, setAllViewers] = useState<ProfileViewer[]>([]);
+  
+  // Determine current profile data based on guest status
+  const currentProfileImage = isGuest ? guestProfileImage : profileImage;
+  const currentDisplayName = isGuest ? guestDisplayName : (userProfile?.displayName || 'User');
+  const currentUsername = isGuest ? guestUsername : (userProfile?.username || '@user');
+  
+  // Guest-safe setProfileImage function
+  const setProfileImageSafe = (image: string) => {
+    if (!isGuest) {
+      setProfileImage(image);
+    } else {
+      // Guest users cannot change their profile picture - this will be handled by the restriction hook
+      console.warn('Guest users cannot change their profile picture');
+    }
+  };
   
   // Generate mock viewers data when the component mounts
   useEffect(() => {
@@ -117,8 +145,8 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
 
   return (
     <UserProfileContext.Provider value={{
-      profileImage,
-      setProfileImage,
+      profileImage: currentProfileImage,
+      setProfileImage: setProfileImageSafe,
       userStatus,
       setUserStatus,
       statusColor,
@@ -133,6 +161,8 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
       topViewers,
       hasGemPlus,
       setHasGemPlus,
+      displayName: currentDisplayName,
+      username: currentUsername,
     }}>
       {children}
     </UserProfileContext.Provider>

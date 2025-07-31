@@ -2181,7 +2181,7 @@ const HomeScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Guest Mode Indicator */}
-        <GuestModeIndicator showUpgradePrompt={true} onUpgradePress={() => router.push('/auth')} />
+        <GuestModeIndicator showUpgradePrompt={true} />
         
         {/* Combined Spotlight and Live Activity Widgets */}
         <View style={styles.scrollContainer} onLayout={handleContainerLayout}>

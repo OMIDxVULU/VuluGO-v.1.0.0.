@@ -106,7 +106,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               uid: guestUser.uid,
               email: null,
               displayName: 'Guest',
-              photoURL: guestUser.photoURL,
+              username: 'guest',
+              photoURL: 'https://via.placeholder.com/150/6E69F4/FFFFFF?text=G', // Purple default avatar
               gold: 500, // Limited gold for guests
               gems: 10,  // Limited gems for guests
               level: 1,
@@ -174,7 +175,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         uid: guestUser.uid,
         email: null,
         displayName: 'Guest',
-        photoURL: guestUser.photoURL,
+        username: 'guest',
+        photoURL: 'https://via.placeholder.com/150/6E69F4/FFFFFF?text=G', // Purple default avatar
         gold: 500, // Limited gold for guests
         gems: 10,  // Limited gems for guests
         level: 1,
@@ -189,6 +191,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
+      // Clear guest user state immediately
+      setUser(null);
+      setUserProfile(null);
+      setIsGuest(false);
+      
+      // Then clear the actual session
       await authService.signOut();
     } catch (error) {
       throw error;

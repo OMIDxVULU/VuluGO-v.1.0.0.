@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -16,7 +16,9 @@ import {
   PanResponder,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Vibration,
 } from 'react-native';
+import { LongPressGestureHandler, State, PanGestureHandler } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +29,8 @@ import MenuButton from '../components/MenuButton';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useUserStatus, STATUS_TYPES, StatusType } from '../context/UserStatusContext';
+import { useAuth } from '../context/AuthContext';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
 
 const { width } = Dimensions.get('window');
 
@@ -36,13 +40,24 @@ const STATUS_CATEGORIES = {
   MOOD: 'Mood'
 };
 
+// Photo interface
+interface Photo {
+  id: string;
+  uri: string;
+  isProfile: boolean;
+}
+
 const ProfileScreen = () => {
   const router = useRouter();
+  const { isGuest } = useAuth();
+  const { canManagePhotos, canEditProfile, canChangeStatus } = useGuestRestrictions();
   const { 
     profileImage, 
     setProfileImage, 
     hasGemPlus,
-    setHasGemPlus
+    setHasGemPlus,
+    displayName,
+    username
   } = useUserProfile();
   
   // Use UserStatusContext instead of local state
@@ -59,6 +74,16 @@ const ProfileScreen = () => {
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [previewCurrentPage, setPreviewCurrentPage] = useState(0);
   const [previewTotalPages, setPreviewTotalPages] = useState(3); // 2 images + 1 bio page
+  
+  // Photo management state
+  const [photos, setPhotos] = useState<Photo[]>([
+    { id: 'profile', uri: profileImage, isProfile: true },
+    { id: 'photo1', uri: 'https://randomuser.me/api/portraits/women/34.jpg', isProfile: false },
+    { id: 'photo2', uri: 'https://randomuser.me/api/portraits/women/32.jpg', isProfile: false },
+  ]);
+  const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
+  const [draggedPhotoPosition, setDraggedPhotoPosition] = useState({ x: 0, y: 0 });
+  const [photoLayouts, setPhotoLayouts] = useState<{ [key: string]: { x: number, y: number, width: number } }>({});
   
   const statusSelectorAnim = useRef(new Animated.Value(0)).current;
   const profileScaleAnim = useRef(new Animated.Value(1)).current;
@@ -172,7 +197,13 @@ const ProfileScreen = () => {
     router.push('/(main)/account');
   };
 
+  // Photo management functions
   const handleAddPhoto = () => {
+    // Check if user is guest and prevent photo editing
+    if (!canManagePhotos()) {
+      return;
+    }
+    
     photoOptionsAnim.setValue(0);
     Animated.spring(photoOptionsAnim, {
       toValue: 1,
@@ -182,6 +213,92 @@ const ProfileScreen = () => {
     }).start();
     setShowPhotoOptions(true);
   };
+
+  const handleDeletePhoto = (photoId: string) => {
+    if (!canManagePhotos()) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete Photo',
+      'Are you sure you want to delete this photo?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setPhotos(prevPhotos => {
+              const newPhotos = prevPhotos.filter(photo => photo.id !== photoId);
+              // If we deleted the profile photo, make the first remaining photo the profile
+              if (photoId === 'profile' && newPhotos.length > 0) {
+                newPhotos[0].isProfile = true;
+              }
+              return newPhotos;
+            });
+          }
+        }
+      ]
+    );
+  };
+
+
+
+  const handleLongPressPhoto = (photoId: string) => {
+    if (!canManagePhotos()) {
+      return;
+    }
+
+    Vibration.vibrate(50);
+    setDraggedPhotoId(photoId);
+  };
+
+  const handlePhotoDrag = useCallback((photoId: string, event: any) => {
+    if (draggedPhotoId !== photoId) return;
+
+    const { translationX, translationY, absoluteX } = event.nativeEvent;
+    
+    // Update dragged photo position
+    setDraggedPhotoPosition({ x: absoluteX, y: translationY });
+    
+    // Calculate which photo position this should snap to
+    const photoWidth = 132; // Photo width + margin
+    const containerStartX = 12; // Starting X position of photos container
+    
+    const relativeX = absoluteX - containerStartX;
+    const targetIndex = Math.max(0, Math.min(photos.length - 1, 
+      Math.round(relativeX / photoWidth)));
+    
+    const currentIndex = photos.findIndex(photo => photo.id === photoId);
+    
+    if (targetIndex !== currentIndex) {
+      setPhotos(prevPhotos => {
+        const newPhotos = [...prevPhotos];
+        const [movedPhoto] = newPhotos.splice(currentIndex, 1);
+        newPhotos.splice(targetIndex, 0, movedPhoto);
+        
+        // Update profile picture to be the first photo
+        newPhotos.forEach((photo, index) => {
+          photo.isProfile = index === 0;
+        });
+        
+        return newPhotos;
+      });
+    }
+  }, [draggedPhotoId, photos]);
+
+  const handlePhotoDragEnd = () => {
+    setDraggedPhotoId(null);
+    setDraggedPhotoPosition({ x: 0, y: 0 });
+  };
+
+  // Update profile image when photos change
+  useEffect(() => {
+    const profilePhoto = photos.find(photo => photo.isProfile);
+    if (profilePhoto) {
+      setProfileImage(profilePhoto.uri);
+    }
+  }, [photos, setProfileImage]);
 
   const hidePhotoOptions = () => {
     Animated.timing(photoOptionsAnim, {
@@ -217,6 +334,11 @@ const ProfileScreen = () => {
 
   // Function to show status selector with animation
   const showStatusMenu = () => {
+    // Check if user is guest and prevent status editing
+    if (!canChangeStatus()) {
+      return;
+    }
+    
     setShowStatusSelector(true);
     Animated.timing(statusSelectorAnim, {
       toValue: 1,
@@ -497,7 +619,15 @@ const ProfileScreen = () => {
               </View>
             </TouchableOpacity>
             <View style={styles.profileInfoTextContainer}>
-              <Text style={styles.profileName}>Sophia Jack</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName}>{displayName}</Text>
+                {isGuest && (
+                  <View style={styles.guestBadge}>
+                    <Text style={styles.guestBadgeText}>GUEST</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.profileUsername}>@{username}</Text>
             </View>
           </Animated.View>
         </View>
@@ -506,17 +636,21 @@ const ProfileScreen = () => {
         <View style={styles.photoSection}>
           {/* Photos Section Header */}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Photos (3)</Text>
-            <TouchableOpacity onPress={openPreview}>
-              <LinearGradient
-                colors={['#7872F4', '#5865F2']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.previewButton}
-              >
-                <Text style={styles.previewButtonText}>Preview</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>
+              Your Photos ({photos.length})
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity onPress={openPreview}>
+                <LinearGradient
+                  colors={['#7872F4', '#5865F2']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.previewButton}
+                >
+                  <Text style={styles.previewButtonText}>Preview</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
           
           {/* Photos Grid */}
@@ -540,33 +674,55 @@ const ProfileScreen = () => {
               </LinearGradient>
             </TouchableOpacity>
             
-            {/* Profile Photo Display - Shows same image as profile square */}
-            <TouchableOpacity style={styles.photoItemContainer}>
-              <View style={styles.profilePhotoContainer}>
-                <Image 
-                  source={{ uri: profileImage }} 
-                  style={styles.profilePhotoItem}
-                  resizeMode="cover"
-                />
-              </View>
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)']}
-                style={styles.photoGradient}
-              />
-            </TouchableOpacity>
-            
-            {/* Other photos */}
-            {[34, 32].map((id) => (
-              <TouchableOpacity key={id} style={styles.photoItemContainer}>
-                <Image 
-                  source={{ uri: `https://randomuser.me/api/portraits/women/${id}.jpg` }} 
-                  style={styles.photoItem}
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.7)']}
-                  style={styles.photoGradient}
-                />
-              </TouchableOpacity>
+                        {/* Photos */}
+            {photos.map((photo, index) => (
+                                              <LongPressGestureHandler
+                  key={photo.id}
+                  onHandlerStateChange={({ nativeEvent }) => {
+                    if (nativeEvent.state === State.ACTIVE) {
+                      handleLongPressPhoto(photo.id);
+                    }
+                  }}
+                  minDurationMs={200}
+                  enabled={!draggedPhotoId}
+                >
+                  <PanGestureHandler
+                    onGestureEvent={(event) => handlePhotoDrag(photo.id, event)}
+                    onEnded={handlePhotoDragEnd}
+                    enabled={!!draggedPhotoId}
+                    activeOffsetX={[-5, 5]}
+                  >
+                    <Animated.View 
+                      style={[
+                        styles.photoItemContainer,
+                        draggedPhotoId === photo.id && styles.draggingPhoto,
+                        draggedPhotoId === photo.id && { opacity: 0.3 }
+                      ]}
+                    >
+                    <Image 
+                      source={{ uri: photo.uri }} 
+                      style={styles.photoItem}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.7)']}
+                      style={styles.photoGradient}
+                    />
+                    
+                    {/* Delete Button */}
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => handleDeletePhoto(photo.id)}
+                    >
+                      <MaterialIcons name="close" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    
+
+                    
+ 
+                  </Animated.View>
+                </PanGestureHandler>
+              </LongPressGestureHandler>
             ))}
           </ScrollView>
         </View>
@@ -1043,7 +1199,7 @@ const ProfileScreen = () => {
                   onPress={() => navigatePreview('next')}
                 />
                 
-                <Text style={styles.previewDisplayNameBio}>Sophia Jack</Text>
+                <Text style={styles.previewDisplayNameBio}>{displayName}</Text>
                 <View style={styles.bioSeparator} />
                 
                 <Text style={styles.previewBioTitle}>About Me</Text>
@@ -1093,7 +1249,7 @@ const ProfileScreen = () => {
                   </TouchableOpacity>
                   
                   <View style={styles.previewNameContainer}>
-                    <Text style={styles.previewDisplayNameImage}>Sophia Jack</Text>
+                    <Text style={styles.previewDisplayNameImage}>{displayName}</Text>
                   </View>
                   
                   <TouchableOpacity style={styles.previewMoreButton}>
@@ -1260,8 +1416,29 @@ const ProfileScreen = () => {
               </View>
             )}
           </ScrollView>
-        </View>
+                </View>
       </Modal>
+
+      {/* Floating Dragged Photo Overlay */}
+      {draggedPhotoId && (
+        <Animated.View
+          style={[
+            styles.floatingPhoto,
+            {
+              transform: [
+                { translateX: draggedPhotoPosition.x - 41.5 }, // Center the photo
+                { translateY: draggedPhotoPosition.y - 63 }, // Center the photo
+              ],
+            },
+          ]}
+        >
+          <Image
+            source={{ uri: photos.find(p => p.id === draggedPhotoId)?.uri }}
+            style={styles.floatingPhotoImage}
+            resizeMode="cover"
+          />
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -1414,6 +1591,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '400',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  guestBadge: {
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 12,
+  },
+  guestBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   viewsIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1444,6 +1639,7 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontWeight: '600',
   },
+
   previewButton: {
     borderRadius: 10,
     paddingVertical: 8,
@@ -1484,9 +1680,71 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  draggingPhoto: {
+    transform: [{ scale: 1.1 }],
+    shadowColor: '#6E69F4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 107, 53, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  floatingPhoto: {
+    position: 'absolute',
+    width: 83,
+    height: 126,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+    zIndex: 1000,
+  },
+  floatingPhotoImage: {
+    width: 83,
+    height: 126,
+    borderRadius: 12,
+  },
+
   photoItem: {
     width: 83,
     height: 126,
+    borderRadius: 12,
+  },
+  editingPhotoContainer: {
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+    borderStyle: 'dashed',
+  },
+  profileBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#6E69F4',
+    borderRadius: 10,
+    padding: 4,
+  },
+  editOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 12,
   },
   photoGradient: {
@@ -2124,6 +2382,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  photoActionSheetContainer: {
+    backgroundColor: '#1C1D23',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  },
+  photoActionSheetHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#3E4148',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  photoActionSheetTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+
 });
 
 export default ProfileScreen; 

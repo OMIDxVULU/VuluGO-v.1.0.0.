@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
 
 interface GuestModeIndicatorProps {
   showUpgradePrompt?: boolean;
@@ -13,8 +14,17 @@ const GuestModeIndicator: React.FC<GuestModeIndicatorProps> = ({
   onUpgradePress 
 }) => {
   const { isGuest } = useAuth();
+  const { handleGuestRestriction } = useGuestRestrictions();
 
   if (!isGuest) return null;
+
+  const handleUpgradePress = () => {
+    if (onUpgradePress) {
+      onUpgradePress();
+    } else {
+      handleGuestRestriction('premium features');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -24,8 +34,8 @@ const GuestModeIndicator: React.FC<GuestModeIndicatorProps> = ({
       </View>
       
       {showUpgradePrompt && (
-        <TouchableOpacity style={styles.upgradeButton} onPress={onUpgradePress}>
-          <Text style={styles.upgradeText}>Sign Up to Unlock</Text>
+        <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgradePress}>
+          <Text style={styles.upgradeText}>Sign In</Text>
         </TouchableOpacity>
       )}
     </View>

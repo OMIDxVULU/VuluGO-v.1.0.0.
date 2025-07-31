@@ -1,23 +1,42 @@
 import { useAuth } from '../context/AuthContext';
 import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 
 export const useGuestRestrictions = () => {
-  const { isGuest, user } = useAuth();
+  const { isGuest, signOut } = useAuth();
+  const router = useRouter();
 
-  const showGuestRestrictionAlert = (feature: string) => {
+  const forceSignOutAndNavigate = async () => {
+    try {
+      // Clear guest state immediately
+      await signOut();
+      // Navigate to auth screen
+      router.push('/auth');
+    } catch (error) {
+      console.error('Error signing out guest:', error);
+      // Even if signOut fails, navigate to auth
+      router.push('/auth');
+    }
+  };
+
+  const handleGuestRestriction = (feature: string) => {
     Alert.alert(
       'Guest Mode Restriction',
-      `This feature is not available in guest mode. Sign up for a free account to access ${feature}.`,
+      `This feature requires a full account. You'll be signed out of guest mode to sign in.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Up', style: 'default' }
+        { 
+          text: 'Sign In', 
+          style: 'default',
+          onPress: forceSignOutAndNavigate
+        }
       ]
     );
   };
 
   const canSendMessages = () => {
     if (isGuest) {
-      showGuestRestrictionAlert('messaging');
+      handleGuestRestriction('messaging');
       return false;
     }
     return true;
@@ -25,7 +44,7 @@ export const useGuestRestrictions = () => {
 
   const canCreateContent = () => {
     if (isGuest) {
-      showGuestRestrictionAlert('content creation');
+      handleGuestRestriction('content creation');
       return false;
     }
     return true;
@@ -33,7 +52,7 @@ export const useGuestRestrictions = () => {
 
   const canMakePurchases = () => {
     if (isGuest) {
-      showGuestRestrictionAlert('purchases');
+      handleGuestRestriction('purchases');
       return false;
     }
     return true;
@@ -41,7 +60,7 @@ export const useGuestRestrictions = () => {
 
   const canAddFriends = () => {
     if (isGuest) {
-      showGuestRestrictionAlert('adding friends');
+      handleGuestRestriction('adding friends');
       return false;
     }
     return true;
@@ -49,7 +68,7 @@ export const useGuestRestrictions = () => {
 
   const canAccessPremiumFeatures = () => {
     if (isGuest) {
-      showGuestRestrictionAlert('premium features');
+      handleGuestRestriction('premium features');
       return false;
     }
     return true;
@@ -58,6 +77,30 @@ export const useGuestRestrictions = () => {
   const canSaveData = () => {
     if (isGuest) {
       // Guest data is temporary and not saved
+      return false;
+    }
+    return true;
+  };
+
+  const canEditProfile = () => {
+    if (isGuest) {
+      handleGuestRestriction('profile editing');
+      return false;
+    }
+    return true;
+  };
+
+  const canManagePhotos = () => {
+    if (isGuest) {
+      handleGuestRestriction('photo management');
+      return false;
+    }
+    return true;
+  };
+
+  const canChangeStatus = () => {
+    if (isGuest) {
+      handleGuestRestriction('status changes');
       return false;
     }
     return true;
@@ -82,10 +125,13 @@ export const useGuestRestrictions = () => {
     canAddFriends,
     canAccessPremiumFeatures,
     canSaveData,
+    canEditProfile,
+    canManagePhotos,
+    canChangeStatus,
     getGuestGoldLimit,
     getGuestGemsLimit,
     isAtGoldLimit,
     isAtGemsLimit,
-    showGuestRestrictionAlert,
+    handleGuestRestriction,
   };
 }; 
