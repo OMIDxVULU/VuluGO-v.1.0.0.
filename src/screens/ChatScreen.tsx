@@ -31,6 +31,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Message from '../components/Message';
 import ChatHeader from '../components/ChatHeader';
 import ChatFooter from '../components/ChatFooter';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
 
 const { width, height } = Dimensions.get('window');
 
@@ -345,6 +346,7 @@ const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
 };
 
 const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScreenProps) => {
+  const { canSendMessages } = useGuestRestrictions();
   // Use the imported router
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [renderError, setRenderError] = useState(false);
@@ -535,6 +537,11 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
 
   // Handle sending a new message
   const handleSendMessage = (text: string) => {
+    // Check if user can send messages (guest restriction)
+    if (!canSendMessages()) {
+      return;
+    }
+
     const newMessage: ChatMessage = {
       id: Date.now(),
       text,
@@ -546,7 +553,7 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
     };
 
     setMessages((prevMessages) => [...prevMessages, newMessage]);
-          setTimeout(() => {
+    setTimeout(() => {
       scrollToBottom();
     }, 100);
   };
@@ -764,6 +771,7 @@ const styles = StyleSheet.create({
   liveStatsContainer: {
     flexDirection: 'row',
     marginTop: 4,
+
   },
   liveStatItem: {
     flexDirection: 'row',
@@ -805,6 +813,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-});
+});export default ChatScreen;
 
-export default ChatScreen;

@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, TextInput } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
 
 interface CurrencyDisplayProps {
   balance: number;
@@ -20,6 +21,7 @@ const GoldBalanceDisplay: React.FC<GoldBalanceDisplayProps> = ({
   gemBalance = 50,
   onConvert 
 }) => {
+  const { isGuest, getGuestGoldLimit, getGuestGemsLimit } = useGuestRestrictions();
   const [modalVisible, setModalVisible] = useState(false);
   const [gemsToConvert, setGemsToConvert] = useState('10');
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -111,7 +113,10 @@ const GoldBalanceDisplay: React.FC<GoldBalanceDisplayProps> = ({
                 <View style={styles.balanceItem}>
                   <MaterialCommunityIcons name="diamond-stone" size={24} color="#6E69F4" />
                   <Text style={styles.balanceLabel}>Gem Balance</Text>
-                  <Text style={styles.balanceValue}>{gemBalance}</Text>
+                  <Text style={styles.balanceValue}>
+                    {gemBalance}
+                    {isGuest && <Text style={styles.guestLimit}> / {getGuestGemsLimit()}</Text>}
+                  </Text>
                 </View>
 
                 <View style={styles.separator} />
@@ -119,7 +124,10 @@ const GoldBalanceDisplay: React.FC<GoldBalanceDisplayProps> = ({
                 <View style={styles.balanceItem}>
                   <MaterialCommunityIcons name="gold" size={24} color="#FFD700" />
                   <Text style={styles.balanceLabel}>Gold Balance</Text>
-                  <Text style={styles.balanceValue}>{goldBalance}</Text>
+                  <Text style={styles.balanceValue}>
+                    {goldBalance}
+                    {isGuest && <Text style={styles.guestLimit}> / {getGuestGoldLimit()}</Text>}
+                  </Text>
                 </View>
               </View>
 
@@ -280,6 +288,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  guestLimit: {
+    color: '#FF6B35',
+    fontSize: 16,
+    fontWeight: 'normal',
   },
 });
 

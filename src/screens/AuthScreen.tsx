@@ -14,10 +14,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 
 const AuthScreen: React.FC = () => {
   const router = useRouter();
+  const { signInAsGuest, signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,14 +41,27 @@ const AuthScreen: React.FC = () => {
 
     try {
       if (isLogin) {
-        await authService.signIn(email, password);
+        await signIn(email, password);
         Alert.alert('Success', 'Welcome back!');
       } else {
-        await authService.signUp(email, password, displayName);
+        await signUp(email, password, displayName);
         Alert.alert('Success', 'Account created successfully!');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    try {
+      await signInAsGuest();
+      Alert.alert('Success', 'Welcome Guest! You can explore the app with limited features.');
+      router.replace('/(main)');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to sign in as guest. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -172,6 +186,15 @@ const AuthScreen: React.FC = () => {
                 </LinearGradient>
               </TouchableOpacity>
 
+              {/* Guest Login Button */}
+              <TouchableOpacity
+                style={styles.guestButton}
+                onPress={handleGuestLogin}
+                disabled={loading}
+              >
+                <Text style={styles.guestButtonText}>Log in as a guest</Text>
+              </TouchableOpacity>
+
               {/* Toggle Mode */}
               <TouchableOpacity
                 style={styles.toggleButton}
@@ -277,6 +300,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  guestButton: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  guestButtonText: {
+    color: '#6E69F4',
+    fontSize: 16,
+    textDecorationLine: 'underline',
   },
   toggleButton: {
     marginTop: 24,

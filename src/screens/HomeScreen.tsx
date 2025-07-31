@@ -27,6 +27,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import authService from '../services/authService';
 import FirebaseTest from '../components/FirebaseTest';
+import GuestModeIndicator from '../components/GuestModeIndicator';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -2179,6 +2180,9 @@ const HomeScreen = () => {
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {/* Guest Mode Indicator */}
+        <GuestModeIndicator showUpgradePrompt={true} onUpgradePress={() => router.push('/auth')} />
+        
         {/* Combined Spotlight and Live Activity Widgets */}
         <View style={styles.scrollContainer} onLayout={handleContainerLayout}>
           <ScrollView

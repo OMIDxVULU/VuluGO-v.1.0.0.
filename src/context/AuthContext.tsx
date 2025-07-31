@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { authService } from '../services/authService';
+import { authService, GuestUser } from '../services/authService';
 import { firestoreService } from '../services/firestoreService';
 
 interface AuthContextType {
-  user: User | null;
+  user: User | GuestUser | null;
   userProfile: any | null;
   loading: boolean;
+  isGuest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signInAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfile: (updates: any) => Promise<void>;
 }
@@ -28,32 +30,35 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | GuestUser | null>(null);
   const [userProfile, setUserProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     
-    const unsubscribe = authService.onAuthStateChange(async (user) => {
+    const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       if (!mounted) return;
       
-      setUser(user);
-      
-      if (user) {
+      if (firebaseUser) {
+        // Regular Firebase user
+        setUser(firebaseUser);
+        setIsGuest(false);
+        
         // Get user profile from Firestore
         try {
-          const profile = await firestoreService.getUser(user.uid);
+          const profile = await firestoreService.getUser(firebaseUser.uid);
           if (mounted) {
             if (profile) {
               setUserProfile(profile);
             } else {
               // Create new user profile
               const newProfile = {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || 'User',
-                photoURL: user.photoURL,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || 'User',
+                photoURL: firebaseUser.photoURL,
                 gold: 1000,
                 gems: 50,
                 level: 1,
@@ -75,12 +80,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error('Error loading user profile:', error);
           // Set a default profile even if loading fails
-          if (mounted && user) {
+          if (mounted && firebaseUser) {
             const defaultProfile = {
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName || 'User',
-              photoURL: user.photoURL,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || 'User',
+              photoURL: firebaseUser.photoURL,
               gold: 1000,
               gems: 50,
               level: 1,
@@ -89,8 +94,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
       } else {
-        if (mounted) {
-          setUserProfile(null);
+        // Check for guest user in AsyncStorage
+        try {
+          const guestUser = await authService.getGuestUser();
+          if (guestUser && mounted) {
+            setUser(guestUser);
+            setIsGuest(true);
+            
+            // Create guest profile
+            const guestProfile = {
+              uid: guestUser.uid,
+              email: null,
+              displayName: 'Guest',
+              photoURL: guestUser.photoURL,
+              gold: 500, // Limited gold for guests
+              gems: 10,  // Limited gems for guests
+              level: 1,
+              isGuest: true,
+              guestId: guestUser.guestId,
+            };
+            setUserProfile(guestProfile);
+          } else if (mounted) {
+            setUser(null);
+            setUserProfile(null);
+            setIsGuest(false);
+          }
+        } catch (error) {
+          console.error('Error loading guest user:', error);
+          if (mounted) {
+            setUser(null);
+            setUserProfile(null);
+            setIsGuest(false);
+          }
         }
       }
       
@@ -107,6 +142,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any existing guest session
+      await authService.clearGuestUser();
       await authService.signIn(email, password);
     } catch (error) {
       throw error;
@@ -115,7 +152,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (email: string, password: string, displayName: string) => {
     try {
+      // Clear any existing guest session
+      await authService.clearGuestUser();
       await authService.signUp(email, password, displayName);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const signInAsGuest = async () => {
+    try {
+      // Clear any existing Firebase session
+      await authService.signOut();
+      
+      const guestUser = await authService.signInAsGuest();
+      setUser(guestUser);
+      setIsGuest(true);
+      
+      // Create guest profile
+      const guestProfile = {
+        uid: guestUser.uid,
+        email: null,
+        displayName: 'Guest',
+        photoURL: guestUser.photoURL,
+        gold: 500, // Limited gold for guests
+        gems: 10,  // Limited gems for guests
+        level: 1,
+        isGuest: true,
+        guestId: guestUser.guestId,
+      };
+      setUserProfile(guestProfile);
     } catch (error) {
       throw error;
     }
@@ -132,6 +198,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const updateUserProfile = async (updates: any) => {
     if (!user) return;
     
+    // Don't allow guest users to update their profile
+    if (isGuest) {
+      console.warn('Guest users cannot update their profile');
+      return;
+    }
+    
     try {
       await firestoreService.updateUser(user.uid, updates);
       setUserProfile(prev => ({ ...prev, ...updates }));
@@ -144,8 +216,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     userProfile,
     loading,
+    isGuest,
     signIn,
     signUp,
+    signInAsGuest,
     signOut,
     updateUserProfile,
   };
