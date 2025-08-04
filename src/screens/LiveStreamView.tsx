@@ -1031,23 +1031,6 @@ const LiveStreamView = () => {
             {/* Stream Information Section */}
             <View style={styles.infoSection}>
               <Text style={styles.infoSectionTitle}>{streamTitle}</Text>
-              
-              <View style={styles.infoRow}>
-                <Ionicons name="time-outline" size={18} color="#AAAAAA" />
-                <Text style={styles.infoText}>Started {stream?.startedAt ? timeAgo(stream.startedAt) : '1 hour ago'}</Text>
-              </View>
-              
-              <View style={styles.infoRow}>
-                <MaterialIcons name="bolt" size={18} color="#FFD700" />
-                <Text style={styles.infoText}>Total Boost: {boosts}</Text>
-              </View>
-              
-
-              
-              <View style={styles.infoRow}>
-                <Ionicons name="person-outline" size={18} color="#AAAAAA" />
-                <Text style={styles.infoText}>Profile Views: {formatViewCount(profileViews)}</Text>
-              </View>
             </View>
 
             {/* Hosts Section */}
@@ -1079,12 +1062,34 @@ const LiveStreamView = () => {
               ))}
             </View>
 
-            {/* Report Section */}
+            {/* Actions Section */}
             <View style={styles.infoSection}>
-              <Text style={styles.infoSectionHeader}>Report</Text>
-              <Text style={styles.reportText}>Report inappropriate content or behavior in this stream.</Text>
+              <Text style={styles.infoSectionHeader}>Actions</Text>
+              
+              {/* Invite Friends Button */}
+              <TouchableOpacity style={styles.actionButton}>
+                <View style={styles.actionButtonContent}>
+                  <Ionicons name="person-add-outline" size={20} color="#6E56F7" />
+                  <Text style={styles.actionButtonText}>Invite Friends</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#AAAAAA" />
+              </TouchableOpacity>
+              
+              {/* Settings Button */}
+              <TouchableOpacity style={styles.actionButton}>
+                <View style={styles.actionButtonContent}>
+                  <Ionicons name="settings-outline" size={20} color="#6E56F7" />
+                  <Text style={styles.actionButtonText}>Stream Settings</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#AAAAAA" />
+              </TouchableOpacity>
+              
+              {/* Report Button */}
               <TouchableOpacity style={styles.reportButton}>
-                <Text style={styles.reportButtonText}>Report Stream</Text>
+                <View style={styles.reportButtonContent}>
+                  <Ionicons name="flag-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.reportButtonText}>Report Stream</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1575,16 +1580,44 @@ const LiveStreamView = () => {
       marginBottom: 16,
       lineHeight: 20,
     },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      marginBottom: 8,
+      backgroundColor: 'rgba(110, 86, 247, 0.1)',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(110, 86, 247, 0.2)',
+    },
+    actionButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    actionButtonText: {
+      color: '#FFFFFF',
+      fontWeight: '500',
+      marginLeft: 12,
+      fontSize: 14,
+    },
     reportButton: {
       backgroundColor: '#F44336',
       paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 20,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    reportButtonContent: {
+      flexDirection: 'row',
       alignItems: 'center',
     },
     reportButtonText: {
       color: '#FFFFFF',
       fontWeight: 'bold',
+      marginLeft: 8,
     },
     mentionSuggestionsContainer: {
       position: 'absolute',
