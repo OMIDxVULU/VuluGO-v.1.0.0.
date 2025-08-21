@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import CustomTabBar from '../../src/components/CustomTabBar';
 import SidebarMenu from '../../src/components/SidebarMenu';
+
 import { useUserProfile } from '../../src/context/UserProfileContext';
 
 /**

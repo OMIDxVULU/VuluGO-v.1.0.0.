@@ -72,6 +72,10 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   // Use simple refs instead of state
   const isExpandedRef = useRef(menuPositionContext?.isExpanded || false);
   
+  // Add state for button styling (React Native Web compatible)
+  const [buttonStyle, setButtonStyle] = useState({ scale: 1.0 });
+  const [buttonPosition, setButtonPosition] = useState(menuPositionContext?.position || DEFAULT_POSITION);
+  
   // References
   const slideAnim = useRef(new Animated.Value(0)).current;
   const buttonRef = useRef<View>(null);
@@ -85,8 +89,16 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     if (menuPositionContext) {
       isExpandedRef.current = menuPositionContext.isExpanded;
       slideAnim.setValue(menuPositionContext.isExpanded ? 65 : 0);
+      setButtonPosition(menuPositionContext.position);
     }
   }, []);
+
+  // Sync button position with context changes
+  useEffect(() => {
+    if (menuPositionContext?.position) {
+      setButtonPosition(menuPositionContext.position);
+    }
+  }, [menuPositionContext?.position]);
   
   // Determine active menu item based on current route
   const [activeIndex, setActiveIndex] = useState(0);
@@ -235,13 +247,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         };
         
         // Scale up the button for visual feedback
-        if (buttonRef.current) {
-          buttonRef.current.setNativeProps({
-            style: {
-              transform: [{ scale: 1.1 }]
-            }
-          });
-        }
+        setButtonStyle({ scale: 1.1 });
       },
       
       onPanResponderMove: (evt, gestureState) => {
@@ -259,12 +265,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         const bounded = keepWithinBoundaries(buttonX, buttonY);
         
         // Update button position - follow finger exactly during drag
-        buttonRef.current.setNativeProps({
-          style: {
-            left: bounded.x,
-            top: bounded.y
-          }
-        });
+        setButtonPosition(bounded);
         
         // Update position and time for velocity calculation
         initialPositionRef.current = {
@@ -300,11 +301,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
         );
         
         // Scale back down
-        buttonRef.current.setNativeProps({
-          style: {
-            transform: [{ scale: 1.0 }]
-          }
-        });
+        setButtonStyle({ scale: 1.0 });
         
         // Animate to the target position
         let startTime = Date.now();
@@ -322,24 +319,13 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
           const y = bounded.y + (targetPosition.y - bounded.y) * easedProgress;
           
           // Update button position
-          if (buttonRef.current) {
-            buttonRef.current.setNativeProps({
-              style: { left: x, top: y }
-            });
-          }
+          setButtonPosition({ x, y });
           
           if (progress < 1) {
             requestAnimationFrame(animateToTarget);
           } else {
             // Final position update
-            if (buttonRef.current) {
-              buttonRef.current.setNativeProps({
-                style: {
-                  left: targetPosition.x,
-                  top: targetPosition.y
-                }
-              });
-            }
+            setButtonPosition(targetPosition);
             
             // Update context with final position
             if (menuPositionContext) {
@@ -476,8 +462,9 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
           style={[
             styles.floatingToggleContainer,
             {
-              left: menuPositionContext?.position.x || DEFAULT_POSITION.x,
-              top: menuPositionContext?.position.y || DEFAULT_POSITION.y,
+              left: buttonPosition.x,
+              top: buttonPosition.y,
+              transform: [{ scale: buttonStyle.scale }]
             }
           ]}
           {...panResponder.panHandlers}

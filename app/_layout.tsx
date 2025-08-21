@@ -14,6 +14,7 @@ import { LiveStreamProvider } from '../src/context/LiveStreamContext';
 import { NotificationProvider } from '../src/context/NotificationContext';
 import { AuthProvider } from '../src/context/AuthContext';
 import ErrorBoundary from '../src/components/ErrorBoundary';
+import WebResponsiveWrapper from '../src/components/WebResponsiveWrapper';
 
 import { analyticsService } from '../src/services/AnalyticsService';
 
@@ -118,40 +119,42 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary onError={handleError}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <AuthProvider>
-          <UserStatusProvider>
-            <UserProfileProvider>
-              <LiveStreamProvider>
-                <NotificationProvider>
-                  <AppContext.Provider value={{ fontsLoaded }}>
-                    <MenuPositionProvider>
-                      <SafeAreaProvider>
-                        <PaperProvider theme={paperTheme}>
-                          <StatusBar style="light" />
-                          <Stack screenOptions={{ 
-                            headerShown: false, 
-                            gestureEnabled: true, // Explicitly enable swipe gesture
-                            contentStyle: { backgroundColor: '#131318' },
-                            animation: Platform.OS === 'ios' ? 'default' : 'fade',
-                          }}>
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="auth" />
-                            <Stack.Screen name="(main)" />
-                            <Stack.Screen name="livestream" />
-                          </Stack>
-                          
+      <WebResponsiveWrapper>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <AuthProvider>
+            <UserStatusProvider>
+              <UserProfileProvider>
+                <LiveStreamProvider>
+                  <NotificationProvider>
+                    <AppContext.Provider value={{ fontsLoaded }}>
+                      <MenuPositionProvider>
+                        <SafeAreaProvider>
+                          <PaperProvider theme={paperTheme}>
+                            <StatusBar style="light" />
+                            <Stack screenOptions={{ 
+                              headerShown: false, 
+                              gestureEnabled: true, // Explicitly enable swipe gesture
+                              contentStyle: { backgroundColor: '#131318' },
+                              animation: Platform.OS === 'ios' ? 'default' : 'fade',
+                            }}>
+                              <Stack.Screen name="index" />
+                              <Stack.Screen name="auth" />
+                              <Stack.Screen name="(main)" />
+                              <Stack.Screen name="livestream" />
+                            </Stack>
+                            
 
-                        </PaperProvider>
-                      </SafeAreaProvider>
-                    </MenuPositionProvider>
-                  </AppContext.Provider>
-                </NotificationProvider>
-              </LiveStreamProvider>
-            </UserProfileProvider>
-          </UserStatusProvider>
-        </AuthProvider>
-      </GestureHandlerRootView>
+                          </PaperProvider>
+                        </SafeAreaProvider>
+                      </MenuPositionProvider>
+                    </AppContext.Provider>
+                  </NotificationProvider>
+                </LiveStreamProvider>
+              </UserProfileProvider>
+            </UserStatusProvider>
+          </AuthProvider>
+        </GestureHandlerRootView>
+      </WebResponsiveWrapper>
     </ErrorBoundary>
   );
 }

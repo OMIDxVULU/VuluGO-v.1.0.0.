@@ -85,6 +85,12 @@ const HomeScreen = () => {
   // Add record of entries for each event cycle
   const [eventEntriesRecord, setEventEntriesRecord] = useState<{[key: number]: number}>({});
   
+  // Add state for the new minimal gems widget
+  const [isMinimalGemsExpanded, setIsMinimalGemsExpanded] = useState(false);
+  // Add states to track if the tutorials have been shown for gems widget
+  const [showGemsExpandTutorial, setShowGemsExpandTutorial] = useState(true);
+  const [showGemsMinimizeTutorial, setShowGemsMinimizeTutorial] = useState(true);
+  
   // --- Animation Setup for Your Spotlight Shadow ---
   const yourShadowOpacity = useSharedValue(0.7); // Initial opacity
 
@@ -1220,12 +1226,6 @@ const HomeScreen = () => {
       }]
     };
   });
-
-  // Add state for the new minimal gems widget
-  const [isMinimalGemsExpanded, setIsMinimalGemsExpanded] = useState(false);
-  // Add states to track if the tutorials have been shown for gems widget
-  const [showGemsExpandTutorial, setShowGemsExpandTutorial] = useState(true);
-  const [showGemsMinimizeTutorial, setShowGemsMinimizeTutorial] = useState(true);
 
   // Add logging to track gems state changes
   useEffect(() => {
