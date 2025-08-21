@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder, StatusBar, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder, StatusBar, TextInput, Alert } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5, AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -922,7 +922,6 @@ const HomeScreen = () => {
   const purchaseSpotlight = (minutes: number, cost: number) => {
     if (goldBalance < cost) {
       // Handle insufficient balance
-      console.log("Insufficient gold balance");
       return;
     }
     
@@ -949,7 +948,6 @@ const HomeScreen = () => {
 
   // Add logging to track state changes
   useEffect(() => {
-    console.log('isMinimalEventExpanded changed to:', isMinimalEventExpanded);
     // Hide appropriate tutorial after user has interacted with the widget
     if (isMinimalEventExpanded) {
       setShowExpandTutorial(false);
@@ -999,7 +997,6 @@ const HomeScreen = () => {
     
     const toggleExpanded = () => {
       setIsMinimalEventExpanded(!isMinimalEventExpanded);
-      console.log('Toggled minimal event:', !isMinimalEventExpanded);
     };
     
     // Calculate prize pool based on number of entries
@@ -1149,9 +1146,9 @@ const HomeScreen = () => {
           glowIntensity={3}
         />
         {/* Content container - slightly padded */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.spotlightContainer, { padding: 5 }]} // Add padding
-          onPress={() => console.log("Spotlight active")}
+          onPress={openSpotlightModal}
           activeOpacity={0.9} // Maintain high opacity
         >
           {/* Content is now directly inside TouchableOpacity */}
@@ -1191,9 +1188,9 @@ const HomeScreen = () => {
           glowIntensity={3}
         />
         {/* Content container - slightly padded */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.spotlightContainer, { borderColor: '#FFC107', padding: 5 }]} // Add padding
-          onPress={() => console.log('Spotlight other')}
+          onPress={openSpotlightModal}
           activeOpacity={0.9} // Maintain high opacity
         >
            {/* Content is now directly inside TouchableOpacity */}
@@ -1229,7 +1226,6 @@ const HomeScreen = () => {
 
   // Add logging to track gems state changes
   useEffect(() => {
-    console.log('isMinimalGemsExpanded changed to:', isMinimalGemsExpanded);
     // Hide appropriate tutorial after user has interacted with the widget
     if (isMinimalGemsExpanded) {
       setShowGemsExpandTutorial(false);
@@ -1261,7 +1257,6 @@ const HomeScreen = () => {
     
     const toggleExpanded = () => {
       setIsMinimalGemsExpanded(!isMinimalGemsExpanded);
-      console.log('Toggled minimal gems:', !isMinimalGemsExpanded);
     };
     
     return (
@@ -1519,7 +1514,11 @@ const HomeScreen = () => {
                 }}
                 onPress={(e) => {
                   e.stopPropagation();
-                  console.log('Buy more gems pressed');
+                  Alert.alert(
+                    'Purchase Gems',
+                    'Gem purchasing will be available soon! Stay tuned for updates.',
+                    [{ text: 'OK' }]
+                  );
                 }}
               >
                 <Text style={{
@@ -1703,7 +1702,6 @@ const HomeScreen = () => {
   
   // Update the useEffect for the automatic event timer to properly detect winners
   useEffect(() => {
-    console.log('Setting up event timer with state:', { hasEnteredEvent, hasWonEvent, eventTimeLeft });
     
     // Always run the timer, regardless of user participation
     const timer = setInterval(() => {
@@ -1712,11 +1710,10 @@ const HomeScreen = () => {
         
         // When timer reaches zero, determine winners and reset
         if (newValue === 0) {
-          console.log('Timer reached zero. Current state:', { hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount });
+
           
           // GUARANTEED WIN: If user has entered this cycle and hasn't won yet, they win
           if (hasEnteredEvent && !hasWonEvent) {
-            console.log('User has entered and wins!');
             // Force this to happen synchronously before any state updates
             setTimeout(() => {
               setHasWonEvent(true);
@@ -1726,13 +1723,10 @@ const HomeScreen = () => {
               const winAmount = calculateWinAmount();
               addEventWinNotification(winAmount);
             }, 0);
-          } else {
-            console.log('No active entries or already won.');
           }
           
           // Always start a new cycle after a delay
           setTimeout(() => {
-            console.log('Starting new event cycle');
             setEventTimeLeft(180); // Reset to 3 minutes
             setEventCycleCount(prev => prev + 1); // Increment cycle count
             
@@ -1752,7 +1746,6 @@ const HomeScreen = () => {
     
     // Clean up on unmount
     return () => {
-      console.log('Clearing event timer');
       clearInterval(timer);
     };
   }, [hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount]); // Add eventCycleCount dependency
@@ -1777,7 +1770,6 @@ const HomeScreen = () => {
     } else if (!hasEnteredEvent) {
       // Make sure the event isn't expired (timer at 0)
       if (eventTimeLeft <= 0) {
-        console.log('Cannot enter an expired event, wait for the next cycle');
         return;
       }
       
@@ -1786,7 +1778,6 @@ const HomeScreen = () => {
         // Deduct entry cost from balance
         setGoldBalance(prev => prev - eventEntryCost);
         setHasEnteredEvent(true);
-        console.log('Event entered for', eventEntryCost, 'gold. Waiting for results...');
         
         // Increment entries
         const newEntryCount = eventEntries + 1;
@@ -1799,10 +1790,7 @@ const HomeScreen = () => {
         }));
       } else {
         // Not enough gold
-        console.log('Insufficient gold to enter event');
       }
-    } else {
-      console.log('Already entered this event cycle. Wait for results.');
     }
   };
 
@@ -1817,11 +1805,9 @@ const HomeScreen = () => {
     if (entriesWhenWon === 1) {
       // Full refund case
       prizeAmount = eventEntryCost;
-      console.log('Claiming prize: Full refund of entry fee');
     } else {
       // Normal prize pool (70% of all entries)
       prizeAmount = Math.floor(entriesWhenWon * eventEntryCost * 0.7);
-      console.log(`Claiming prize: ${prizeAmount} gold from prize pool`);
     }
     
     // Add the prize to user's gold balance
@@ -1833,13 +1819,10 @@ const HomeScreen = () => {
     setHasEnteredEvent(false);
     
     showNotification(`Claimed ${prizeAmount} gold!`);
-    console.log('Prize claimed, wonEventCycle reset to -1');
   };
 
   // Function to add a notification when user wins an event
   const addEventWinNotification = (winAmount: number) => {
-    // Log to console for debugging
-    console.log('Added notification: You won', winAmount, 'gold in the event!');
     
     // Get the current count and increment it
     const newCount = counts.allNotifications + 1;
@@ -1857,7 +1840,6 @@ const HomeScreen = () => {
 
   // Function to show notification
   const showNotification = (message: string) => {
-    console.log('Notification:', message);
     // In a real app, you would use a notification system
     // For this demo, we'll just log to console
     
@@ -2257,7 +2239,7 @@ const HomeScreen = () => {
                     otherSpotlightTimeLeft > 0 && styles.otherActiveShadow,
                     otherSpotlightTimeLeft > 0 && otherAnimatedShadowStyle
                   ]}
-                  onPress={() => console.log('Boost other')}
+                  onPress={() => { /* TODO: Implement boost other functionality */ }}
                   activeOpacity={0.9}
                 >
                   {/* Progress bar positioned absolutely inside */}

@@ -17,6 +17,12 @@ import {
 } from 'react-native';
 import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { firestoreService } from '../services/firestoreService';
+import { UnifiedMessage, MessageConverter } from '../services/types';
+import { ChatOperations, chatSubscriptionManager } from '../utils/chatUtils';
+import { useAuth } from '../context/AuthContext';
+import { LoadingState, ErrorState, MessageSkeletonLoader, useErrorHandler } from '../components/ErrorHandling';
+import { MessageValidator } from '../utils/chatUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -85,121 +91,25 @@ const CURRENT_USER_ID = 'currentUser';
 const CURRENT_USER_NAME = 'You';
 const CURRENT_USER_AVATAR = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
-// Sample data with Discord-like features
-const DUMMY_MESSAGES: Message[] = [
-  {
-    id: '1',
-    senderId: 'otherUser1',
-    senderName: 'Sophia', 
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Hey! How are you?",
-    timestamp: '2:30 PM',
-  },
-  {
-    id: '2',
-    senderId: 'otherUser1',
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Did you check out the new features?",
-    timestamp: '2:30 PM',
-  },
-  {
-    id: '3',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "I'm doing great! Just finished working on the new feature.",
-    timestamp: '2:31 PM',
-  },
-  {
-    id: '4',
-    senderId: 'otherUser1', 
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "That's awesome! Can't wait to see it 😊",
-    timestamp: '2:32 PM',
-    reactions: [
-      { emoji: '👍', count: 1, userIds: [CURRENT_USER_ID] },
-      { emoji: '🎉', count: 1, userIds: [CURRENT_USER_ID] }
-    ]
-  },
-  {
-    id: '5',
-    senderId: 'otherUser1', 
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "How did the testing go?",
-    timestamp: '2:33 PM',
-  },
-  {
-    id: '6',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "I'll send you a demo soon. Here's a screenshot of what I've been working on:",
-    timestamp: '2:35 PM',
-    attachments: [
-      {
-        id: 'att1',
-        type: 'image',
-        url: 'https://picsum.photos/400/300',
-        width: 400,
-        height: 300
-      }
-    ]
-  },
-  {
-    id: '7',
-    senderId: 'otherUser1',
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Wow, that looks great! When can we test it?",
-    timestamp: '2:36 PM',
-    replyTo: {
-      id: '6',
-      senderId: CURRENT_USER_ID,
-      senderName: CURRENT_USER_NAME,
-      text: "I'll send you a demo soon. Here's a screenshot of what I've been working on:"
-    }
-  },
-  {
-    id: '8',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "Hey @Sophia, I'm planning to start a live stream to showcase the features in about 10 minutes. Would you join?",
-    timestamp: '2:37 PM',
-    mentions: [
-      {
-        id: 'otherUser1',
-        name: 'Sophia',
-        startIndex: 4,
-        endIndex: 11
-      }
-    ]
-  },
-  {
-    id: '9',
-    senderId: 'otherUser1',
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Sure! I'll be there.",
-    timestamp: '2:38 PM',
-  },
-];
+
 
 const DiscordChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) => {
+  const { user: currentUser } = useAuth();
+
+  // Real chat state
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>(() => 
-    // Use chat partner details for initial non-currentUser messages
-    DUMMY_MESSAGES.map(msg => 
-      msg.senderId !== CURRENT_USER_ID ? { ...msg, senderName: name, senderAvatar: avatar } : msg
-    )
-  );
+  const [messages, setMessages] = useState<UnifiedMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Error handling
+  const { error, loading: sendingMessage, handleError, clearError, withErrorHandling } = useErrorHandler();
+
+  // Legacy Discord-style state (keeping for compatibility)
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isAttachmentPickerVisible, setIsAttachmentPickerVisible] = useState(false);
   const [isEmojiPickerVisible, setIsEmojiPickerVisible] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<UnifiedMessage | null>(null);
   const [swipedMessageId, setSwipedMessageId] = useState<string | null>(null);
   
   // Refs
@@ -208,6 +118,88 @@ const DiscordChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) =>
   const inputContainerRef = useRef<View>(null);
   const swipeAnimRef = useRef<{ [key: string]: Animated.Value }>({});
   
+  // Load conversation and messages
+  useEffect(() => {
+    let isMounted = true;
+    let unsubscribeMessages: (() => void) | null = null;
+
+    const loadConversation = async () => {
+      if (!currentUser || !userId) return;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        // Create or get conversation
+        const conversation = await firestoreService.getConversationByParticipants([currentUser.uid, userId]);
+
+        if (!isMounted) return;
+
+        if (conversation) {
+          setConversationId(conversation.id);
+
+          // Load existing messages
+          const existingMessages = await firestoreService.getConversationMessages(conversation.id);
+          const unifiedMessages = existingMessages.map(MessageConverter.fromDirectMessage);
+
+          if (isMounted) {
+            setMessages(unifiedMessages);
+          }
+
+          // Set up real-time listener
+          unsubscribeMessages = firestoreService.onConversationMessages(conversation.id, (newMessages) => {
+            if (!isMounted) return;
+            const unifiedMessages = newMessages.map(MessageConverter.fromDirectMessage);
+            setMessages(unifiedMessages);
+          });
+
+        } else {
+          // Create new conversation
+          const newConversationId = await firestoreService.createConversation(
+            [currentUser.uid, userId],
+            {
+              [currentUser.uid]: currentUser.displayName || 'You',
+              [userId]: name
+            },
+            {
+              [currentUser.uid]: currentUser.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg',
+              [userId]: avatar || 'https://randomuser.me/api/portraits/women/2.jpg'
+            }
+          );
+
+          if (isMounted) {
+            setConversationId(newConversationId);
+          }
+        }
+
+      } catch (error: any) {
+        console.error('Error loading conversation:', error);
+        if (isMounted) {
+          handleError('Failed to load conversation');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadConversation();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (unsubscribeMessages) {
+        // Capture the current conversationId to avoid stale closure
+        const currentConversationId = conversationId;
+        if (currentConversationId) {
+          chatSubscriptionManager.unsubscribe(`conversation-${currentConversationId}`);
+        }
+        unsubscribeMessages();
+      }
+    };
+  }, [userId, currentUser, name, avatar]);
+
   // Initialize swipe animations for each message
   useEffect(() => {
     const swipeAnims: { [key: string]: Animated.Value } = {};
@@ -219,12 +211,12 @@ const DiscordChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) =>
     swipeAnimRef.current = { ...swipeAnimRef.current, ...swipeAnims };
   }, [messages]);
 
-  // Auto-scroll to bottom on mount and when messages change
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: false });
     }, 100);
-  }, []);
+  }, [messages]);
 
   // Focus input when component mounts
   useEffect(() => {
@@ -255,42 +247,59 @@ const DiscordChatScreen = ({ userId, name, avatar, goBack }: ChatScreenProps) =>
   };
   
   // Function to handle sending a message
-  const sendMessage = () => {
-    if (message.trim()) {
-      // Detect mentions in the message
-      const mentions = detectMentions(message);
-      
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        senderId: CURRENT_USER_ID,
-        senderName: CURRENT_USER_NAME,
-        senderAvatar: CURRENT_USER_AVATAR,
-        text: message,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        ...(mentions.length > 0 && { mentions }),
-        ...(replyingTo && { 
-          replyTo: {
-            id: replyingTo.id,
-            senderId: replyingTo.senderId,
-            senderName: replyingTo.senderName,
-            text: replyingTo.text
-          } 
-        })
-      };
-      
-      setMessages(prevMessages => [...prevMessages, newMessage]);
-      setMessage('');
-      setReplyingTo(null);
-      
-      // Auto-scroll to bottom
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+  const sendMessage = async () => {
+    if (!message.trim()) return;
+
+    if (!currentUser || !conversationId) {
+      handleError('Cannot send message: conversation not loaded');
+      return;
     }
+
+    // Validate message
+    const validation = MessageValidator.validateMessage(message);
+    if (!validation.isValid) {
+      handleError(validation.error || 'Invalid message');
+      return;
+    }
+
+    // Detect mentions in the message
+    const mentions = detectMentions(message);
+
+    const messageData = {
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName || 'You',
+      senderAvatar: currentUser.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg',
+      recipientId: userId,
+      text: message.trim(),
+      ...(mentions.length > 0 && { mentions }),
+      ...(replyingTo && {
+        replyTo: {
+          id: replyingTo.id,
+          senderId: replyingTo.senderId,
+          senderName: replyingTo.senderName,
+          text: replyingTo.text
+        }
+      })
+    };
+
+    // Use the error handling wrapper
+    await withErrorHandling(
+      async () => {
+        await ChatOperations.sendMessage(conversationId, messageData);
+        setMessage('');
+        setReplyingTo(null);
+
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+      'Failed to send message'
+    );
   };
   
   // Function to handle replying to a message
-  const handleReply = (message: Message) => {
+  const handleReply = (message: UnifiedMessage) => {
     setReplyingTo(message);
     textInputRef.current?.focus();
     // Reset any swiped message

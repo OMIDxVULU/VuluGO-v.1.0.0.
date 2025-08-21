@@ -70,7 +70,7 @@ class AnalyticsService {
     
     try {
       // Here you would initialize analytics providers like Firebase, Sentry, etc.
-      console.log('Analytics service initialized');
+      // Analytics service initialized
       
       // Mark as initialized
       this.initialized = true;
@@ -102,7 +102,7 @@ class AnalyticsService {
     this.extraUserProperties[this.config.userIdKey] = userId;
     
     // Here you would set the user ID in various analytics providers
-    console.log(`User ID set to: ${userId}`);
+    // User ID updated
   }
   
   /**
@@ -116,7 +116,7 @@ class AnalyticsService {
     };
     
     // Here you would set these properties in various analytics providers
-    console.log('User properties updated:', properties);
+    // User properties updated
   }
   
   /**
@@ -142,7 +142,7 @@ class AnalyticsService {
     };
     
     // Here you would send the event to various analytics providers
-    console.log('Event tracked:', enrichedEvent);
+    // Event tracked
   }
   
   /**
@@ -179,7 +179,7 @@ class AnalyticsService {
     this.performanceData[metricName] = value;
     
     // Here you would send the performance metric to performance monitoring providers
-    console.log(`Performance metric recorded: ${metricName} = ${value}`);
+    // Performance metric recorded
   }
   
   /**
@@ -240,7 +240,7 @@ class AnalyticsService {
       }
     });
     
-    console.log(`New session started: ${this.sessionId}`);
+    // New session started
   }
   
   /**
@@ -283,7 +283,7 @@ class AnalyticsService {
     });
     
     // Here you would flush any pending data to analytics providers
-    console.log('Analytics service shut down');
+    // Analytics service shut down
   }
 }
 

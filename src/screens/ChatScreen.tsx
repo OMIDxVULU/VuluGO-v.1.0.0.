@@ -32,6 +32,12 @@ import Message from '../components/Message';
 import ChatHeader from '../components/ChatHeader';
 import ChatFooter from '../components/ChatFooter';
 import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
+import { firestoreService } from '../services/firestoreService';
+import { UnifiedMessage, MessageConverter } from '../services/types';
+import { ChatOperations, chatSubscriptionManager } from '../utils/chatUtils';
+import { useAuth } from '../context/AuthContext';
+import { LoadingState, ErrorState, MessageSkeletonLoader, useErrorHandler } from '../components/ErrorHandling';
+import { MessageValidator } from '../utils/chatUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -145,115 +151,6 @@ const LiveChatPreview = () => {
   );
 };
 
-// Placeholder for current user info
-const CURRENT_USER_ID = 'currentUser';
-const CURRENT_USER_NAME = 'You';
-const CURRENT_USER_AVATAR = 'https://randomuser.me/api/portraits/lego/1.jpg';
-
-// 2. Update Dummy Data with Discord-like features
-const DUMMY_MESSAGES: Message[] = [
-  {
-    id: '1',
-    senderId: 'otherUser1',
-    senderName: 'Sophia', 
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Hey! How are you?",
-    timestamp: '2:30 PM',
-  },
-  {
-    id: '2',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "I'm doing great! Just finished working on the new feature.",
-    timestamp: '2:31 PM',
-  },
-  {
-    id: '3',
-    senderId: 'otherUser1', 
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "That's awesome! Can't wait to see it 😊",
-    timestamp: '2:32 PM',
-    reactions: [
-      { emoji: '👍', count: 1, userIds: [CURRENT_USER_ID] },
-      { emoji: '🎉', count: 1, userIds: [CURRENT_USER_ID] }
-    ]
-  },
-  {
-    id: '3.1',
-    senderId: 'otherUser1', 
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "How did the testing go?",
-    timestamp: '2:33 PM',
-  },
-  {
-    id: '4',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "I'll send you a demo soon. Here's a screenshot of what I've been working on:",
-    timestamp: '2:35 PM',
-    attachments: [
-      {
-        id: 'att1',
-        type: 'image',
-        url: 'https://picsum.photos/400/300',
-        width: 400,
-        height: 300
-      }
-    ]
-  },
-  {
-    id: '5',
-    senderId: 'otherUser1',
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Wow, that looks great! When can we test it?",
-    timestamp: '2:36 PM',
-    replyTo: {
-      id: '4',
-      senderId: CURRENT_USER_ID,
-      senderName: CURRENT_USER_NAME,
-      text: "I'll send you a demo soon. Here's a screenshot of what I've been working on:"
-    }
-  },
-  {
-    id: '6',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "Hey @Sophia, I'm planning to start a live stream to showcase the features in about 10 minutes. Would you join?",
-    timestamp: '2:37 PM',
-    mentions: [
-      {
-        id: 'otherUser1',
-        name: 'Sophia',
-        startIndex: 4,
-        endIndex: 11
-      }
-    ]
-  },
-  {
-    id: '7',
-    senderId: 'otherUser1',
-    senderName: 'Sophia',
-    senderAvatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    text: "Sure! I'll be there.",
-    timestamp: '2:38 PM',
-  },
-  {
-    id: '8',
-    senderId: CURRENT_USER_ID,
-    senderName: CURRENT_USER_NAME,
-    senderAvatar: CURRENT_USER_AVATAR,
-    text: "Great! Here's a link to the room:",
-    timestamp: '2:39 PM',
-    isLive: true, // Keep isLive for the preview component
-  },
-];
-
 // Configure haptic feedback patterns based on device capabilities
 const triggerHapticFeedback = (type?: 'selection' | 'longPress' | 'error' | 'reaction' | 'light' | 'medium' | 'warning') => {
   if (Platform.OS === 'ios') {
@@ -300,39 +197,7 @@ const triggerHapticFeedback = (type?: 'selection' | 'longPress' | 'error' | 'rea
   }
 };
 
-// Define the ChatMessage type locally since we don't have access to the types module
-interface ChatMessage {
-  id: number;
-  text: string;
-  time: string;
-  type: 'sent' | 'received';
-  status: 'sent' | 'delivered' | 'read';
-  reactions: any[];
-  attachments: any[];
-  isLive?: boolean;
-}
 
-// Function to generate random messages for testing
-const generateRandomMessages = (userId: string): ChatMessage[] => {
-  const messages: ChatMessage[] = [];
-  const messageCount = 10 + Math.floor(Math.random() * 20);
-  
-  for (let i = 0; i < messageCount; i++) {
-    const isSent = Math.random() > 0.5;
-    messages.push({
-      id: i,
-      text: `This is message ${i + 1} in the conversation with ${userId}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: isSent ? 'sent' : 'received',
-      status: isSent ? 'delivered' : 'read',
-      reactions: [],
-      attachments: [],
-      isLive: i === messageCount - 1 && Math.random() > 0.8, // Last message might be live
-    });
-  }
-  
-  return messages;
-};
 
 // Simple hook to scroll to bottom
 const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
@@ -347,9 +212,17 @@ const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
 
 const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: ChatScreenProps) => {
   const { canSendMessages } = useGuestRestrictions();
-  // Use the imported router
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [renderError, setRenderError] = useState(false);
+  const { user: currentUser } = useAuth();
+
+  // Real chat state
+  const [messages, setMessages] = useState<UnifiedMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Error handling
+  const { error, loading: sendingMessage, handleError, clearError, withErrorHandling } = useErrorHandler();
+
+  // Legacy state for backward compatibility
   const [isCloseFriend, setIsCloseFriend] = useState(false);
   
   // Create animations for the swipe back gesture
@@ -412,25 +285,87 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
     })
   ).current;
   
-  // Load messages
+  // Load conversation and messages
   useEffect(() => {
-    // Reset error state on mount
-    setRenderError(false);
-    
-    try {
-      const generatedMessages = generateRandomMessages(userId);
-      setMessages(generatedMessages);
-    } catch (error) {
-      console.error("Error generating messages:", error);
-      setRenderError(true);
-    }
-    
-    // Return cleanup function
-    return () => {
-      // Clear messages when unmounting
-      setMessages([]);
+    let isMounted = true;
+    let unsubscribeMessages: (() => void) | null = null;
+
+    const loadConversation = async () => {
+      if (!currentUser || !userId) return;
+
+      try {
+        setIsLoading(true);
+        clearError();
+
+        // Create or get conversation
+        const conversation = await firestoreService.getConversationByParticipants([currentUser.uid, userId]);
+
+        if (!isMounted) return;
+
+        if (conversation) {
+          setConversationId(conversation.id);
+
+          // Load existing messages
+          const existingMessages = await firestoreService.getConversationMessages(conversation.id);
+          const unifiedMessages = existingMessages.map(MessageConverter.fromDirectMessage);
+
+          if (isMounted) {
+            setMessages(unifiedMessages);
+          }
+
+          // Set up real-time listener
+          unsubscribeMessages = firestoreService.onConversationMessages(conversation.id, (newMessages) => {
+            if (!isMounted) return;
+            const unifiedMessages = newMessages.map(MessageConverter.fromDirectMessage);
+            setMessages(unifiedMessages);
+          });
+
+        } else {
+          // Create new conversation
+          const newConversationId = await firestoreService.createConversation(
+            [currentUser.uid, userId],
+            {
+              [currentUser.uid]: currentUser.displayName || 'You',
+              [userId]: name
+            },
+            {
+              [currentUser.uid]: currentUser.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg',
+              [userId]: avatar || 'https://randomuser.me/api/portraits/women/2.jpg'
+            }
+          );
+
+          if (isMounted) {
+            setConversationId(newConversationId);
+          }
+        }
+
+      } catch (error: any) {
+        console.error('Error loading conversation:', error);
+        if (isMounted) {
+          handleError('Failed to load conversation');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     };
-  }, [userId]);
+
+    loadConversation();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (unsubscribeMessages) {
+        // Capture the current conversationId to avoid stale closure
+        const currentConversationId = conversationId;
+        if (currentConversationId) {
+          chatSubscriptionManager.unsubscribe(`conversation-${currentConversationId}`);
+        }
+        unsubscribeMessages();
+      }
+    };
+  }, [userId, currentUser, name, avatar]);
 
   // Chat functionality references and handlers
   const flatListRef = useRef<FlatList>(null);
@@ -447,45 +382,44 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
     }
   }, [source, goBack, goToDMs, router]);
 
-  const keyExtractor = (item: ChatMessage) => item.id.toString();
+  const keyExtractor = (item: UnifiedMessage) => item.id;
 
-  const getItemLayout = (data: any, index: number) => ({
+  const getItemLayout = (data: UnifiedMessage[], index: number) => ({
     length: 80,
     offset: 80 * index,
     index,
   });
 
-  const renderMessageItem = useCallback(({ item, index }: { item: ChatMessage, index: number }) => {
+  const renderMessageItem = useCallback(({ item, index }: { item: UnifiedMessage, index: number }) => {
     // Check if the previous message is from the same sender
-    const isGroupedMessage = index > 0 && 
-      messages[index - 1] && 
-      ((messages[index - 1].type === 'sent' && item.type === 'sent') ||
-       (messages[index - 1].type === 'received' && item.type === 'received'));
-    
-    // Set user info based on message type
-    const userName = item.type === 'sent' ? 'You' : name;
-    const userAvatar = item.type === 'sent' 
-      ? 'https://randomuser.me/api/portraits/lego/1.jpg' 
-      : avatar || 'https://randomuser.me/api/portraits/women/2.jpg';
-    
+    const isGroupedMessage = index > 0 &&
+      messages[index - 1] &&
+      messages[index - 1].senderId === item.senderId;
+
+    // Convert UnifiedMessage to format expected by Message component
+    const messageComponentFormat = MessageConverter.toMessageComponentFormat(
+      item,
+      currentUser?.uid
+    );
+
     return (
       <View style={{ marginTop: isGroupedMessage ? -8 : 8 }}>
         <Message
-          id={item.id}
-          text={item.text}
-          time={item.time}
-          type={item.type}
-          status={item.status}
-          reactions={item.reactions}
-          attachments={item.attachments}
-          showAvatar={!isGroupedMessage} // Only show avatar for first message in group
-          showName={!isGroupedMessage}   // Only show name for first message in group
-          userName={userName}
-          userAvatar={userAvatar}
+          id={messageComponentFormat.id}
+          text={messageComponentFormat.text}
+          time={messageComponentFormat.time}
+          type={messageComponentFormat.type}
+          status={messageComponentFormat.status}
+          reactions={messageComponentFormat.reactions}
+          attachments={messageComponentFormat.attachments}
+          showAvatar={!isGroupedMessage}
+          showName={!isGroupedMessage}
+          userName={messageComponentFormat.userName}
+          userAvatar={messageComponentFormat.userAvatar}
         />
       </View>
     );
-  }, [messages, name, avatar]);
+  }, [messages, name, avatar, currentUser]);
 
   const renderDateSeparator = (date: string) => {
     return (
@@ -536,26 +470,48 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
   };
 
   // Handle sending a new message
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     // Check if user can send messages (guest restriction)
     if (!canSendMessages()) {
+      handleError('You must be logged in to send messages');
       return;
     }
 
-    const newMessage: ChatMessage = {
-      id: Date.now(),
-      text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      type: 'sent',
-      status: 'delivered',
-      reactions: [],
-      attachments: [],
+    if (!currentUser || !conversationId) {
+      handleError('Cannot send message: conversation not loaded');
+      return;
+    }
+
+    if (!text.trim()) {
+      return;
+    }
+
+    // Validate message
+    const validation = MessageValidator.validateMessage(text);
+    if (!validation.isValid) {
+      handleError(validation.error || 'Invalid message');
+      return;
+    }
+
+    const messageData = {
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName || 'You',
+      senderAvatar: currentUser.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg',
+      recipientId: userId,
+      text: text.trim()
     };
 
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-    setTimeout(() => {
-      scrollToBottom();
-    }, 100);
+    // Use the error handling wrapper
+    await withErrorHandling(
+      async () => {
+        await ChatOperations.sendMessage(conversationId, messageData);
+        // Messages will be updated via real-time listener
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      },
+      'Failed to send message'
+    );
   };
 
   // Toggle close friend status
@@ -601,14 +557,21 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
           <LiveChatPreview />
         )}
         
-        {/* Messages List with error handling */}
-        {renderError ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Something went wrong</Text>
-            <TouchableOpacity onPress={handleNavigation} style={styles.errorButton}>
-              <Text style={styles.errorButtonText}>Return to Messages</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Messages List with loading and error states */}
+        {isLoading ? (
+          <MessageSkeletonLoader />
+        ) : error ? (
+          <ErrorState
+            error={error}
+            onRetry={() => {
+              clearError();
+              // Reload the conversation by resetting the effect
+              setIsLoading(true);
+              setMessages([]);
+              setConversationId(null);
+            }}
+            onBack={handleNavigation}
+          />
         ) : (
           safeRenderMessages()
         )}
