@@ -14,8 +14,10 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons, Feather, AntDesign } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CommonHeader from '../components/CommonHeader';
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
 
-// Mock data for close friends
+// Mock data removed - now using real Firebase data
 const DUMMY_FRIENDS: Friend[] = [
   {
     id: '1',
@@ -121,9 +123,36 @@ const StatusIndicator = ({ status }: { status: Friend['status'] }) => {
 const CloseFriendsScreen = () => {
   console.log("CloseFriendsScreen mounted");
   const router = useRouter();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [friends, setFriends] = useState<Friend[]>(DUMMY_FRIENDS);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'close'>('all');
+  const [error, setError] = useState<string | null>(null);
+
+  // Load real friends data from Firebase
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Load initial friends data
+    const loadFriends = async () => {
+      try {
+        const userFriends = await firestoreService.getUserFriends(user.uid);
+        setFriends(userFriends);
+      } catch (error) {
+        console.error('Error loading friends:', error);
+        setFriends([]);
+      }
+    };
+
+    loadFriends();
+
+    // Set up real-time listener for friends updates
+    const unsubscribe = firestoreService.onUserFriends(user.uid, (updatedFriends) => {
+      setFriends(updatedFriends);
+    });
+
+    return unsubscribe;
+  }, [user?.uid]);
 
   // Filter friends based on search query and active tab
   const getFilteredFriends = () => {
@@ -145,14 +174,45 @@ const CloseFriendsScreen = () => {
   };
 
   // Toggle close friend status
-  const toggleCloseFriend = (id: string) => {
-    setFriends(prev => 
-      prev.map(friend => 
-        friend.id === id 
-          ? { ...friend, isCloseFriend: !friend.isCloseFriend } 
-          : friend
-      )
-    );
+  const toggleCloseFriend = async (id: string) => {
+    if (!user?.uid) return;
+
+    // Clear any previous errors when starting a new operation
+    setError(null);
+
+    try {
+      const friend = friends.find(f => f.id === id);
+      if (!friend) return;
+
+      if (friend.isCloseFriend) {
+        // Remove friend
+        await firestoreService.removeFriend(user.uid, id);
+      } else {
+        // Add friend
+        await firestoreService.addFriend(user.uid, id);
+      }
+
+      // Clear error on successful completion
+      setError(null);
+      // The real-time listener will update the UI automatically
+    } catch (error) {
+      console.error('Error toggling friend status:', error);
+
+      // Set user-friendly error message
+      let errorMessage = 'Failed to update friend status. Please try again.';
+
+      if (error instanceof Error) {
+        if (error.message.includes('permission-denied')) {
+          errorMessage = 'Permission denied. You may not have access to modify this friendship.';
+        } else if (error.message.includes('not-found')) {
+          errorMessage = 'User not found. The friend may have been removed.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        }
+      }
+
+      setError(errorMessage);
+    }
   };
 
   // Handle tab changes
@@ -228,6 +288,19 @@ const CloseFriendsScreen = () => {
             onChangeText={setSearchQuery}
           />
         </View>
+
+        {/* Error Message */}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.errorDismissButton}
+              onPress={() => setError(null)}
+            >
+              <AntDesign name="close" size={16} color="#FF4B4B" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Filter Tabs */}
         <View style={styles.tabsContainer}>
@@ -384,6 +457,26 @@ const styles = StyleSheet.create({
     color: '#9BA1A6',
     fontSize: 16,
     marginTop: 16,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 75, 75, 0.1)',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF4B4B',
+  },
+  errorText: {
+    flex: 1,
+    color: '#FF4B4B',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  errorDismissButton: {
+    padding: 4,
   },
 });
 

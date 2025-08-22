@@ -28,8 +28,10 @@ import { BlurView } from 'expo-blur';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useLoopProtection } from '../FixInfiniteLoop';
 import { useLiveStreams, LiveStream, StreamHost } from '../context/LiveStreamContext';
+import { useAuth } from '../context/AuthContext';
 import { streamingService } from '../services/streamingService';
 import { StreamParticipant } from '../services/streamingService';
+import { firestoreService } from '../services/firestoreService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -44,18 +46,7 @@ const MAX_HOSTS_TO_DISPLAY = 9; // Maximum number of hosts to display (3x3 grid)
 // Mock cat placeholder image URL
 const CAT_PLACEHOLDER = 'https://img.icons8.com/ios-filled/100/FFFFFF/cat-profile.png'; // Simple white cat icon
 
-// Mock data for participants (matching Figma layout)
-const MOCK_PARTICIPANTS = [
-  { id: '1', name: 'Riddaboy98', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', isHost: true, isSpeaking: true, placeholder: false },
-  { id: '2', name: 'CoolCat22', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-  { id: '3', name: 'GamerPro', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-  { id: '4', name: 'StreamQueen', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', isHost: true, isSpeaking: false, placeholder: false },
-  { id: '5', name: 'NightOwl', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-  { id: '6', name: 'PixelArtist', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-  { id: '7', name: 'MusicLover', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', isHost: true, isSpeaking: false, placeholder: false }, 
-  { id: '8', name: 'CoffeeAddict', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-  { id: '9', name: 'TechGuru', avatar: CAT_PLACEHOLDER, isHost: true, isSpeaking: false, placeholder: true },
-];
+// Mock data removed - now using real participants from Firebase
 
 // Simplify ChatMessage interface
 interface ChatMessage {
@@ -96,39 +87,7 @@ const timeAgo = (timestamp: number): string => {
   }
 };
 
-// Update mock messages with a message from the user
-const MOCK_CHAT_MESSAGES = [
-  { 
-    id: '1', 
-    user: { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg' },
-    message: 'Hey everyone! 👋', 
-    timestamp: Date.now() - 300000 
-  },
-  { 
-    id: '2', 
-    user: { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg' },
-    message: 'Great stream!', 
-    timestamp: Date.now() - 240000 
-  },
-  { 
-    id: '3', 
-    user: { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg' },
-    message: 'Love the energy here 💕', 
-    timestamp: Date.now() - 180000 
-  },
-  { 
-    id: '4', 
-    user: { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
-    message: 'Can you play that song again?', 
-    timestamp: Date.now() - 120000 
-  },
-  { 
-    id: '5', 
-    user: { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg' },
-    message: 'This is amazing! 🔥', 
-    timestamp: Date.now() - 60000 
-  },
-];
+// Mock chat messages removed - now using real messages from Firebase
 
 // Room stats for fallback
 const ROOM_STATS = {
@@ -508,6 +467,7 @@ const LiveStreamView = () => {
   const params = useLocalSearchParams();
   const { profileImage } = useUserProfile();
   const { getStreamById, streams, currentlyWatching, isMinimized: contextIsMinimized, setStreamMinimized } = useLiveStreams();
+  const { user } = useAuth();
   
   // Use streamId from params to fetch the actual stream data from context
   const streamId = params.streamId as string;
@@ -551,39 +511,95 @@ const LiveStreamView = () => {
         placeholder: false
       }));
     }
-    // Fallback to mock participants
-    return MOCK_PARTICIPANTS;
+    // Return empty array - real participants will be loaded from Firebase
+    return [];
   };
-  
+
   // State variables
   const [participants, setParticipants] = useState<Participant[]>(initializeParticipants());
   const [currentStreamSession, setCurrentStreamSession] = useState<any>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  // Set up real-time stream updates
+  // Set up real-time stream updates and chat messages
   useEffect(() => {
     if (!streamId) return;
 
-    // Set up real-time listener for stream updates
-    const unsubscribe = streamingService.onStreamUpdate(streamId, (session) => {
-      setCurrentStreamSession(session);
+    let streamUnsubscribe: (() => void) | null = null;
+    let chatUnsubscribe: (() => void) | null = null;
 
-      // Update participants in real-time
-      if (session.participants) {
-        const updatedParticipants = session.participants.map((participant: StreamParticipant, index: number) => ({
-          id: participant.id,
-          name: participant.name,
-          avatar: participant.avatar,
-          isHost: participant.isHost,
-          isSpeaking: participant.isSpeaking,
-          placeholder: false
+    const setupListeners = async () => {
+      // Set up real-time listener for stream updates (participants)
+      streamUnsubscribe = streamingService.onStreamUpdate(streamId, (session) => {
+        setCurrentStreamSession(session);
+
+        // Update participants in real-time
+        if (session.participants) {
+          const updatedParticipants = session.participants.map((participant: StreamParticipant, index: number) => ({
+            id: participant.id,
+            name: participant.name,
+            avatar: participant.avatar,
+            isHost: participant.isHost,
+            isSpeaking: participant.isSpeaking,
+            placeholder: false
+          }));
+          setParticipants(updatedParticipants);
+        }
+      });
+
+      // Load initial chat messages
+      try {
+        const messages = await firestoreService.getStreamMessages(streamId, 50);
+        // Convert Firebase messages to component format
+        const formattedMessages = messages.map(msg => ({
+          id: msg.id,
+          user: {
+            name: msg.senderName,
+            avatar: msg.senderAvatar || userProfileImage,
+            isAdmin: msg.isAdmin || false
+          },
+          message: msg.text,
+          timestamp: msg.timestamp?.toMillis() || Date.now(),
+          replyTo: msg.replyTo ? {
+            id: msg.replyTo.id,
+            userName: msg.replyTo.userName,
+            message: msg.replyTo.message
+          } : undefined
         }));
-        setParticipants(updatedParticipants);
+        setChatMessages(formattedMessages.reverse()); // Reverse to show oldest first
+      } catch (error) {
+        console.error('Error loading initial chat messages:', error);
+        setChatMessages([]); // Fallback to empty array
       }
-    });
 
-    return unsubscribe;
-  }, [streamId]);
+      // Set up real-time listener for chat messages
+      chatUnsubscribe = firestoreService.onStreamMessages(streamId, (messages) => {
+        // Convert Firebase messages to component format
+        const formattedMessages = messages.map(msg => ({
+          id: msg.id,
+          user: {
+            name: msg.senderName,
+            avatar: msg.senderAvatar || userProfileImage,
+            isAdmin: msg.isAdmin || false
+          },
+          message: msg.text,
+          timestamp: msg.timestamp?.toMillis() || Date.now(),
+          replyTo: msg.replyTo ? {
+            id: msg.replyTo.id,
+            userName: msg.replyTo.userName,
+            message: msg.replyTo.message
+          } : undefined
+        }));
+        setChatMessages(formattedMessages);
+      });
+    };
+
+    setupListeners();
+
+    return () => {
+      if (streamUnsubscribe) streamUnsubscribe();
+      if (chatUnsubscribe) chatUnsubscribe();
+    };
+  }, [streamId, userProfileImage]);
 
   // Update participant speaking status in real-time
   const updateParticipantSpeaking = useCallback(async (userId: string, isSpeaking: boolean) => {
@@ -862,19 +878,50 @@ const LiveStreamView = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    if (messageText.trim() === '') return;
-    const newMessage: ChatMessage = {
-      id: generateId(),
-      user: { name: 'Your Name', avatar: userProfileImage },
-      message: messageText,
-      timestamp: Date.now(),
-      ...(replyingTo && { replyTo: { id: replyingTo.id, userName: replyingTo.user.name, message: replyingTo.message.substring(0,30) } })
-    };
-    setChatMessages(prev => [...prev, newMessage]);
-    setMessageText('');
-    setReplyingTo(null);
-    setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 100);
+  const handleSendMessage = async () => {
+    if (messageText.trim() === '' || !streamId) return;
+
+    // Guard against no authenticated user
+    if (!user) {
+      console.error('No authenticated user found');
+      return;
+    }
+
+    try {
+      // Use actual authenticated user from auth context
+      const currentUser = user;
+
+      // Ensure displayName and photoURL have safe fallbacks
+      const displayName = currentUser.displayName || 'Anonymous';
+      const photoURL = currentUser.photoURL || userProfileImage;
+
+      const messageData = {
+        text: messageText,
+        senderId: currentUser.uid,
+        senderName: displayName,
+        senderAvatar: photoURL,
+        isAdmin: false,
+        ...(replyingTo && {
+          replyTo: {
+            id: replyingTo.id,
+            userName: replyingTo.user.name,
+            message: replyingTo.message.substring(0, 30)
+          }
+        })
+      };
+
+      // Send message to Firebase
+      await firestoreService.sendMessage(streamId, messageData);
+
+      // Clear input and reply state
+      setMessageText('');
+      setReplyingTo(null);
+
+      // Scroll to end will happen automatically due to real-time listener
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Could show an error message to the user here
+    }
   };
 
   const selectMention = (participant: Participant) => {

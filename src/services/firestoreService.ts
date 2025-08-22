@@ -15,7 +15,9 @@ import {
   serverTimestamp,
   Timestamp,
   increment,
-  runTransaction
+  runTransaction,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AppUser, ChatMessage, DirectMessage, Conversation } from './types';
@@ -449,6 +451,172 @@ class FirestoreService {
         ...doc.data()
       })) as Conversation[];
       callback(conversations);
+    });
+  }
+
+  // Friend management methods
+  async getUserFriends(userId: string): Promise<any[]> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const friendsIds = userData.friends || [];
+
+        // Get friend details using batched reads
+        const friends = await this.getFriendsBatch(friendsIds, userData);
+        return friends;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error('Failed to get user friends:', error.message);
+      return [];
+    }
+  }
+
+  private getUserStatus(lastSeen: Timestamp): 'online' | 'offline' | 'busy' | 'idle' {
+    if (!lastSeen) return 'offline';
+
+    const now = Timestamp.now();
+    const diffMinutes = (now.toMillis() - lastSeen.toMillis()) / (1000 * 60);
+
+    if (diffMinutes < 5) return 'online';
+    if (diffMinutes < 30) return 'idle';
+    return 'offline';
+  }
+
+  async addFriend(userId: string, friendId: string): Promise<void> {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', userId);
+        const friendRef = doc(db, 'users', friendId);
+
+        // Read both user documents to verify they exist
+        const userDoc = await transaction.get(userRef);
+        const friendDoc = await transaction.get(friendRef);
+
+        if (!userDoc.exists()) {
+          throw new Error(`User ${userId} does not exist`);
+        }
+        if (!friendDoc.exists()) {
+          throw new Error(`User ${friendId} does not exist`);
+        }
+
+        // Update both documents within the same transaction
+        transaction.update(userRef, {
+          friends: arrayUnion(friendId),
+          updatedAt: serverTimestamp()
+        });
+
+        transaction.update(friendRef, {
+          friends: arrayUnion(userId),
+          updatedAt: serverTimestamp()
+        });
+      });
+    } catch (error: any) {
+      console.error('Failed to add friend:', error.message);
+      throw error;
+    }
+  }
+
+  async removeFriend(userId: string, friendId: string): Promise<void> {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', userId);
+        const friendRef = doc(db, 'users', friendId);
+
+        // Read both user documents to verify they exist
+        const userDoc = await transaction.get(userRef);
+        const friendDoc = await transaction.get(friendRef);
+
+        if (!userDoc.exists()) {
+          throw new Error(`User ${userId} does not exist`);
+        }
+        if (!friendDoc.exists()) {
+          throw new Error(`User ${friendId} does not exist`);
+        }
+
+        // Update both documents within the same transaction
+        transaction.update(userRef, {
+          friends: arrayRemove(friendId),
+          updatedAt: serverTimestamp()
+        });
+
+        transaction.update(friendRef, {
+          friends: arrayRemove(userId),
+          updatedAt: serverTimestamp()
+        });
+      });
+    } catch (error: any) {
+      console.error('Failed to remove friend:', error.message);
+      throw error;
+    }
+  }
+
+  // Helper method for batched friend reads
+  private async getFriendsBatch(friendsIds: string[], userData: any): Promise<any[]> {
+    if (friendsIds.length === 0) return [];
+
+    // Process friends in chunks to avoid hitting Firestore limits
+    const CHUNK_SIZE = 10;
+    const chunks = [];
+    for (let i = 0; i < friendsIds.length; i += CHUNK_SIZE) {
+      chunks.push(friendsIds.slice(i, i + CHUNK_SIZE));
+    }
+
+    const allFriends = [];
+
+    // Process each chunk
+    for (const chunk of chunks) {
+      // Create document references for this chunk
+      const friendRefs = chunk.map(friendId => doc(db, 'users', friendId));
+
+      // Batch read all documents in this chunk
+      const friendSnaps = await Promise.all(friendRefs.map(ref => getDoc(ref)));
+
+      // Process results
+      for (let i = 0; i < friendSnaps.length; i++) {
+        const friendSnap = friendSnaps[i];
+        const friendId = chunk[i];
+
+        if (friendSnap.exists()) {
+          const friendData = friendSnap.data();
+
+          // Compute isCloseFriend from actual data
+          const closeFriendsIds = userData.closeFriends || [];
+          const isCloseFriend = Array.isArray(closeFriendsIds) && closeFriendsIds.includes(friendId);
+
+          allFriends.push({
+            id: friendId,
+            name: friendData.displayName,
+            avatar: friendData.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg',
+            status: this.getUserStatus(friendData.lastSeen),
+            isCloseFriend: isCloseFriend
+          });
+        }
+      }
+    }
+
+    return allFriends;
+  }
+
+  // Real-time listener for user's friends
+  onUserFriends(userId: string, callback: (friends: any[]) => void): () => void {
+    const userRef = doc(db, 'users', userId);
+
+    return onSnapshot(userRef, async (userSnap) => {
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const friendsIds = userData.friends || [];
+
+        // Get friend details using batched reads
+        const friends = await this.getFriendsBatch(friendsIds, userData);
+        callback(friends);
+      } else {
+        callback([]);
+      }
     });
   }
 }
