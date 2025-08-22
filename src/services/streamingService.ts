@@ -52,7 +52,7 @@ class StreamingService {
         }],
         startedAt: Date.now(),
         isActive: true,
-        viewerCount: 1
+        viewerCount: 0
       };
 
       // Store in Firebase
@@ -168,7 +168,7 @@ class StreamingService {
   async getActiveStreams(): Promise<LiveStream[]> {
     try {
       const streams = await firestoreService.getActiveStreams();
-      return streams.map(this.convertToLiveStream);
+      return streams.map(StreamingService.convertToLiveStream);
     } catch (error) {
       console.error('Error getting active streams:', error);
       return [];
@@ -195,7 +195,7 @@ class StreamingService {
   onActiveStreamsUpdate(callback: (streams: LiveStream[]) => void): () => void {
     // Set up Firebase listener for active streams collection
     const unsubscribe = firestoreService.onActiveStreamsUpdate((streamsData) => {
-      const liveStreams = streamsData.map(this.convertToLiveStream);
+      const liveStreams = streamsData.map(StreamingService.convertToLiveStream);
       callback(liveStreams);
     });
 
@@ -203,7 +203,7 @@ class StreamingService {
   }
 
   // Convert StreamSession to LiveStream format for compatibility
-  private convertToLiveStream(session: StreamSession): LiveStream {
+  private static convertToLiveStream(session: StreamSession): LiveStream {
     const hosts: StreamHost[] = session.participants
       .filter(p => p.isHost)
       .map((p, index) => ({

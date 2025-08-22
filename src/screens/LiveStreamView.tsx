@@ -255,6 +255,18 @@ const sharedStyles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
+  speakingIndicatorSmall: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
 });
 
 // Helper to parse mentions and text

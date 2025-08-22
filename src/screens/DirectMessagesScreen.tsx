@@ -201,11 +201,10 @@ const DirectMessagesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const searchAnimation = useRef(new Animated.Value(0)).current;
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   // Load conversations from Firebase with real-time updates
   useEffect(() => {
-    let unsubscribeConversations: (() => void) | null = null;
-
     const loadConversations = async () => {
       if (!currentUser) return;
 
@@ -214,7 +213,7 @@ const DirectMessagesScreen = () => {
         setError(null);
 
         // Set up real-time listener for conversations
-        unsubscribeConversations = firestoreService.onUserConversations(currentUser.uid, (updatedConversations) => {
+        unsubscribeRef.current = firestoreService.onUserConversations(currentUser.uid, (updatedConversations) => {
           setConversations(updatedConversations);
 
           // Convert conversations to chat previews
@@ -237,8 +236,9 @@ const DirectMessagesScreen = () => {
 
     // Cleanup function
     return () => {
-      if (unsubscribeConversations) {
-        unsubscribeConversations();
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
     };
   }, [currentUser]);

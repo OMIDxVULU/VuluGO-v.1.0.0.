@@ -365,20 +365,7 @@ class FirestoreService {
     }
   }
 
-  // Live stream operations
-  async createStream(streamData: Omit<LiveStream, 'id' | 'startedAt' | 'viewerCount'>): Promise<string> {
-    try {
-      const streamRef = await addDoc(collection(db, 'streams'), {
-        ...streamData,
-        isLive: true,
-        viewerCount: 0,
-        startedAt: serverTimestamp()
-      });
-      return streamRef.id;
-    } catch (error: any) {
-      throw new Error(`Failed to create stream: ${error.message}`);
-    }
-  }
+
 
   async getLiveStreams(): Promise<LiveStream[]> {
     try {

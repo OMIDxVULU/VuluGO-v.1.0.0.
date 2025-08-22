@@ -145,21 +145,38 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
   // New functions for enhanced live stream features
   const joinAsHost = async (streamId: string, userName: string, userAvatar: string) => {
     try {
-      // Create a new stream if it doesn't exist
+      let actualStreamId = streamId;
       const streamExists = streams.some(s => s.id === streamId);
+
+      // Create a new stream if it doesn't exist
       if (!streamExists) {
-        const newStreamId = await streamingService.createStream(
+        actualStreamId = await streamingService.createStream(
           `Live Stream by ${userName}`,
           'currentUser', // Use actual user ID
           userName,
           userAvatar
         );
-        console.log(`Created new stream: ${newStreamId}`);
+        console.log(`Created new stream: ${actualStreamId}`);
+
+        // After creating the stream, fetch the latest streams to ensure we have the complete stream data
+        try {
+          const activeStreams = await streamingService.getActiveStreams();
+          setStreams(activeStreams);
+        } catch (error) {
+          console.error('Error refreshing streams after creation:', error);
+        }
+      }
+
+      // Find the stream to update (using actualStreamId in case it changed)
+      const targetStream = streams.find(s => s.id === actualStreamId);
+      if (!targetStream) {
+        console.error(`Stream with id ${actualStreamId} not found after creation`);
+        return;
       }
 
       setStreams(prevStreams =>
         prevStreams.map(stream => {
-          if (stream.id === streamId) {
+          if (stream.id === actualStreamId) {
             const nextJoinOrder = stream.hosts.length + 1;
             const newHost: StreamHost = {
               name: userName,
