@@ -30,16 +30,6 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
   // Get the current status color for the profile tab indicator
   const profileStatusColor = getStatusColor(currentUserStatus);
   
-  // Get options for the *currently active* route
-  const activeRouteKey = state.routes[state.index].key;
-  const activeDescriptor = descriptors[activeRouteKey];
-  const activeOptions = activeDescriptor.options;
-
-  // If the active route's tabBarStyle is set to display: 'none', hide the tab bar
-  if (activeOptions.tabBarStyle && typeof activeOptions.tabBarStyle === 'object' && (activeOptions.tabBarStyle as any).display === 'none') {
-    return null;
-  }
-  
   // Memoize routes filtering to reduce calculations on re-renders
   const { visibleRoutes, visibleRouteIndices } = useMemo(() => {
     const allowedRoutes = ['index', 'notifications', 'profile'];
@@ -47,7 +37,20 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
     const indices = filtered.map(route => state.routes.findIndex(r => r.key === route.key));
     return { visibleRoutes: filtered, visibleRouteIndices: indices };
   }, [state.routes]);
-  
+
+  // Get options for the *currently active* route
+  const activeRouteKey = state.routes[state.index].key;
+  const activeDescriptor = descriptors[activeRouteKey];
+  const activeOptions = activeDescriptor.options;
+
+  // Flatten tabBarStyle to handle objects, arrays, and StyleSheet IDs
+  const flattenedTabBarStyle = StyleSheet.flatten(activeOptions.tabBarStyle);
+
+  // If the active route's tabBarStyle is set to display: 'none', hide the tab bar
+  if (flattenedTabBarStyle && flattenedTabBarStyle.display === 'none') {
+    return null;
+  }
+
   // Memoize the icon component generator to prevent recreating functions on every render
   const getIconComponent = useMemo(() => (routeName: string, isFocused: boolean, badge: number | undefined) => {
     const color = isFocused ? "#FFFFFF" : "rgba(211, 210, 210, 0.6)";
@@ -107,7 +110,7 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({
         return null;
     }
   }, [profileImage, profileStatusColor, counts]);
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.bottomBarContent}>

@@ -10,9 +10,10 @@ export function useLoopProtection() {
       // Suppress "Maximum update depth exceeded" warnings
       if (args[0] && typeof args[0] === 'string' && args[0].includes('Maximum update depth exceeded')) {
         // Break the loop by pausing state updates for a moment
-        setTimeout(() => {
+        // Using Promise.resolve() instead of setTimeout for compatibility
+        Promise.resolve().then(() => {
           console.log('Loop protection activated - cycle broken');
-        }, 0);
+        });
         return;
       }
       return originalConsoleError(...args);
