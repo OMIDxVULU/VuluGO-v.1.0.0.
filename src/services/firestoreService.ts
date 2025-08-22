@@ -253,6 +253,106 @@ class FirestoreService {
     }
   }
 
+  // Streaming methods
+  async createStream(streamId: string, streamData: any): Promise<void> {
+    try {
+      const streamsRef = collection(db, 'streams');
+      await setDoc(doc(streamsRef, streamId), {
+        ...streamData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Failed to create stream:', error.message);
+      throw error;
+    }
+  }
+
+  async getActiveStreams(): Promise<any[]> {
+    try {
+      const streamsRef = collection(db, 'streams');
+      const q = query(
+        streamsRef,
+        where('isActive', '==', true),
+        orderBy('startedAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error: any) {
+      console.error('Failed to get active streams:', error.message);
+      return [];
+    }
+  }
+
+  async updateStreamParticipants(streamId: string, participants: any[]): Promise<void> {
+    try {
+      const streamRef = doc(db, 'streams', streamId);
+      await updateDoc(streamRef, {
+        participants,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Failed to update stream participants:', error.message);
+      throw error;
+    }
+  }
+
+  async updateStreamViewerCount(streamId: string, viewerCount: number): Promise<void> {
+    try {
+      const streamRef = doc(db, 'streams', streamId);
+      await updateDoc(streamRef, {
+        viewerCount,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Failed to update stream viewer count:', error.message);
+      throw error;
+    }
+  }
+
+  async updateStreamStatus(streamId: string, isActive: boolean): Promise<void> {
+    try {
+      const streamRef = doc(db, 'streams', streamId);
+      await updateDoc(streamRef, {
+        isActive,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Failed to update stream status:', error.message);
+      throw error;
+    }
+  }
+
+  onStreamUpdate(streamId: string, callback: (data: any) => void): () => void {
+    const streamRef = doc(db, 'streams', streamId);
+    return onSnapshot(streamRef, (doc) => {
+      if (doc.exists()) {
+        callback(doc.data());
+      }
+    });
+  }
+
+  onActiveStreamsUpdate(callback: (streams: any[]) => void): () => void {
+    const streamsRef = collection(db, 'streams');
+    const q = query(
+      streamsRef,
+      where('isActive', '==', true),
+      orderBy('startedAt', 'desc')
+    );
+
+    return onSnapshot(q, (querySnapshot) => {
+      const streams = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      callback(streams);
+    });
+  }
+
   async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
     try {
       const conversationRef = doc(db, 'conversations', conversationId);

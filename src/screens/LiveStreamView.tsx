@@ -28,6 +28,8 @@ import { BlurView } from 'expo-blur';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useLoopProtection } from '../FixInfiniteLoop';
 import { useLiveStreams, LiveStream, StreamHost } from '../context/LiveStreamContext';
+import { streamingService } from '../services/streamingService';
+import { StreamParticipant } from '../services/streamingService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -375,12 +377,14 @@ const ChatMessageItem = React.memo(({
 });
 
 // Update ParticipantItem component to use sharedStyles
-const ParticipantItem = React.memo(({ 
-  participant, 
-  animationRef 
-}: { 
-  participant: Participant, 
-  animationRef: Animated.Value 
+const ParticipantItem = React.memo(({
+  participant,
+  animationRef,
+  onToggleSpeaking
+}: {
+  participant: Participant,
+  animationRef: Animated.Value,
+  onToggleSpeaking: (userId: string, isSpeaking: boolean) => void
 }) => {
   return (
     <View style={sharedStyles.participantItem}>
@@ -405,6 +409,20 @@ const ParticipantItem = React.memo(({
       )}
       
       <View style={sharedStyles.participantImageWrapper}>
+        {/* Speaking indicator for hosts */}
+        {participant.isHost && (
+          <TouchableOpacity
+            style={sharedStyles.speakingIndicatorSmall}
+            onPress={() => onToggleSpeaking(participant.id, !participant.isSpeaking)}
+          >
+            <MaterialIcons
+              name={participant.isSpeaking ? "mic" : "mic-off"}
+              size={12}
+              color={participant.isSpeaking ? "#4CAF50" : "#FF5722"}
+            />
+          </TouchableOpacity>
+        )}
+
         {participant.placeholder ? (
           <LinearGradient
             colors={['#FF6CAA', '#FF3C8C']} 
@@ -527,7 +545,44 @@ const LiveStreamView = () => {
   
   // State variables
   const [participants, setParticipants] = useState<Participant[]>(initializeParticipants());
+  const [currentStreamSession, setCurrentStreamSession] = useState<any>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(MOCK_CHAT_MESSAGES);
+
+  // Set up real-time stream updates
+  useEffect(() => {
+    if (!streamId) return;
+
+    // Set up real-time listener for stream updates
+    const unsubscribe = streamingService.onStreamUpdate(streamId, (session) => {
+      setCurrentStreamSession(session);
+
+      // Update participants in real-time
+      if (session.participants) {
+        const updatedParticipants = session.participants.map((participant: StreamParticipant, index: number) => ({
+          id: participant.id,
+          name: participant.name,
+          avatar: participant.avatar,
+          isHost: participant.isHost,
+          isSpeaking: participant.isSpeaking,
+          placeholder: false
+        }));
+        setParticipants(updatedParticipants);
+      }
+    });
+
+    return unsubscribe;
+  }, [streamId]);
+
+  // Update participant speaking status in real-time
+  const updateParticipantSpeaking = useCallback(async (userId: string, isSpeaking: boolean) => {
+    if (!streamId) return;
+
+    try {
+      await streamingService.updateParticipantSpeaking(streamId, userId, isSpeaking);
+    } catch (error) {
+      console.error('Error updating speaking status:', error);
+    }
+  }, [streamId]);
   const [messageText, setMessageText] = useState('');
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false);
   
@@ -1003,14 +1058,15 @@ const LiveStreamView = () => {
   const renderParticipantsGrid = useCallback(() => (
     <View style={styles.gridContainer}>
       {participants.map((participant, index) => (
-        <ParticipantItem 
+        <ParticipantItem
           key={participant.id}
           participant={participant}
-          animationRef={speakingAnimationRefs.current[index]} 
+          animationRef={speakingAnimationRefs.current[index]}
+          onToggleSpeaking={updateParticipantSpeaking}
         />
       ))}
     </View>
-  ), [participants]);
+  ), [participants, updateParticipantSpeaking]);
 
   // COMBINED INFO PANEL - All information in one view, no tabs
   const renderInfoPanel = () => {

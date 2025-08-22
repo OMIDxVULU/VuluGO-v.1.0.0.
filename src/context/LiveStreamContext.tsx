@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { streamingService } from '../services/streamingService';
 
 // Define the structure of a stream
 export interface StreamHost {
@@ -59,190 +60,36 @@ interface LiveStreamContextType {
 // Create the context with a default value
 const LiveStreamContext = createContext<LiveStreamContextType | undefined>(undefined);
 
-// Mock data for demonstration purposes - in a real app, this would come from an API
-const MOCK_STREAMS: LiveStream[] = [
-  {
-    id: '101',
-    title: 'Live title, test test test test test 123',
-    hosts: [
-      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Jessica', avatar: 'https://randomuser.me/api/portraits/women/31.jpg', isMuted: false, isBanned: false },
-      { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg', isMuted: false, isBanned: false },
-      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg', isMuted: true, isBanned: false },
-    ],
-    views: 2590,
-    boost: 0,
-    friends: [
-      { name: 'Jessica', avatar: 'https://randomuser.me/api/portraits/women/31.jpg' },
-    ],
-    isActive: true,
-    startedAt: Date.now() - 3600000, // started 1 hour ago
-  },
-  {
-    id: '102',
-    title: 'Friday Night Live Stream',
-    hosts: [
-      { name: 'Michael', avatar: 'https://randomuser.me/api/portraits/men/33.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'David', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-      { name: 'Tom', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Sarah', avatar: 'https://randomuser.me/api/portraits/women/36.jpg', isMuted: false, isBanned: false },
-      { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 1240,
-    boost: 0,
-    friends: [
-      { name: 'Michael', avatar: 'https://randomuser.me/api/portraits/men/33.jpg' },
-    ],
-    isActive: true,
-    startedAt: Date.now() - 7200000, // started 2 hours ago
-  },
-  {
-    id: '201',
-    title: 'Live Stream with Friends',
-    hosts: [
-      { name: 'James', avatar: 'https://randomuser.me/api/portraits/men/43.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-      { name: 'Kevin', avatar: 'https://randomuser.me/api/portraits/men/44.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Emma', avatar: 'https://randomuser.me/api/portraits/women/37.jpg', isMuted: false, isBanned: false },
-      { name: 'Alex', avatar: 'https://randomuser.me/api/portraits/men/33.jpg', isMuted: false, isBanned: false },
-      { name: 'Sophie', avatar: 'https://randomuser.me/api/portraits/women/38.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 1350,
-    boost: 210,
-    rank: 3,
-    isActive: true,
-    startedAt: Date.now() - 1800000, // started 30 minutes ago
-  },
-  {
-    id: '202',
-    title: 'Live Stream with Friends',
-    hosts: [
-      { name: 'Sara', avatar: 'https://randomuser.me/api/portraits/women/32.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'Emily', avatar: 'https://randomuser.me/api/portraits/women/33.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-      { name: 'Anna', avatar: 'https://randomuser.me/api/portraits/women/34.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
-      { name: 'John', avatar: 'https://randomuser.me/api/portraits/men/32.jpg', joinOrder: 4, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Mike', avatar: 'https://randomuser.me/api/portraits/men/31.jpg', isMuted: false, isBanned: false },
-      { name: 'Lisa', avatar: 'https://randomuser.me/api/portraits/women/35.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 2650,
-    boost: 0,
-    rank: 1,
-    isActive: true,
-    startedAt: Date.now() - 900000, // started 15 minutes ago
-  },
-  {
-    id: '203',
-    title: 'Epic gameplay session',
-    hosts: [
-      { name: 'GamerPro', avatar: 'https://randomuser.me/api/portraits/men/45.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'GameGirl', avatar: 'https://randomuser.me/api/portraits/women/39.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Fan1', avatar: 'https://randomuser.me/api/portraits/men/46.jpg', isMuted: false, isBanned: false },
-      { name: 'Fan2', avatar: 'https://randomuser.me/api/portraits/women/40.jpg', isMuted: false, isBanned: false },
-      { name: 'Fan3', avatar: 'https://randomuser.me/api/portraits/men/47.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 1400,
-    boost: 0,
-    rank: 2,
-    isActive: true,
-    startedAt: Date.now() - 2700000, // started 45 minutes ago
-  },
-  {
-    id: '301',
-    title: 'Music & Chill',
-    hosts: [
-      { name: 'MusicLover', avatar: 'https://randomuser.me/api/portraits/women/41.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/48.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Listener1', avatar: 'https://randomuser.me/api/portraits/women/42.jpg', isMuted: false, isBanned: false },
-      { name: 'Listener2', avatar: 'https://randomuser.me/api/portraits/men/49.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 890,
-    boost: 0,
-    isActive: true,
-    startedAt: Date.now() - 3600000, // started 1 hour ago
-  },
-  {
-    id: '302',
-    title: 'Late night talks',
-    hosts: [
-      { name: 'NightOwl', avatar: 'https://randomuser.me/api/portraits/men/50.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'Insomniac', avatar: 'https://randomuser.me/api/portraits/women/43.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'LateBird', avatar: 'https://randomuser.me/api/portraits/men/51.jpg', isMuted: false, isBanned: false },
-      { name: 'SleepyHead', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 650,
-    boost: 0,
-    isActive: true,
-    startedAt: Date.now() - 5400000, // started 1.5 hours ago
-  },
-  {
-    id: '303',
-    title: 'Tech talk & coding',
-    hosts: [
-      { name: 'TechGuru', avatar: 'https://randomuser.me/api/portraits/men/52.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'CodeQueen', avatar: 'https://randomuser.me/api/portraits/women/45.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Dev1', avatar: 'https://randomuser.me/api/portraits/men/53.jpg', isMuted: false, isBanned: false },
-      { name: 'Dev2', avatar: 'https://randomuser.me/api/portraits/women/46.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 1200,
-    boost: 0,
-    isActive: true,
-    startedAt: Date.now() - 3600000, // started 1 hour ago
-  },
-  {
-    id: '304',
-    title: 'Casual gaming & chill vibes',
-    hosts: [
-      { name: 'RelaxedGamer', avatar: 'https://randomuser.me/api/portraits/women/22.jpg', joinOrder: 1, isSpeaking: true, isMuted: false },
-      { name: 'ChillDude', avatar: 'https://randomuser.me/api/portraits/men/21.jpg', joinOrder: 2, isSpeaking: false, isMuted: false },
-      { name: 'FunFriend', avatar: 'https://randomuser.me/api/portraits/women/21.jpg', joinOrder: 3, isSpeaking: false, isMuted: false },
-    ],
-    viewers: [
-      { name: 'Viewer1', avatar: 'https://randomuser.me/api/portraits/men/54.jpg', isMuted: false, isBanned: false },
-      { name: 'Viewer2', avatar: 'https://randomuser.me/api/portraits/women/47.jpg', isMuted: false, isBanned: false },
-    ],
-    views: 1500,
-    boost: 0,
-    isActive: true,
-    startedAt: Date.now() - 5400000, // started 1.5 hours ago
-  },
-];
+// Note: MOCK_STREAMS has been replaced with real Firebase data
+// The streaming service now fetches active streams from Firestore
 
 // Provider component
 export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [streams, setStreams] = useState<LiveStream[]>(MOCK_STREAMS);
+  const [streams, setStreams] = useState<LiveStream[]>([]);
   const [currentlyWatching, setCurrentlyWatching] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
 
-  // In a real app, you would fetch data from your API here
+  // Fetch streams from Firebase
   useEffect(() => {
-    // Simulating an API call
     const fetchStreams = async () => {
-      // In a real app: const response = await api.getStreams();
-      // Then: setStreams(response.data);
-      
-      // For now, we're using our mock data
-      setStreams(MOCK_STREAMS);
+      try {
+        const activeStreams = await streamingService.getActiveStreams();
+        setStreams(activeStreams);
+      } catch (error) {
+        console.error('Error fetching streams:', error);
+        // Fallback to empty array if Firebase fails
+        setStreams([]);
+      }
     };
 
     fetchStreams();
+
+    // Set up real-time listener for stream updates
+    const unsubscribe = streamingService.onActiveStreamsUpdate((updatedStreams) => {
+      setStreams(updatedStreams);
+    });
+
+    return unsubscribe;
   }, []);
 
   // Categorize streams for easier access
@@ -266,10 +113,25 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
     return streams.find(stream => stream.id === id);
   };
 
-  const joinStream = (streamId: string) => {
-    console.log(`Joining stream ${streamId}`);
-    setCurrentlyWatching(streamId);
-    // In a real app, you might also track this on your backend
+  const joinStream = async (streamId: string) => {
+    try {
+      // Get current user info (you'll need to pass this from auth context)
+      // For now, we'll use placeholder data
+      const currentUser = { uid: 'currentUser', displayName: 'You', photoURL: 'https://randomuser.me/api/portraits/lego/1.jpg' };
+
+      await streamingService.joinStream(
+        streamId,
+        currentUser.uid,
+        currentUser.displayName || 'You',
+        currentUser.photoURL || 'https://randomuser.me/api/portraits/lego/1.jpg'
+      );
+
+      setCurrentlyWatching(streamId);
+      console.log(`Successfully joined stream ${streamId}`);
+    } catch (error) {
+      console.error('Error joining stream:', error);
+      // You might want to show an error message to the user here
+    }
   };
 
   // Add this new function to handle minimizing streams
@@ -281,82 +143,142 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // New functions for enhanced live stream features
-  const joinAsHost = (streamId: string, userName: string, userAvatar: string) => {
-    setStreams(prevStreams => 
-      prevStreams.map(stream => {
-        if (stream.id === streamId) {
-          const nextJoinOrder = stream.hosts.length + 1;
-          const newHost: StreamHost = {
-            name: userName,
-            avatar: userAvatar,
-            joinOrder: nextJoinOrder,
-            isSpeaking: false,
-            isMuted: false
-          };
-          return {
-            ...stream,
-            hosts: [...stream.hosts, newHost]
-          };
-        }
-        return stream;
-      })
-    );
-  };
+  const joinAsHost = async (streamId: string, userName: string, userAvatar: string) => {
+    try {
+      // Create a new stream if it doesn't exist
+      const streamExists = streams.some(s => s.id === streamId);
+      if (!streamExists) {
+        const newStreamId = await streamingService.createStream(
+          `Live Stream by ${userName}`,
+          'currentUser', // Use actual user ID
+          userName,
+          userAvatar
+        );
+        console.log(`Created new stream: ${newStreamId}`);
+      }
 
-  const kickHost = (streamId: string, hostName: string, kickedBy: string) => {
-    setStreams(prevStreams => 
-      prevStreams.map(stream => {
-        if (stream.id === streamId) {
-          const kickedByHost = stream.hosts.find(h => h.name === kickedBy);
-          const hostToKick = stream.hosts.find(h => h.name === hostName);
-          
-          // Check if the kicker has higher power (lower join order)
-          if (kickedByHost && hostToKick && kickedByHost.joinOrder < hostToKick.joinOrder) {
+      setStreams(prevStreams =>
+        prevStreams.map(stream => {
+          if (stream.id === streamId) {
+            const nextJoinOrder = stream.hosts.length + 1;
+            const newHost: StreamHost = {
+              name: userName,
+              avatar: userAvatar,
+              joinOrder: nextJoinOrder,
+              isSpeaking: false,
+              isMuted: false
+            };
             return {
               ...stream,
-              hosts: stream.hosts.filter(h => h.name !== hostName)
+              hosts: [...stream.hosts, newHost]
             };
           }
-        }
-        return stream;
-      })
-    );
+          return stream;
+        })
+      );
+    } catch (error) {
+      console.error('Error joining as host:', error);
+    }
   };
 
-  const muteViewer = (streamId: string, viewerName: string, mutedBy: string) => {
-    setStreams(prevStreams => 
-      prevStreams.map(stream => {
-        if (stream.id === streamId) {
-          return {
-            ...stream,
-            viewers: stream.viewers.map(viewer => 
-              viewer.name === viewerName 
-                ? { ...viewer, isMuted: !viewer.isMuted }
-                : viewer
-            )
-          };
-        }
-        return stream;
-      })
-    );
+  const kickHost = async (streamId: string, hostName: string, kickedBy: string) => {
+    try {
+      // Find the user ID of the host to kick
+      const stream = streams.find(s => s.id === streamId);
+      if (!stream) return;
+
+      // For now, we'll use the host name as user ID (TODO: Use actual user IDs)
+      const userId = hostName; // This should be the actual user ID
+      const kickedById = kickedBy; // This should be the actual user ID
+
+      await streamingService.kickParticipant(streamId, userId, kickedById);
+
+      // Update local state
+      setStreams(prevStreams =>
+        prevStreams.map(stream => {
+          if (stream.id === streamId) {
+            const kickedByHost = stream.hosts.find(h => h.name === kickedBy);
+            const hostToKick = stream.hosts.find(h => h.name === hostName);
+
+            // Check if the kicker has higher power (lower join order)
+            if (kickedByHost && hostToKick && kickedByHost.joinOrder < hostToKick.joinOrder) {
+              return {
+                ...stream,
+                hosts: stream.hosts.filter(h => h.name !== hostName)
+              };
+            }
+          }
+          return stream;
+        })
+      );
+    } catch (error) {
+      console.error('Error kicking host:', error);
+    }
   };
 
-  const banViewer = (streamId: string, viewerName: string, bannedBy: string) => {
-    setStreams(prevStreams => 
-      prevStreams.map(stream => {
-        if (stream.id === streamId) {
-          return {
-            ...stream,
-            viewers: stream.viewers.map(viewer => 
-              viewer.name === viewerName 
-                ? { ...viewer, isBanned: !viewer.isBanned }
-                : viewer
-            )
-          };
-        }
-        return stream;
-      })
-    );
+  const muteViewer = async (streamId: string, viewerName: string, mutedBy: string) => {
+    try {
+      // Find the user ID of the viewer to mute
+      const stream = streams.find(s => s.id === streamId);
+      if (!stream) return;
+
+      // For now, we'll use the viewer name as user ID (TODO: Use actual user IDs)
+      const userId = viewerName; // This should be the actual user ID
+
+      await streamingService.toggleParticipantMute(streamId, userId);
+
+      // Update local state
+      setStreams(prevStreams =>
+        prevStreams.map(stream => {
+          if (stream.id === streamId) {
+            return {
+              ...stream,
+              viewers: stream.viewers.map(viewer =>
+                viewer.name === viewerName
+                  ? { ...viewer, isMuted: !viewer.isMuted }
+                  : viewer
+              )
+            };
+          }
+          return stream;
+        })
+      );
+    } catch (error) {
+      console.error('Error muting viewer:', error);
+    }
+  };
+
+  const banViewer = async (streamId: string, viewerName: string, bannedBy: string) => {
+    try {
+      // Find the user ID of the viewer to ban
+      const stream = streams.find(s => s.id === streamId);
+      if (!stream) return;
+
+      // For now, we'll use the viewer name as user ID (TODO: Use actual user IDs)
+      const userId = viewerName; // This should be the actual user ID
+      const bannedById = bannedBy; // This should be the actual user ID
+
+      await streamingService.banParticipant(streamId, userId, bannedById);
+
+      // Update local state
+      setStreams(prevStreams =>
+        prevStreams.map(stream => {
+          if (stream.id === streamId) {
+            return {
+              ...stream,
+              viewers: stream.viewers.map(viewer =>
+                viewer.name === viewerName
+                  ? { ...viewer, isBanned: !viewer.isBanned }
+                  : viewer
+              )
+            };
+          }
+          return stream;
+        })
+      );
+    } catch (error) {
+      console.error('Error banning viewer:', error);
+    }
   };
 
   const leaveStream = (streamId: string) => {

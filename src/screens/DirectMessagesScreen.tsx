@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,10 @@ import { router } from 'expo-router';
 import { MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CommonHeader from '../components/CommonHeader';
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
+import { LoadingState, ErrorState } from '../components/ErrorHandling';
+import { Conversation } from '../services/types';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,102 +42,62 @@ interface ChatPreview {
   isCloseFriend?: boolean; // Whether the user is a close friend
 }
 
-// Updated Sample data based on Figma structure
-const DUMMY_CHATS: ChatPreview[] = [
-  {
-    id: '1',
-    name: 'Sophia Anderson',
-    lastMessage: "Sure, let me know when you're free!",
-    timestamp: '5m',
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-    status: 'online',
-    isCloseFriend: true,
-  },
-  {
-    id: '2',
-    name: 'David',
-    lastMessage: 'I\'m going live in 5 minutes!',
-    timestamp: '1h',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    status: 'busy',
-    level: 22,
-    isTyping: true,
-  },
-  {
-    id: '3',
-    name: 'Jessica',
-    lastMessage: 'Thanks for the help yesterday!',
-    timestamp: '2h',
-    avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
-    status: 'idle',
-    level: 74,
-  },
-  {
-    id: '4',
-    name: 'Michael',
-    lastMessage: 'Let me know when you\'re free',
-    timestamp: '6h',
-    avatar: 'https://randomuser.me/api/portraits/men/4.jpg',
-    status: 'offline',
-    level: 31,
-    unreadCount: 1,
-    isMuted: true,
-  },
-  {
-    id: '5',
-    name: 'Gaming Group',
-    lastMessage: 'Alex: Are we playing tonight?',
-    timestamp: 'Yesterday',
-    avatar: 'https://randomuser.me/api/portraits/women/5.jpg',
-    status: 'online',
-    isPinned: true,
-  },
-  {
-    id: '6',
-    name: 'Emma',
-    lastMessage: 'I sent you the files',
-    timestamp: 'Yesterday',
-    avatar: 'https://randomuser.me/api/portraits/women/6.jpg',
-    status: 'online',
-    level: 18,
-  },
-  {
-    id: '7',
-    name: 'John',
-    lastMessage: 'See you tomorrow!',
-    timestamp: 'Tuesday',
-    avatar: 'https://randomuser.me/api/portraits/men/7.jpg',
-    status: 'offline',
-    level: 65,
-  },
-  {
-    id: '8',
-    name: 'Sarah',
-    lastMessage: 'Check out this music',
-    timestamp: 'Monday',
-    avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
-    status: 'idle',
-    level: 42,
-  },
-  {
-    id: '9',
-    name: 'James',
-    lastMessage: 'How did the meeting go?',
-    timestamp: 'Last week',
-    avatar: 'https://randomuser.me/api/portraits/men/9.jpg',
-    status: 'busy',
-    level: 55,
-  },
-  {
-    id: '10',
-    name: 'Rebecca',
-    lastMessage: 'Happy birthday!',
-    timestamp: 'Last week',
-    avatar: 'https://randomuser.me/api/portraits/women/10.jpg',
-    status: 'offline',
-    level: 29,
-  },
-];
+// Helper function to format timestamp
+const formatTimestamp = (timestamp: any): string => {
+  if (!timestamp) return '';
+
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+
+  if (diffDays < 365) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// Helper function to get other participant info
+const getOtherParticipantInfo = (conversation: Conversation, currentUserId: string) => {
+  const otherParticipantId = conversation.participants.find(id => id !== currentUserId);
+  if (!otherParticipantId) return null;
+
+  return {
+    id: otherParticipantId,
+    name: conversation.participantNames?.[otherParticipantId] || 'Unknown',
+    avatar: conversation.participantAvatars?.[otherParticipantId] || 'https://randomuser.me/api/portraits/lego/1.jpg',
+  };
+};
+
+// Helper function to convert Conversation to ChatPreview
+const conversationToChatPreview = (conversation: Conversation, currentUserId: string): ChatPreview | null => {
+  const otherParticipant = getOtherParticipantInfo(conversation, currentUserId);
+  if (!otherParticipant) return null;
+
+  const lastMessage = conversation.lastMessage;
+  const unreadCount = conversation.unreadCount?.[currentUserId] || 0;
+
+  return {
+    id: conversation.id,
+    name: otherParticipant.name,
+    lastMessage: lastMessage?.text || 'No messages yet',
+    timestamp: formatTimestamp(conversation.lastMessageTime),
+    avatar: otherParticipant.avatar,
+    status: 'online', // TODO: Get real user status
+    unreadCount: unreadCount,
+    isCloseFriend: false, // TODO: Implement close friends logic
+    isMuted: false, // TODO: Implement mute logic
+    isPinned: false, // TODO: Implement pin logic
+  };
+};
 
 // Active users for the horizontal scroll
 const ACTIVE_USERS = [
@@ -229,10 +193,56 @@ const StatusIndicator = ({ status, size = 'normal' }: { status: ChatPreview['sta
 };
 
 const DirectMessagesScreen = () => {
+  const { user: currentUser } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [chats, setChats] = useState<ChatPreview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const searchAnimation = useRef(new Animated.Value(0)).current;
-  
+
+  // Load conversations from Firebase with real-time updates
+  useEffect(() => {
+    let unsubscribeConversations: (() => void) | null = null;
+
+    const loadConversations = async () => {
+      if (!currentUser) return;
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Set up real-time listener for conversations
+        unsubscribeConversations = firestoreService.onUserConversations(currentUser.uid, (updatedConversations) => {
+          setConversations(updatedConversations);
+
+          // Convert conversations to chat previews
+          const chatPreviews = updatedConversations
+            .map(conversation => conversationToChatPreview(conversation, currentUser.uid))
+            .filter((chat): chat is ChatPreview => chat !== null);
+
+          setChats(chatPreviews);
+          setIsLoading(false);
+        });
+
+      } catch (error: any) {
+        console.error('Error loading conversations:', error);
+        setError('Failed to load conversations');
+        setIsLoading(false);
+      }
+    };
+
+    loadConversations();
+
+    // Cleanup function
+    return () => {
+      if (unsubscribeConversations) {
+        unsubscribeConversations();
+      }
+    };
+  }, [currentUser]);
+
   // Animate search bar
   const toggleSearch = (active: boolean) => {
     setIsSearchActive(active);
@@ -251,9 +261,9 @@ const DirectMessagesScreen = () => {
   
   // Filter chats based on search query
   const getFilteredChats = () => {
-    if (!searchQuery.trim()) return DUMMY_CHATS;
-    
-    return DUMMY_CHATS.filter(chat => 
+    if (!searchQuery.trim()) return chats;
+
+    return chats.filter(chat =>
       chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -474,15 +484,44 @@ const DirectMessagesScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Messages List */}
-        <FlatList
-          data={getFilteredChats()}
-          renderItem={renderChatItem}
-          keyExtractor={(item) => `chat-item-${item.id}`}
-          showsVerticalScrollIndicator={false}
-          style={styles.chatList}
-          contentContainerStyle={styles.chatListContent}
-        />
+        {/* Messages List with Loading and Error States */}
+        {isLoading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState
+            error={error}
+            onRetry={() => {
+              setError(null);
+              setIsLoading(true);
+              // Reload conversations
+              if (currentUser) {
+                firestoreService.getUserConversations(currentUser.uid)
+                  .then(userConversations => {
+                    setConversations(userConversations);
+                    const chatPreviews = userConversations
+                      .map(conversation => conversationToChatPreview(conversation, currentUser.uid))
+                      .filter((chat): chat is ChatPreview => chat !== null);
+                    setChats(chatPreviews);
+                    setIsLoading(false);
+                  })
+                  .catch(error => {
+                    console.error('Error reloading conversations:', error);
+                    setError('Failed to load conversations');
+                    setIsLoading(false);
+                  });
+              }
+            }}
+          />
+        ) : (
+          <FlatList
+            data={getFilteredChats()}
+            renderItem={renderChatItem}
+            keyExtractor={(item) => `chat-item-${item.id}`}
+            showsVerticalScrollIndicator={false}
+            style={styles.chatList}
+            contentContainerStyle={styles.chatListContent}
+          />
+        )}
 
         {/* Group Chat Floating Button */}
         <TouchableOpacity
