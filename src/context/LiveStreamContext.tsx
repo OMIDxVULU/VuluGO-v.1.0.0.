@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { streamingService } from '../services/streamingService';
+import { useAuth } from './AuthContext';
 
 // Define the structure of a stream
 export interface StreamHost {
@@ -68,9 +69,15 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
   const [streams, setStreams] = useState<LiveStream[]>([]);
   const [currentlyWatching, setCurrentlyWatching] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const { loading: authLoading } = useAuth();
 
-  // Fetch streams from Firebase
+  // Fetch streams from Firebase - wait for auth to complete
   useEffect(() => {
+    // Don't start fetching until auth loading is complete
+    if (authLoading) {
+      return;
+    }
+
     const fetchStreams = async () => {
       try {
         const activeStreams = await streamingService.getActiveStreams();
@@ -90,7 +97,7 @@ export const LiveStreamProvider: React.FC<{ children: ReactNode }> = ({ children
     });
 
     return unsubscribe;
-  }, []);
+  }, [authLoading]); // Depend on authLoading to wait for auth completion
 
   // Categorize streams for easier access
   const featuredStreams = streams.filter(stream => stream.rank !== undefined)

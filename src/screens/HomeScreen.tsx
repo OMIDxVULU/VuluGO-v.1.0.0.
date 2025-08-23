@@ -28,6 +28,10 @@ import { useAuth } from '../context/AuthContext';
 import authService from '../services/authService';
 import FirebaseTest from '../components/FirebaseTest';
 import GuestModeIndicator from '../components/GuestModeIndicator';
+import { firestoreService, GlobalChatMessage } from '../services/firestoreService';
+import FirebaseErrorHandler from '../utils/firebaseErrorHandler';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
+import DataValidator from '../utils/dataValidation';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -1850,7 +1854,121 @@ const HomeScreen = () => {
 
   // State for Global Chat
   const [showGlobalChatModal, setShowGlobalChatModal] = useState(false);
-  
+  const [globalChatMessages, setGlobalChatMessages] = useState<GlobalChatMessage[]>([]);
+  const [globalChatInput, setGlobalChatInput] = useState('');
+  const [isLoadingGlobalChat, setIsLoadingGlobalChat] = useState(false);
+  const [globalChatError, setGlobalChatError] = useState<string | null>(null);
+
+  // Get auth and guest restrictions
+  const { user, isGuest } = useAuth();
+  const { canSendMessages, handleGuestRestriction } = useGuestRestrictions();
+
+  // Set up global chat listener
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    if (showGlobalChatModal) {
+      setIsLoadingGlobalChat(true);
+      setGlobalChatError(null);
+
+      // Only set up listener for authenticated users
+      if (user) {
+        // Set up real-time listener for global chat messages
+        unsubscribe = firestoreService.onGlobalChatMessages((messages) => {
+          setGlobalChatMessages(messages);
+          setIsLoadingGlobalChat(false);
+        });
+      } else {
+        // For guest users, just show empty state
+        setGlobalChatMessages([]);
+        setIsLoadingGlobalChat(false);
+        setGlobalChatError('Sign in to view and send messages');
+      }
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [showGlobalChatModal, user]); // Add user to dependencies
+
+  // Handle sending global chat message
+  const handleSendGlobalChatMessage = async () => {
+    if (!globalChatInput.trim()) {
+      return;
+    }
+
+    // Check if user can send messages (guest restriction)
+    if (!canSendMessages()) {
+      handleGuestRestriction('sending messages');
+      return;
+    }
+
+    if (!user) {
+      setGlobalChatError('You must be signed in to send messages');
+      return;
+    }
+
+    const messageText = globalChatInput.trim();
+    setGlobalChatInput(''); // Clear input immediately for better UX
+
+    try {
+      // Debug: Log user state
+      console.log('🔐 handleSendGlobalChatMessage - User Debug:', {
+        hasUser: !!user,
+        isGuest: isGuest,
+        userId: user?.uid,
+        userEmail: user?.email,
+        displayName: user?.displayName,
+        photoURL: user?.photoURL
+      });
+
+      // Validate user authentication
+      const userValidation = DataValidator.validateUserAuth(user);
+      if (!userValidation.isValid) {
+        console.error('❌ User validation failed:', userValidation.errors);
+        throw new Error(userValidation.errors.join(', '));
+      }
+
+      // Create message data with safe defaults
+      const messageData = {
+        senderId: user.uid,
+        senderName: DataValidator.createSafeDisplayName(user),
+        text: messageText,
+        type: 'text' as const,
+        senderAvatar: DataValidator.createSafeAvatarUrl(user)
+      };
+
+      // Debug: Log message data before validation
+      console.log('📝 handleSendGlobalChatMessage - Message Data:', messageData);
+
+      // Validate the complete message data
+      const messageValidation = DataValidator.validateGlobalChatMessage(messageData);
+      if (!messageValidation.isValid) {
+        console.error('❌ Message validation failed:', messageValidation.errors);
+        throw new Error(messageValidation.errors.join(', '));
+      }
+
+      // Debug: Log sanitized data
+      console.log('✅ handleSendGlobalChatMessage - Sanitized Data:', messageValidation.sanitizedData);
+
+      // Send the sanitized message data
+      console.log('🚀 handleSendGlobalChatMessage - Calling firestoreService...');
+      await firestoreService.sendGlobalChatMessage(messageValidation.sanitizedData!);
+      console.log('✅ handleSendGlobalChatMessage - Message sent successfully!');
+      setGlobalChatError(null);
+    } catch (error: any) {
+      // Restore the input text if sending failed
+      setGlobalChatInput(messageText);
+
+      const errorInfo = FirebaseErrorHandler.handleError(error);
+      setGlobalChatError(errorInfo.userFriendlyMessage);
+
+      console.error('Failed to send global chat message:', error);
+    }
+  };
+
   // Add these lines for handle swipe gesture:
   // Pan responder for swiping down the chat modal
   const chatPanResponder = useRef(
@@ -1950,56 +2068,87 @@ const HomeScreen = () => {
             </View>
             
             {/* Chat Messages */}
-            <ScrollView style={styles.chatMessagesContainer}>
-              {/* Example messages - in a real app these would be dynamic */}
-              <View style={styles.chatMessageContainer}>
-                <View style={[styles.chatAvatarContainer, {backgroundColor: '#F06292'}]}>
-                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+            <ScrollView
+              style={styles.chatMessagesContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {isLoadingGlobalChat ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading messages...</Text>
                 </View>
-                <View style={styles.chatMessageContent}>
-                  <View style={styles.chatMessageHeader}>
-                    <Text style={styles.chatMessageSender}>Jessica</Text>
-                    <Text style={styles.chatMessageTime}>2m ago</Text>
+              ) : globalChatMessages.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <MaterialCommunityIcons name="chat-outline" size={48} color="rgba(255,255,255,0.3)" />
+                  <Text style={styles.emptyText}>No messages yet</Text>
+                  <Text style={styles.emptySubtext}>Be the first to start the conversation!</Text>
+                </View>
+              ) : (
+                globalChatMessages.map((message) => (
+                  <View key={message.id} style={styles.chatMessageContainer}>
+                    <View style={[styles.chatAvatarContainer, {backgroundColor: '#6E69F4'}]}>
+                      {message.senderAvatar ? (
+                        <Image
+                          source={{ uri: message.senderAvatar }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <MaterialCommunityIcons name="account" size={24} color="#FFF" />
+                      )}
+                    </View>
+                    <View style={styles.chatMessageContent}>
+                      <View style={styles.chatMessageHeader}>
+                        <Text style={styles.chatMessageSender}>{message.senderName}</Text>
+                        <Text style={styles.chatMessageTime}>
+                          {message.timestamp ? new Date(message.timestamp.toDate()).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : 'Now'}
+                        </Text>
+                      </View>
+                      <Text style={styles.chatMessageText}>{message.text}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.chatMessageText}>Hey everyone! Who's watching the stream?</Text>
-                </View>
-              </View>
-              
-              <View style={styles.chatMessageContainer}>
-                <View style={[styles.chatAvatarContainer, {backgroundColor: '#64B5F6'}]}>
-                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
-                </View>
-                <View style={styles.chatMessageContent}>
-                  <View style={styles.chatMessageHeader}>
-                    <Text style={styles.chatMessageSender}>Mike</Text>
-                    <Text style={styles.chatMessageTime}>1m ago</Text>
-                  </View>
-                  <Text style={styles.chatMessageText}>I am! The tournament is getting intense!</Text>
-                </View>
-              </View>
-              
-              <View style={styles.chatMessageContainer}>
-                <View style={[styles.chatAvatarContainer, {backgroundColor: '#81C784'}]}>
-                  <MaterialCommunityIcons name="account" size={24} color="#FFF" />
-                </View>
-                <View style={styles.chatMessageContent}>
-                  <View style={styles.chatMessageHeader}>
-                    <Text style={styles.chatMessageSender}>Sarah</Text>
-                    <Text style={styles.chatMessageTime}>Just now</Text>
-                  </View>
-                  <Text style={styles.chatMessageText}>Can't believe that last play! Amazing!</Text>
-                </View>
-              </View>
+                ))
+              )}
             </ScrollView>
             
+            {/* Error Message */}
+            {globalChatError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{globalChatError}</Text>
+                <TouchableOpacity onPress={() => setGlobalChatError(null)}>
+                  <MaterialCommunityIcons name="close" size={16} color="#FF6B6B" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Chat Input */}
             <View style={styles.chatInputContainer}>
-              <TextInput 
+              <TextInput
                 style={styles.chatInput}
+                placeholder={isGuest ? "Sign in to send messages" : "Type a message..."}
                 placeholderTextColor="rgba(255,255,255,0.4)"
+                value={globalChatInput}
+                onChangeText={setGlobalChatInput}
+                multiline
+                maxLength={500}
+                editable={!isGuest}
+                onSubmitEditing={handleSendGlobalChatMessage}
+                returnKeyType="send"
               />
-              <TouchableOpacity style={styles.sendButton}>
-                <MaterialCommunityIcons name="send" size={24} color="#4CAF50" />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (!globalChatInput.trim() || isGuest) && styles.sendButtonDisabled
+                ]}
+                onPress={handleSendGlobalChatMessage}
+                disabled={!globalChatInput.trim() || isGuest}
+              >
+                <MaterialCommunityIcons
+                  name="send"
+                  size={24}
+                  color={(!globalChatInput.trim() || isGuest) ? "rgba(76, 175, 80, 0.3)" : "#4CAF50"}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -2164,7 +2313,7 @@ const HomeScreen = () => {
       >
         {/* Guest Mode Indicator */}
         <GuestModeIndicator showUpgradePrompt={true} />
-        
+
         {/* Combined Spotlight and Live Activity Widgets */}
         <View style={styles.scrollContainer} onLayout={handleContainerLayout}>
           <ScrollView
@@ -3671,6 +3820,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: '#FFFFFF',
     marginRight: 10,
+    maxHeight: 100,
+    minHeight: 40,
+    textAlignVertical: 'center',
   },
   sendButton: {
     width: 44,
@@ -3690,6 +3842,60 @@ const styles = StyleSheet.create({
   },
   swipeableArea: {
     width: '100%',
+  },
+  sendButtonDisabled: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    borderColor: 'rgba(255, 107, 107, 0.3)',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 15,
+    marginBottom: 10,
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    flex: 1,
   },
 });
 

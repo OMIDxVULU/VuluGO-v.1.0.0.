@@ -1,4 +1,4 @@
-import { 
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -6,7 +6,8 @@ import {
   User,
   updateProfile
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, getFirebaseServices, isFirebaseInitialized } from './firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface AuthUser {
   uid: string;
@@ -29,12 +30,52 @@ export interface GuestUser {
 class AuthService {
   // In-memory storage for guest user (will be lost on app restart)
   private guestUserStorage: GuestUser | null = null;
+  private readonly GUEST_USER_KEY = '@vulugo_guest_user';
 
   // Generate unique guest ID
   private generateGuestId(): string {
     const timestamp = Date.now().toString(36);
     const randomStr = Math.random().toString(36).substring(2, 8);
     return `guest_${timestamp}_${randomStr}`;
+  }
+
+  // Check if Firebase is ready for authentication operations
+  private ensureFirebaseReady(): void {
+    if (!isFirebaseInitialized()) {
+      const status = getFirebaseServices();
+      if (!status.isInitialized) {
+        throw new Error(`Firebase not initialized: ${status.initializationError?.message || 'Unknown error'}`);
+      }
+    }
+  }
+
+  // Persist guest user to AsyncStorage
+  private async persistGuestUser(guestUser: GuestUser): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.GUEST_USER_KEY, JSON.stringify(guestUser));
+    } catch (error) {
+      console.warn('Failed to persist guest user:', error);
+    }
+  }
+
+  // Load guest user from AsyncStorage
+  private async loadPersistedGuestUser(): Promise<GuestUser | null> {
+    try {
+      const stored = await AsyncStorage.getItem(this.GUEST_USER_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.warn('Failed to load persisted guest user:', error);
+      return null;
+    }
+  }
+
+  // Clear persisted guest user
+  private async clearPersistedGuestUser(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.GUEST_USER_KEY);
+    } catch (error) {
+      console.warn('Failed to clear persisted guest user:', error);
+    }
   }
 
   // Sign in as guest
@@ -50,8 +91,9 @@ class AuthService {
         guestId: guestId
       };
 
-      // Store guest user in memory
+      // Store guest user in memory and persist to AsyncStorage
       this.guestUserStorage = guestUser;
+      await this.persistGuestUser(guestUser);
 
       return guestUser;
     } catch (error: any) {
@@ -59,14 +101,27 @@ class AuthService {
     }
   }
 
-  // Get guest user from memory
+  // Get guest user from memory or AsyncStorage
   async getGuestUser(): Promise<GuestUser | null> {
-    return this.guestUserStorage;
+    // First check memory
+    if (this.guestUserStorage) {
+      return this.guestUserStorage;
+    }
+
+    // Then check AsyncStorage
+    const persisted = await this.loadPersistedGuestUser();
+    if (persisted) {
+      this.guestUserStorage = persisted;
+      return persisted;
+    }
+
+    return null;
   }
 
   // Clear guest user data
   async clearGuestUser(): Promise<void> {
     this.guestUserStorage = null;
+    await this.clearPersistedGuestUser();
   }
 
   // Check if current user is guest
@@ -78,14 +133,23 @@ class AuthService {
   // Sign up with email and password
   async signUp(email: string, password: string, displayName?: string): Promise<AuthUser> {
     try {
+      this.ensureFirebaseReady();
+
+      if (!auth) {
+        throw new Error('Firebase Auth not available');
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
       // Update profile with display name if provided
       if (displayName) {
         await updateProfile(user, { displayName });
       }
-      
+
+      // Clear any guest user data when signing up
+      await this.clearGuestUser();
+
       return {
         uid: user.uid,
         email: user.email,
@@ -100,9 +164,18 @@ class AuthService {
   // Sign in with email and password
   async signIn(email: string, password: string): Promise<AuthUser> {
     try {
+      this.ensureFirebaseReady();
+
+      if (!auth) {
+        throw new Error('Firebase Auth not available');
+      }
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
+      // Clear any guest user data when signing in
+      await this.clearGuestUser();
+
       return {
         uid: user.uid,
         email: user.email,

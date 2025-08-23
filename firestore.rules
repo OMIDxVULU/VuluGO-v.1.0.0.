@@ -1,9 +1,56 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow all access for development (we'll secure this later)
-    match /{document=**} {
-      allow read, write: if true;
+    // Users can read and write their own profile
+    match /users/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users can read other users' basic profiles (only when authenticated)
+    match /users/{userId} {
+      allow read: if request.auth != null;
+    }
+
+    // Streams - PUBLIC READ ACCESS for live streams, authenticated users can write
+    // This allows the app to show live streams to all users (including guests)
+    match /streams/{streamId} {
+      allow read: if true; // Public read access for live streams
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Stream messages - PUBLIC READ for viewing, authenticated users can write
+    match /streams/{streamId}/messages/{messageId} {
+      allow read: if true; // Public read access for stream messages
+      allow write: if request.auth != null;
+    }
+
+    // Conversations - users can access conversations they participate in
+    match /conversations/{conversationId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+    }
+
+    // Conversation messages - users can access messages in conversations they participate in
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+
+    // Allow authenticated users to read conversations where they are participants
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+    }
+
+    // Global Chat - PUBLIC READ ACCESS, authenticated users can write
+    match /globalChat/{messageId} {
+      allow read: if true; // Public read access for global chat messages
+      allow create: if request.auth != null; // Only authenticated users can send messages
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.senderId;
     }
   }
-} 
+}

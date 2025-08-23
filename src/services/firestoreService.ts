@@ -19,8 +19,9 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth, isFirebaseInitialized } from './firebase';
 import type { AppUser, ChatMessage, DirectMessage, Conversation } from './types';
+import FirebaseErrorHandler from '../utils/firebaseErrorHandler';
 
 // Re-export types for backward compatibility
 export type { AppUser as User, ChatMessage, DirectMessage, Conversation };
@@ -38,7 +39,42 @@ export interface LiveStream {
   endedAt?: Timestamp;
 }
 
+export interface GlobalChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  text: string;
+  timestamp: Timestamp;
+  type: 'text' | 'system';
+}
+
 class FirestoreService {
+  // Firebase readiness check
+  private ensureFirebaseReady(): void {
+    if (!isFirebaseInitialized()) {
+      throw new Error('Firebase services not initialized');
+    }
+    if (!db) {
+      throw new Error('Firestore not available');
+    }
+  }
+
+  // Authentication helper methods
+  private isAuthenticated(): boolean {
+    return auth?.currentUser !== null;
+  }
+
+  private getCurrentUserId(): string | null {
+    return auth?.currentUser?.uid || null;
+  }
+
+  private requireAuth(): void {
+    if (!this.isAuthenticated()) {
+      throw new Error('Authentication required for this operation');
+    }
+  }
+
   // User operations
   async createUser(userData: Omit<AppUser, 'createdAt' | 'lastSeen'>): Promise<void> {
     try {
@@ -91,6 +127,124 @@ class FirestoreService {
       return messageRef.id;
     } catch (error: any) {
       throw new Error(`Failed to send message: ${error.message}`);
+    }
+  }
+
+  // Global Chat operations
+  async sendGlobalChatMessage(message: Omit<GlobalChatMessage, 'id' | 'timestamp'>): Promise<string> {
+    try {
+      // Debug: Log authentication state
+      const currentUser = auth?.currentUser;
+      const isAuth = this.isAuthenticated();
+      console.log('🔐 sendGlobalChatMessage - Auth Debug:', {
+        hasAuth: !!auth,
+        hasCurrentUser: !!currentUser,
+        isAuthenticated: isAuth,
+        userId: currentUser?.uid,
+        userEmail: currentUser?.email,
+        authState: currentUser ? 'authenticated' : 'not authenticated'
+      });
+
+      // Authentication check
+      if (!this.isAuthenticated()) {
+        console.warn('❌ Guest user attempted to send global chat message');
+        throw new Error('Authentication required to send messages');
+      }
+
+      // Debug: Log message data before validation
+      console.log('📝 sendGlobalChatMessage - Message Data:', {
+        senderId: message.senderId,
+        senderName: message.senderName,
+        hasAvatar: !!message.senderAvatar,
+        textLength: message.text?.length,
+        messageType: message.type
+      });
+
+      // Validate required fields
+      if (!message.senderId?.trim()) {
+        throw new Error('Sender ID is required');
+      }
+
+      if (!message.text?.trim()) {
+        throw new Error('Message text is required');
+      }
+
+      if (!message.senderName?.trim()) {
+        throw new Error('Sender name is required');
+      }
+
+      // Sanitize and prepare message data
+      const sanitizedMessage: any = {
+        senderId: message.senderId.trim(),
+        senderName: message.senderName.trim(),
+        text: message.text.trim(),
+        type: message.type || 'text',
+        timestamp: serverTimestamp()
+      };
+
+      // Only include senderAvatar if it's provided and not empty
+      if (message.senderAvatar && message.senderAvatar.trim()) {
+        sanitizedMessage.senderAvatar = message.senderAvatar.trim();
+      }
+
+      // Debug: Log sanitized message before sending
+      console.log('✅ sendGlobalChatMessage - Sanitized Data:', {
+        ...sanitizedMessage,
+        timestamp: '[ServerTimestamp]'
+      });
+
+      // Attempt to send message
+      console.log('🚀 sendGlobalChatMessage - Attempting to send to Firestore...');
+      const messageRef = await addDoc(collection(db, 'globalChat'), sanitizedMessage);
+      console.log('✅ sendGlobalChatMessage - Success! Message ID:', messageRef.id);
+
+      return messageRef.id;
+    } catch (error: any) {
+      // Enhanced error logging
+      console.error('❌ sendGlobalChatMessage - Error occurred:', {
+        errorCode: error?.code,
+        errorMessage: error?.message,
+        errorName: error?.name,
+        fullError: error
+      });
+
+      // Don't log validation errors as they are user input issues
+      if (error.message.includes('is required') || error.message.includes('Authentication required')) {
+        throw error; // Re-throw validation errors without additional logging
+      }
+
+      FirebaseErrorHandler.logError('sendGlobalChatMessage', error);
+      throw new Error(`Failed to send global chat message: ${error.message}`);
+    }
+  }
+
+  async getGlobalChatMessages(limitCount: number = 50): Promise<GlobalChatMessage[]> {
+    try {
+      // Public read access - no authentication required for viewing messages
+      if (!db) {
+        console.warn('Firestore not initialized');
+        return [];
+      }
+
+      const messagesRef = collection(db, 'globalChat');
+      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(limitCount));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as GlobalChatMessage[];
+    } catch (error: any) {
+      // For permission errors, return empty array silently (expected for guest users)
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        // Don't log permission errors as they are expected for guest users
+        return [];
+      }
+
+      // Only log non-permission errors
+      FirebaseErrorHandler.logError('getGlobalChatMessages', error);
+      console.error('Failed to get global chat messages:', error.message);
+      return [];
     }
   }
 
@@ -258,6 +412,7 @@ class FirestoreService {
   // Streaming methods
   async createStream(streamId: string, streamData: any): Promise<void> {
     try {
+      this.requireAuth(); // Require authentication for creating streams
       const streamsRef = collection(db, 'streams');
       await setDoc(doc(streamsRef, streamId), {
         ...streamData,
@@ -272,10 +427,16 @@ class FirestoreService {
 
   async getActiveStreams(): Promise<any[]> {
     try {
+      // Public read access - no authentication required for viewing streams
+      if (!db) {
+        console.warn('Firestore not initialized');
+        return [];
+      }
+
       const streamsRef = collection(db, 'streams');
       const q = query(
         streamsRef,
-        where('isActive', '==', true),
+        where('isLive', '==', true),
         orderBy('startedAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
@@ -285,6 +446,14 @@ class FirestoreService {
         ...doc.data()
       }));
     } catch (error: any) {
+      FirebaseErrorHandler.logError('getActiveStreams', error);
+
+      // For permission errors, return empty array silently (expected for guests)
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        return [];
+      }
+
+      // For other errors, return empty array but log more prominently
       console.error('Failed to get active streams:', error.message);
       return [];
     }
@@ -339,20 +508,48 @@ class FirestoreService {
   }
 
   onActiveStreamsUpdate(callback: (streams: any[]) => void): () => void {
-    const streamsRef = collection(db, 'streams');
-    const q = query(
-      streamsRef,
-      where('isActive', '==', true),
-      orderBy('startedAt', 'desc')
-    );
+    try {
+      // Public read access - no authentication required for viewing streams
+      if (!db) {
+        console.warn('Firestore not initialized');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
+      }
 
-    return onSnapshot(q, (querySnapshot) => {
-      const streams = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      callback(streams);
-    });
+      const streamsRef = collection(db, 'streams');
+      const q = query(
+        streamsRef,
+        where('isLive', '==', true),
+        orderBy('startedAt', 'desc')
+      );
+
+      return onSnapshot(q,
+        (querySnapshot) => {
+          const streams = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          callback(streams);
+        },
+        (error) => {
+          FirebaseErrorHandler.logError('onActiveStreamsUpdate', error);
+
+          // For permission errors, silently return empty array (expected for guests)
+          if (FirebaseErrorHandler.isPermissionError(error)) {
+            callback([]);
+            return;
+          }
+
+          // For other errors, log and return empty array
+          console.error('Error in active streams listener:', error);
+          callback([]);
+        }
+      );
+    } catch (error: any) {
+      console.error('Failed to set up active streams listener:', error.message);
+      callback([]);
+      return () => {}; // Return empty unsubscribe function
+    }
   }
 
   async markMessagesAsRead(conversationId: string, userId: string): Promise<void> {
@@ -411,16 +608,36 @@ class FirestoreService {
   }
 
   onLiveStreams(callback: (streams: LiveStream[]) => void): () => void {
-    const streamsRef = collection(db, 'streams');
-    const q = query(streamsRef, where('isLive', '==', true), orderBy('startedAt', 'desc'));
+    try {
+      // Public read access - no authentication required for viewing streams
+      if (!db) {
+        console.warn('Firestore not initialized');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
+      }
 
-    return onSnapshot(q, (querySnapshot) => {
-      const streams = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as LiveStream[];
-      callback(streams);
-    });
+      const streamsRef = collection(db, 'streams');
+      const q = query(streamsRef, where('isLive', '==', true), orderBy('startedAt', 'desc'));
+
+      return onSnapshot(q,
+        (querySnapshot) => {
+          const streams = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as LiveStream[];
+          callback(streams);
+        },
+        (error) => {
+          console.error('Error in live streams listener:', error);
+          // Call callback with empty array on error to prevent app crashes
+          callback([]);
+        }
+      );
+    } catch (error: any) {
+      console.error('Failed to set up live streams listener:', error.message);
+      callback([]);
+      return () => {}; // Return empty unsubscribe function
+    }
   }
 
   // Real-time listeners for direct messages
@@ -435,6 +652,48 @@ class FirestoreService {
       })) as DirectMessage[];
       callback(messages);
     });
+  }
+
+  // Global Chat real-time listener
+  onGlobalChatMessages(callback: (messages: GlobalChatMessage[]) => void): () => void {
+    try {
+      // Public read access - no authentication required for viewing messages
+      if (!db) {
+        console.warn('Firestore not initialized');
+        callback([]);
+        return () => {}; // Return empty unsubscribe function
+      }
+
+      const messagesRef = collection(db, 'globalChat');
+      const q = query(messagesRef, orderBy('timestamp', 'desc'), limit(50));
+
+      return onSnapshot(q,
+        (querySnapshot) => {
+          const messages = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as GlobalChatMessage[];
+          callback(messages);
+        },
+        (error) => {
+          // For permission errors, silently return empty array (expected for guest users)
+          if (FirebaseErrorHandler.isPermissionError(error)) {
+            // Don't log permission errors as they are expected for guest users
+            callback([]);
+            return;
+          }
+
+          // Only log non-permission errors
+          FirebaseErrorHandler.logError('onGlobalChatMessages', error);
+          console.error('Error in global chat messages listener:', error);
+          callback([]);
+        }
+      );
+    } catch (error: any) {
+      console.error('Failed to set up global chat messages listener:', error.message);
+      callback([]);
+      return () => {}; // Return empty unsubscribe function
+    }
   }
 
   onUserConversations(userId: string, callback: (conversations: Conversation[]) => void): () => void {

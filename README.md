@@ -4,7 +4,7 @@ A modern social streaming app with interactive chat features and comprehensive l
 
 ## Features
 
-### Live Streaming
+### Live Streiaming
 - Host and join live audio rooms with multiple participants
 - View participant information and speaking status
 - Interactive progress bar showing stream ranking
