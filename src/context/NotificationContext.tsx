@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { useAuth } from './AuthContext';
+import notificationService, { NotificationCounts as FirebaseNotificationCounts, NotificationData } from '../services/notificationService';
 
 // Define interfaces for notification counts
-interface NotificationCounts {
+export interface NotificationCounts {
   announcements: number;
   friendRequests: number;
   profileViews: number;
@@ -9,139 +11,226 @@ interface NotificationCounts {
   total: number;
 }
 
-// Define actions for our reducer
-type NotificationAction = 
-  | { type: 'UPDATE_ANNOUNCEMENTS'; count: number }
-  | { type: 'UPDATE_FRIEND_REQUESTS'; count: number }
-  | { type: 'UPDATE_PROFILE_VIEWS'; count: number }
-  | { type: 'UPDATE_ALL_NOTIFICATIONS'; count: number }
-  | { type: 'CLEAR_TYPE'; notificationType: keyof Omit<NotificationCounts, 'total'> }
-  | { type: 'MARK_ALL_READ' };
-
 interface NotificationContextType {
   counts: NotificationCounts;
+  notifications: NotificationData[];
+  isLoading: boolean;
   updateAnnouncementCount: (count: number) => void;
   updateFriendRequestCount: (count: number) => void;
   updateProfileViewCount: (count: number) => void;
   updateAllNotificationsCount: (count: number) => void;
   clearNotificationsByType: (type: keyof Omit<NotificationCounts, 'total'>) => void;
-  markAllAsRead: () => void;
+  markAllAsRead: () => Promise<void>;
+  refreshNotifications: () => Promise<void>;
+  markNotificationAsRead: (notificationId: string) => Promise<void>;
 }
 
-// Initial state
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+// Initial state - will be replaced with Firebase data
 const initialState: NotificationCounts = {
-  announcements: 7,
-  friendRequests: 15,
-  profileViews: 31,
-  allNotifications: 3,
-  total: 56
+  announcements: 0,
+  friendRequests: 0,
+  profileViews: 0,
+  allNotifications: 0,
+  total: 0
 };
 
 // Helper function to calculate total
 const calculateTotal = (counts: Omit<NotificationCounts, 'total'>): number => {
-  return counts.announcements + 
-         counts.friendRequests + 
-         counts.profileViews + 
+  return counts.announcements +
+         counts.friendRequests +
+         counts.profileViews +
          counts.allNotifications;
 };
 
-// Create the reducer
-const notificationReducer = (state: NotificationCounts, action: NotificationAction): NotificationCounts => {
-  let newState: NotificationCounts;
-  
-  switch (action.type) {
-    case 'UPDATE_ANNOUNCEMENTS':
-      newState = { ...state, announcements: action.count };
-      return { ...newState, total: calculateTotal(newState) };
-      
-    case 'UPDATE_FRIEND_REQUESTS':
-      newState = { ...state, friendRequests: action.count };
-      return { ...newState, total: calculateTotal(newState) };
-      
-    case 'UPDATE_PROFILE_VIEWS':
-      newState = { ...state, profileViews: action.count };
-      return { ...newState, total: calculateTotal(newState) };
-      
-    case 'UPDATE_ALL_NOTIFICATIONS':
-      newState = { ...state, allNotifications: action.count };
-      return { ...newState, total: calculateTotal(newState) };
-      
-    case 'CLEAR_TYPE':
-      newState = { ...state, [action.notificationType]: 0 };
-      return { ...newState, total: calculateTotal(newState) };
-      
-    case 'MARK_ALL_READ':
-      return {
-        announcements: 0,
-        friendRequests: 0,
-        profileViews: 0,
-        allNotifications: 0,
-        total: 0
-      };
-      
-    default:
-      return state;
-  }
+// Convert Firebase notification counts to our format
+const convertFirebaseCountsToLocal = (firebaseCounts: FirebaseNotificationCounts): NotificationCounts => {
+  return {
+    announcements: firebaseCounts.announcements,
+    friendRequests: firebaseCounts.friendRequests,
+    profileViews: firebaseCounts.profileViews,
+    allNotifications: firebaseCounts.activities, // Map activities to allNotifications
+    total: firebaseCounts.total
+  };
 };
+export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isGuest } = useAuth();
+  const [counts, setCounts] = useState<NotificationCounts>(initialState);
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-// Create the context
-const NotificationContext = createContext<NotificationContextType>({
-  counts: initialState,
-  updateAnnouncementCount: () => {},
-  updateFriendRequestCount: () => {},
-  updateProfileViewCount: () => {},
-  updateAllNotificationsCount: () => {},
-  clearNotificationsByType: () => {},
-  markAllAsRead: () => {}
-});
+  // Use ref to track current Firebase counts to avoid stale closure issues
+  const firebaseCountsRef = useRef<NotificationCounts | null>(null);
 
-// Create the provider component
-export const NotificationProvider: React.FC<{children: ReactNode}> = ({ children }) => {
-  const [counts, dispatch] = useReducer(notificationReducer, initialState);
+  // Load notifications when user changes
+  useEffect(() => {
+    if (!user || isGuest) {
+      setCounts(initialState);
+      setNotifications([]);
+      firebaseCountsRef.current = null; // Clear ref when user changes
+      return;
+    }
 
-  // Action creators
+    let unsubscribe: (() => void) | undefined;
+
+    const loadNotifications = async () => {
+      setIsLoading(true);
+      try {
+        // Get initial notification counts
+        const firebaseCounts = await notificationService.getNotificationCounts(user.uid);
+        const localCounts = convertFirebaseCountsToLocal(firebaseCounts);
+        firebaseCountsRef.current = localCounts; // Keep ref in sync
+        setCounts(localCounts);
+
+        // Set up real-time listener for notifications
+        unsubscribe = notificationService.onNotifications(user.uid, (newNotifications) => {
+          setNotifications(newNotifications);
+
+          // Apply incremental changes based on fresh Firebase counts or previous state
+          setCounts(prev => {
+            // Calculate counts from current notifications (only unread)
+            const currentCounts = calculateCountsFromNotifications(newNotifications);
+
+            // Update the ref with the new counts
+            firebaseCountsRef.current = currentCounts;
+
+            return currentCounts;
+          });
+        });
+      } catch (error) {
+        console.error('Failed to load notifications:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadNotifications();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user, isGuest]);
+
+  // Calculate counts from notification array - only count unread notifications
+  const calculateCountsFromNotifications = (notificationList: NotificationData[]): NotificationCounts => {
+    const counts = {
+      announcements: 0,
+      friendRequests: 0,
+      profileViews: 0,
+      allNotifications: 0,
+      total: 0
+    };
+
+    // Filter for unread notifications only
+    const unreadNotifications = notificationList.filter(notification => !notification.read);
+    counts.total = unreadNotifications.length;
+
+    unreadNotifications.forEach(notification => {
+      switch (notification.type) {
+        case 'announcement':
+          counts.announcements++;
+          break;
+        case 'friend_request':
+          counts.friendRequests++;
+          break;
+        case 'profile_view':
+          counts.profileViews++;
+          break;
+        case 'activity':
+          counts.allNotifications++;
+          break;
+      }
+    });
+
+    return counts;
+  };
+
   const updateAnnouncementCount = (count: number) => {
-    dispatch({ type: 'UPDATE_ANNOUNCEMENTS', count });
+    setCounts(prev => ({ ...prev, announcements: count, total: calculateTotal({ ...prev, announcements: count }) }));
   };
 
   const updateFriendRequestCount = (count: number) => {
-    dispatch({ type: 'UPDATE_FRIEND_REQUESTS', count });
+    setCounts(prev => ({ ...prev, friendRequests: count, total: calculateTotal({ ...prev, friendRequests: count }) }));
   };
 
   const updateProfileViewCount = (count: number) => {
-    dispatch({ type: 'UPDATE_PROFILE_VIEWS', count });
+    setCounts(prev => ({ ...prev, profileViews: count, total: calculateTotal({ ...prev, profileViews: count }) }));
   };
 
   const updateAllNotificationsCount = (count: number) => {
-    dispatch({ type: 'UPDATE_ALL_NOTIFICATIONS', count });
+    setCounts(prev => ({ ...prev, allNotifications: count, total: calculateTotal({ ...prev, allNotifications: count }) }));
   };
 
   const clearNotificationsByType = (type: keyof Omit<NotificationCounts, 'total'>) => {
-    dispatch({ type: 'CLEAR_TYPE', notificationType: type });
+    setCounts(prev => ({ ...prev, [type]: 0, total: calculateTotal({ ...prev, [type]: 0 }) }));
   };
 
-  const markAllAsRead = () => {
-    dispatch({ type: 'MARK_ALL_READ' });
+  const markAllAsRead = async () => {
+    if (!user || isGuest) return;
+
+    try {
+      await notificationService.markAllAsRead(user.uid);
+      setCounts(initialState);
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
-  const value = {
-    counts,
-    updateAnnouncementCount,
-    updateFriendRequestCount,
-    updateProfileViewCount,
-    updateAllNotificationsCount,
-    clearNotificationsByType,
-    markAllAsRead
+  const refreshNotifications = async () => {
+    if (!user || isGuest) return;
+
+    setIsLoading(true);
+    try {
+      const firebaseCounts = await notificationService.getNotificationCounts(user.uid);
+      setCounts(convertFirebaseCountsToLocal(firebaseCounts));
+
+      const newNotifications = await notificationService.getUserNotifications(user.uid);
+      setNotifications(newNotifications);
+    } catch (error) {
+      console.error('Failed to refresh notifications:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      await notificationService.markAsRead(notificationId);
+      // The real-time listener will update the state automatically
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
   return (
-    <NotificationContext.Provider value={value}>
+    <NotificationContext.Provider value={{
+      counts,
+      notifications,
+      isLoading,
+      updateAnnouncementCount,
+      updateFriendRequestCount,
+      updateProfileViewCount,
+      updateAllNotificationsCount,
+      clearNotificationsByType,
+      markAllAsRead,
+      refreshNotifications,
+      markNotificationAsRead
+    }}>
       {children}
     </NotificationContext.Provider>
   );
 };
 
 // Custom hook to use the notification context
-export const useNotifications = () => useContext(NotificationContext);
+export const useNotifications = (): NotificationContextType => {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error('useNotifications must be used within a NotificationProvider');
+  }
+  return context;
+};
 
-export default NotificationContext; 
+export default NotificationContext;

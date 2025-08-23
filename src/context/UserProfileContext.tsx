@@ -1,15 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-
-// Type for profile viewer data
-interface ProfileViewer {
-  id: string;
-  name: string;
-  username: string;
-  profileImage: string;
-  viewCount: number;
-  lastViewed: Date;
-}
+import profileAnalyticsService, { ProfileViewer, ProfileAnalytics } from '../services/profileAnalyticsService';
 
 interface UserProfileContextType {
   profileImage: string;
@@ -30,30 +21,13 @@ interface UserProfileContextType {
   setHasGemPlus: (hasGemPlus: boolean) => void;
   displayName: string;
   username: string;
+  profileAnalytics: ProfileAnalytics | null;
+  isLoadingAnalytics: boolean;
+  refreshAnalytics: () => Promise<void>;
+  recordProfileView: (viewerData: any) => Promise<void>;
 }
 
 const initialProfileImage = 'https://randomuser.me/api/portraits/women/33.jpg';
-
-// Mock data for recent viewers
-const generateMockViewers = (): ProfileViewer[] => {
-  return Array.from({ length: 20 }, (_, i) => {
-    const gender = Math.random() > 0.5 ? 'women' : 'men';
-    const id = Math.floor(Math.random() * 99) + 1;
-    const viewCount = Math.floor(Math.random() * 50) + 1;
-    const daysAgo = Math.floor(Math.random() * 14);
-    const names = ['Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Jamie', 'Quinn', 'Avery', 'Dakota'];
-    const name = names[Math.floor(Math.random() * names.length)];
-    
-    return {
-      id: `user-${i}`,
-      name: `${name} ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`,
-      username: `@${name.toLowerCase()}${Math.floor(Math.random() * 999)}`,
-      profileImage: `https://randomuser.me/api/portraits/${gender}/${id}.jpg`,
-      viewCount,
-      lastViewed: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
-    };
-  });
-};
 
 const UserProfileContext = createContext<UserProfileContextType>({
   profileImage: initialProfileImage,
@@ -94,16 +68,19 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
   const [profileImage, setProfileImage] = useState(initialProfileImage);
   const [userStatus, setUserStatus] = useState('online');
   const [statusColor, setStatusColor] = useState('#7ADA72');
-  const [totalViews, setTotalViews] = useState(3456);
-  const [dailyViews, setDailyViews] = useState(135);
+  const [totalViews, setTotalViews] = useState(0);
+  const [dailyViews, setDailyViews] = useState(0);
   const [hasGemPlus, setHasGemPlus] = useState(false);
-  const [allViewers, setAllViewers] = useState<ProfileViewer[]>([]);
-  
+  const [recentViewers, setRecentViewers] = useState<ProfileViewer[]>([]);
+  const [topViewers, setTopViewers] = useState<ProfileViewer[]>([]);
+  const [profileAnalytics, setProfileAnalytics] = useState<ProfileAnalytics | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+
   // Determine current profile data based on guest status
   const currentProfileImage = isGuest ? guestProfileImage : profileImage;
   const currentDisplayName = isGuest ? guestDisplayName : (userProfile?.displayName || 'User');
   const currentUsername = isGuest ? guestUsername : (userProfile?.username || '@user');
-  
+
   // Guest-safe setProfileImage function
   const setProfileImageSafe = (image: string) => {
     if (!isGuest) {
@@ -113,21 +90,73 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
       console.warn('Guest users cannot change their profile picture');
     }
   };
-  
-  // Generate mock viewers data when the component mounts
+
+  // Load profile analytics from Firebase
+  const loadProfileAnalytics = async () => {
+    if (!userProfile?.uid || isGuest) return;
+
+    setIsLoadingAnalytics(true);
+    try {
+      const analytics = await profileAnalyticsService.getProfileAnalytics(userProfile.uid);
+      if (analytics) {
+        setProfileAnalytics(analytics);
+        setTotalViews(analytics.totalViews);
+        setDailyViews(analytics.dailyViews);
+      }
+
+      const viewers = await profileAnalyticsService.getProfileViewers(userProfile.uid);
+      setRecentViewers(viewers.slice(0, 20));
+      setTopViewers(viewers.sort((a, b) => b.viewCount - a.viewCount).slice(0, 10));
+    } catch (error) {
+      console.error('Failed to load profile analytics:', error);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  // Update viewers from real-time view data
+  const updateViewersFromViews = async (views: any[]) => {
+    if (!userProfile?.uid || isGuest) return;
+
+    try {
+      const viewers = await profileAnalyticsService.getProfileViewers(userProfile.uid);
+      setRecentViewers(viewers.slice(0, 20));
+      setTopViewers(viewers.sort((a, b) => b.viewCount - a.viewCount).slice(0, 10));
+
+      // Update view counts
+      const analytics = await profileAnalyticsService.getProfileAnalytics(userProfile.uid);
+      if (analytics) {
+        setTotalViews(analytics.totalViews);
+        setDailyViews(analytics.dailyViews);
+        setProfileAnalytics(analytics);
+      }
+    } catch (error) {
+      console.error('Failed to update viewers:', error);
+    }
+  };
+
+  // Load analytics when user changes
   useEffect(() => {
-    setAllViewers(generateMockViewers());
-  }, []);
-  
-  // Get recent viewers (sorted by lastViewed date)
-  const recentViewers = [...allViewers].sort((a, b) => 
-    b.lastViewed.getTime() - a.lastViewed.getTime()
-  ).slice(0, 20);
-  
-  // Get top viewers (sorted by viewCount)
-  const topViewers = [...allViewers].sort((a, b) => 
-    b.viewCount - a.viewCount
-  ).slice(0, 10);
+    if (!userProfile || isGuest) {
+      setTotalViews(0);
+      setDailyViews(0);
+      setRecentViewers([]);
+      setTopViewers([]);
+      setProfileAnalytics(null);
+      return;
+    }
+
+    loadProfileAnalytics();
+
+    // Set up real-time listener for profile views
+    const unsubscribe = profileAnalyticsService.onProfileViews(userProfile.uid, updateViewersFromViews);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [userProfile, isGuest]);
 
   // Reset daily views when the component mounts (app starts)
   useEffect(() => {
@@ -141,6 +170,22 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
 
   const resetDailyViews = () => {
     setDailyViews(0);
+  };
+
+  // Refresh analytics data
+  const refreshAnalytics = async () => {
+    await loadProfileAnalytics();
+  };
+
+  // Record a profile view
+  const recordProfileView = async (viewerData: any) => {
+    if (!userProfile?.uid || isGuest) return;
+
+    try {
+      await profileAnalyticsService.recordProfileView(userProfile.uid, viewerData);
+    } catch (error) {
+      console.error('Failed to record profile view:', error);
+    }
   };
 
   return (
@@ -163,8 +208,12 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
       setHasGemPlus,
       displayName: currentDisplayName,
       username: currentUsername,
+      profileAnalytics,
+      isLoadingAnalytics,
+      refreshAnalytics,
+      recordProfileView
     }}>
       {children}
     </UserProfileContext.Provider>
   );
-}; 
+};

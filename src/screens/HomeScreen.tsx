@@ -32,6 +32,11 @@ import { firestoreService, GlobalChatMessage } from '../services/firestoreServic
 import FirebaseErrorHandler from '../utils/firebaseErrorHandler';
 import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
 import DataValidator from '../utils/dataValidation';
+import friendActivityService, { FriendActivity } from '../services/friendActivityService';
+import virtualCurrencyService, { CurrencyBalance } from '../services/virtualCurrencyService';
+import { useMusic } from '../context/MusicContext';
+import { useGaming } from '../context/GamingContext';
+import { useShop } from '../context/ShopContext';
 
 const defaultSpotlightAvatar = 'https://randomuser.me/api/portraits/lego/1.jpg';
 
@@ -48,6 +53,30 @@ const HomeScreen = () => {
   const { friendStreams } = useLiveStreams();
   const { profileImage } = useUserProfile();
   const { counts, updateAllNotificationsCount } = useNotifications();
+
+  // Get music data from context
+  const { friendsActivities: friendsMusicActivities, isLoadingActivity: isLoadingMusic } = useMusic();
+
+  // Get gaming data from context
+  const {
+    isMining,
+    miningStats,
+    slotsStats,
+    goldMinerStats,
+    userGameProfile,
+    isLoadingMining,
+    isLoadingSlots,
+    isLoadingGoldMiner
+  } = useGaming();
+
+  // Get shop data from context
+  const {
+    featuredProducts,
+    activePromotions,
+    userInventory,
+    isLoadingProducts,
+    isLoadingPromotions
+  } = useShop();
   
   // Activity Modal states
   const [activityModalVisible, setActivityModalVisible] = useState(false);
@@ -73,9 +102,19 @@ const HomeScreen = () => {
 
   const [spotlightModalVisible, setSpotlightModalVisible] = useState(false);
   const [spotlightQueuePosition, setSpotlightQueuePosition] = useState<number>(0);
+  // State for Virtual Currency (moved up to be available early)
+  const [currencyBalances, setCurrencyBalances] = useState<CurrencyBalance>({
+    gold: 0,
+    gems: 0,
+    tokens: 0,
+    lastUpdated: new Date()
+  });
+  const [isLoadingCurrency, setIsLoadingCurrency] = useState(false);
+
   // Get user data from Firebase
   const { userProfile } = useAuth();
-  const [goldBalance, setGoldBalance] = useState<number>(userProfile?.gold || 1000);
+  // Gold balance now comes from currencyBalances state (loaded from Firebase)
+  const goldBalance = currencyBalances.gold;
   const [eventEntryCost, setEventEntryCost] = useState(100); // Fixed entry cost of 100 gold
   const [eventEntries, setEventEntries] = useState(0); // Number of entries, starting at 0
   const [eventTimeLeft, setEventTimeLeft] = useState(180); // 3 minutes for demonstration (would be 3 hours in production)
@@ -406,41 +445,55 @@ const HomeScreen = () => {
   };
 
   const renderFriendListeningMusic = () => {
+    // Return real Firebase music activities instead of mock data
+    if (isLoadingMusic || friendsMusicActivities.length === 0) {
+      return null;
+    }
+
+    // Get the most recent music activity
+    const recentMusicActivity = friendsMusicActivities[0];
+    if (!recentMusicActivity) return null;
+
+    const track = recentMusicActivity.track;
     const activityData = {
-      title: 'This Is Imagine Dragons',
-      subtitle: 'Playlist • Spotify',
-      friendName: 'Jamie',
-      friendAvatar: 'https://randomuser.me/api/portraits/women/31.jpg',
-      avatars: [
-        'https://randomuser.me/api/portraits/women/31.jpg',
-      ],
-      streamId: '301', // Add streamId
+      title: track.title,
+      subtitle: `${track.artist} • ${recentMusicActivity.platform}`,
+      friendName: recentMusicActivity.userName,
+      friendAvatar: recentMusicActivity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U',
+      avatars: [recentMusicActivity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U'],
+      streamId: recentMusicActivity.id,
+      musicData: {
+        songTitle: track.title,
+        artist: track.artist,
+        albumArt: track.albumArt,
+        platform: recentMusicActivity.platform
+      }
     };
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.musicStreamContainer}
         onPress={() => handleActivityPress('listening', activityData)}
       >
         {/* Left section with album/playlist art */}
         <View style={styles.musicContentContainer}>
           <View style={styles.albumArtContainer}>
-            <Image 
-              source={{ uri: 'https://i.scdn.co/image/ab67616d0000b2732c8a1a947c85d3ee03bb5567' }} 
+            <Image
+              source={{ uri: track.albumArt || 'https://via.placeholder.com/60/6E69F4/FFFFFF?text=♪' }}
               style={styles.albumArt}
             />
           </View>
           <View style={styles.songInfoContainer}>
-            <Text style={styles.songTitle} numberOfLines={1}>Blinding Lights</Text>
-            <Text style={styles.artistName} numberOfLines={1}>The Weeknd</Text>
+            <Text style={styles.songTitle} numberOfLines={1}>{track.title}</Text>
+            <Text style={styles.artistName} numberOfLines={1}>{track.artist} • {recentMusicActivity.platform}</Text>
           </View>
         </View>
-        
+
         {/* Right section with friend avatar */}
         <View style={styles.musicFriendContainer}>
           <View style={styles.musicAvatarContainer}>
-            <Image 
-              source={{ uri: 'https://randomuser.me/api/portraits/women/35.jpg' }} 
+            <Image
+              source={{ uri: recentMusicActivity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
               style={styles.musicAvatar}
             />
             <View style={styles.musicIndicator}></View>
@@ -450,7 +503,348 @@ const HomeScreen = () => {
     );
   };
 
-  // Additional random widgets
+  // Friend activity widgets based on real Firebase data
+  const renderFriendActivityWidgets = () => {
+    if (isLoadingActivities || friendActivities.length === 0) {
+      return [];
+    }
+
+    const activityWidgets: JSX.Element[] = [];
+
+    // Render different types of activities
+    friendActivities.slice(0, 5).forEach((activity, index) => {
+      switch (activity.activityType) {
+        case 'live_stream':
+          const liveStreamWidget = renderLiveStreamActivityWidget(activity, index);
+          if (liveStreamWidget) activityWidgets.push(liveStreamWidget);
+          break;
+        case 'music_listening':
+          const musicWidget = renderMusicActivityWidget(activity, index);
+          if (musicWidget) activityWidgets.push(musicWidget);
+          break;
+        case 'gaming':
+          const gamingWidget = renderGamingActivityWidget(activity, index);
+          if (gamingWidget) activityWidgets.push(gamingWidget);
+          break;
+        default:
+          const genericWidget = renderGenericActivityWidget(activity, index);
+          if (genericWidget) activityWidgets.push(genericWidget);
+          break;
+      }
+    });
+
+    return activityWidgets;
+  };
+
+  // Render live stream activity widget
+  const renderLiveStreamActivityWidget = (activity: FriendActivity, index: number) => {
+    const streamData = activity.data;
+    if (!streamData) return null;
+
+    return (
+      <TouchableOpacity
+        key={`activity-${activity.id}-${index}`}
+        style={styles.liveStreamContainer}
+        onPress={() => handleActivityPress('watching', {
+          streamId: streamData.streamId,
+          title: streamData.streamTitle || activity.title,
+          hostName: activity.userName,
+          hostAvatar: activity.userAvatar,
+          viewerCount: streamData.viewerCount || 0
+        })}
+      >
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>LIVE</Text>
+          </View>
+        </View>
+
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            {streamData.streamTitle || activity.title}
+          </Text>
+          <Text style={styles.viewersText}>{streamData.viewerCount || 0} Viewers watching</Text>
+        </View>
+
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}></View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Render music activity widget
+  const renderMusicActivityWidget = (activity: FriendActivity, index: number) => {
+    const musicData = activity.data;
+    if (!musicData) return null;
+
+    return (
+      <TouchableOpacity key={`activity-${activity.id}-${index}`} style={styles.musicStreamContainer}>
+        <View style={styles.musicContentContainer}>
+          <View style={styles.albumArtContainer}>
+            <Image
+              source={{ uri: musicData.albumArt || 'https://via.placeholder.com/60/6E69F4/FFFFFF?text=♪' }}
+              style={styles.albumArt}
+            />
+          </View>
+          <View style={styles.songInfoContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>{musicData.songTitle}</Text>
+            <Text style={styles.artistName} numberOfLines={1}>{musicData.artist}</Text>
+          </View>
+        </View>
+
+        <View style={styles.musicFriendContainer}>
+          <View style={styles.musicAvatarContainer}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.musicAvatar}
+            />
+            <View style={styles.musicIndicator}></View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Render gaming activity widget
+  const renderGamingActivityWidget = (activity: FriendActivity, index: number) => {
+    const gamingData = activity.data;
+    if (!gamingData) return null;
+
+    return (
+      <TouchableOpacity key={`activity-${activity.id}-${index}`} style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image
+              source={{ uri: gamingData.gameIcon || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=🎮' }}
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={styles.avatarWrapperRed}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>🎮</Text>
+          </View>
+        </View>
+
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            {activity.userName} playing {gamingData.gameName}
+          </Text>
+          <Text style={styles.viewersText}>
+            {gamingData.level ? `Level ${gamingData.level}` : 'Gaming'}
+          </Text>
+        </View>
+
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}></View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Render generic activity widget
+  const renderGenericActivityWidget = (activity: FriendActivity, index: number) => {
+    return (
+      <TouchableOpacity key={`activity-${activity.id}-${index}`} style={styles.liveStreamContainer}>
+        <View style={styles.avatarGrid}>
+          <View style={styles.avatarWrapperRed}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.gridAvatar}
+            />
+          </View>
+          <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+            <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>•</Text>
+          </View>
+        </View>
+
+        <View style={styles.streamInfoContainer}>
+          <Text style={styles.streamTitle} numberOfLines={2}>
+            {activity.title}
+          </Text>
+          <Text style={styles.viewersText}>{activity.description}</Text>
+        </View>
+
+        <View style={styles.broadcasterContainerWrapper}>
+          <View style={styles.broadcasterContainer}>
+            <Image
+              source={{ uri: activity.userAvatar || 'https://via.placeholder.com/40/6E69F4/FFFFFF?text=U' }}
+              style={styles.broadcasterAvatar}
+            />
+            <View style={styles.liveIndicatorRed}></View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Gaming status widget showing user's current gaming activities
+  const renderGamingStatusWidget = () => {
+    if (isLoadingMining && isLoadingSlots && isLoadingGoldMiner) {
+      return null;
+    }
+
+    // Show mining status if user is currently mining
+    if (isMining && miningStats) {
+      return (
+        <TouchableOpacity style={styles.liveStreamContainer}>
+          <View style={styles.avatarGrid}>
+            <View style={styles.avatarWrapperRed}>
+              <Text style={styles.gridAvatar}>⛏️</Text>
+            </View>
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>MINING</Text>
+            </View>
+          </View>
+
+          <View style={styles.streamInfoContainer}>
+            <Text style={styles.streamTitle} numberOfLines={2}>
+              You are mining
+            </Text>
+            <Text style={styles.viewersText}>Level {miningStats.miningLevel} • {miningStats.totalResourcesCollected.gold} gold collected</Text>
+          </View>
+
+          <View style={styles.broadcasterContainerWrapper}>
+            <View style={styles.broadcasterContainer}>
+              <Text style={styles.broadcasterAvatar}>⛏️</Text>
+              <View style={styles.liveIndicatorRed}></View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show recent gaming stats if available
+    if (userGameProfile && userGameProfile.totalGamesPlayed > 0) {
+      return (
+        <TouchableOpacity style={styles.liveStreamContainer}>
+          <View style={styles.avatarGrid}>
+            <View style={styles.avatarWrapperRed}>
+              <Text style={styles.gridAvatar}>🎮</Text>
+            </View>
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>GAMER</Text>
+            </View>
+          </View>
+
+          <View style={styles.streamInfoContainer}>
+            <Text style={styles.streamTitle} numberOfLines={2}>
+              Gaming Profile
+            </Text>
+            <Text style={styles.viewersText}>Level {userGameProfile.level} • {userGameProfile.totalGamesPlayed} games played</Text>
+          </View>
+
+          <View style={styles.broadcasterContainerWrapper}>
+            <View style={styles.broadcasterContainer}>
+              <Text style={styles.broadcasterAvatar}>🎮</Text>
+              <View style={styles.liveIndicatorRed}></View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
+  };
+
+  // Shop widget showing featured products or promotions
+  const renderShopWidget = () => {
+    if (isLoadingProducts && isLoadingPromotions) {
+      return null;
+    }
+
+    // Show active promotions if available
+    if (activePromotions && activePromotions.length > 0) {
+      const promotion = activePromotions[0];
+      return (
+        <TouchableOpacity style={styles.liveStreamContainer}>
+          <View style={styles.avatarGrid}>
+            <View style={styles.avatarWrapperRed}>
+              <Text style={styles.gridAvatar}>🛍️</Text>
+            </View>
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>SALE</Text>
+            </View>
+          </View>
+
+          <View style={styles.streamInfoContainer}>
+            <Text style={styles.streamTitle} numberOfLines={2}>
+              {promotion.name}
+            </Text>
+            <Text style={styles.viewersText}>{promotion.discountPercentage}% OFF • Limited Time</Text>
+          </View>
+
+          <View style={styles.broadcasterContainerWrapper}>
+            <View style={styles.broadcasterContainer}>
+              <Text style={styles.broadcasterAvatar}>🛍️</Text>
+              <View style={styles.liveIndicatorRed}></View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // Show featured products if available
+    if (featuredProducts && featuredProducts.length > 0) {
+      const product = featuredProducts[0];
+      return (
+        <TouchableOpacity style={styles.liveStreamContainer}>
+          <View style={styles.avatarGrid}>
+            <View style={styles.avatarWrapperRed}>
+              <Text style={styles.gridAvatar}>⭐</Text>
+            </View>
+            <View style={[styles.plusMoreContainer, styles.plusMoreContainerRed]}>
+              <Text style={[styles.plusMoreText, styles.plusMoreTextRed]}>{product.rarity.toUpperCase()}</Text>
+            </View>
+          </View>
+
+          <View style={styles.streamInfoContainer}>
+            <Text style={styles.streamTitle} numberOfLines={2}>
+              {product.name}
+            </Text>
+            <Text style={styles.viewersText}>
+              {product.price.gold ? `${product.price.gold} Gold` : ''}
+              {product.price.gems ? ` • ${product.price.gems} Gems` : ''}
+            </Text>
+          </View>
+
+          <View style={styles.broadcasterContainerWrapper}>
+            <View style={styles.broadcasterContainer}>
+              <Text style={styles.broadcasterAvatar}>⭐</Text>
+              <View style={styles.liveIndicatorRed}></View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
+  };
+
+  // Legacy function for backward compatibility - now returns real data
   const renderRandomFriendWidgets = () => {
     // Create an array to hold random widgets
     const randomWidgets = [];
@@ -881,7 +1275,8 @@ const HomeScreen = () => {
       </TouchableOpacity>
     );
     
-    return randomWidgets;
+    // Return real friend activities instead of mock data
+    return renderFriendActivityWidgets();
   };
 
   // Add new state for event expansion
@@ -923,22 +1318,47 @@ const HomeScreen = () => {
   /* First declaration of renderMinimalEventWidget removed */
   const openSpotlightModal = () => setSpotlightModalVisible(true);
   const closeSpotlightModal = () => setSpotlightModalVisible(false);
-  const purchaseSpotlight = (minutes: number, cost: number) => {
+  const purchaseSpotlight = async (minutes: number, cost: number) => {
     if (goldBalance < cost) {
       // Handle insufficient balance
+      Alert.alert('Insufficient Balance', `You need ${cost} gold to purchase ${minutes} minutes of spotlight.`);
       return;
     }
-    
-    // Deduct cost and set timer
-    setGoldBalance(prev => prev - cost);
-    setYourSpotlightTimeLeft(minutes * 60);
-    setShowYourPill(true);
-    setSpotlightQueuePosition(1); // placeholder for queue logic
-    
-    // Simulate other viewers seeing your spotlight
-    setViewersCount(Math.floor(Math.random() * 50) + 20);
-    
-    closeSpotlightModal();
+
+    if (!user || isGuest) {
+      handleGuestRestriction('spotlight purchase');
+      return;
+    }
+
+    try {
+      // Deduct cost using virtual currency service
+      await virtualCurrencyService.spendCurrency(
+        user.uid,
+        'gold',
+        cost,
+        `Spotlight purchase: ${minutes} minutes`,
+        {
+          type: 'spotlight_purchase',
+          duration: minutes,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      // Set timer and show spotlight
+      setYourSpotlightTimeLeft(minutes * 60);
+      setShowYourPill(true);
+      setSpotlightQueuePosition(1); // placeholder for queue logic
+
+      // Simulate other viewers seeing your spotlight
+      setViewersCount(Math.floor(Math.random() * 50) + 20);
+
+      closeSpotlightModal();
+
+      Alert.alert('Success!', `You've purchased ${minutes} minutes of spotlight time!`);
+    } catch (error: any) {
+      console.error('Failed to purchase spotlight:', error);
+      Alert.alert('Purchase Failed', error.message || 'Failed to purchase spotlight. Please try again.');
+    }
   };
 
   // Add a isActive state/prop check for determining widget display mode
@@ -1538,18 +1958,60 @@ const HomeScreen = () => {
     );
   };
 
-  // Additional state for gem balance
-  const [gemBalance, setGemBalance] = useState<number>(userProfile?.gems || 50);
+  // Gem balance now comes from currencyBalances state (loaded from Firebase)
+  const gemBalance = currencyBalances.gems;
 
   // Handle gem to gold conversion
-  const handleConvertGemToGold = (gems: number) => {
+  const handleConvertGemToGold = async (gems: number) => {
+    if (!user || isGuest) {
+      handleGuestRestriction('gem conversion');
+      return;
+    }
+
+    if (currencyBalances.gems < gems) {
+      Alert.alert('Insufficient Gems', `You need ${gems} gems to make this conversion.`);
+      return;
+    }
+
     const conversionRate = 5; // 1 gem = 5 gold
     const goldToAdd = gems * conversionRate;
-    
-    setGoldBalance(prev => prev + goldToAdd);
-    setGemBalance(prev => prev - gems);
-    
-    // Add any additional logic like API calls here
+
+    try {
+      // Spend gems
+      await virtualCurrencyService.spendCurrency(
+        user.uid,
+        'gems',
+        gems,
+        `Gem to gold conversion: ${gems} gems → ${goldToAdd} gold`,
+        {
+          type: 'gem_conversion',
+          gemsSpent: gems,
+          goldReceived: goldToAdd,
+          conversionRate,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      // Add gold
+      await virtualCurrencyService.addCurrency(
+        user.uid,
+        'gold',
+        goldToAdd,
+        `Gem to gold conversion: ${gems} gems → ${goldToAdd} gold`,
+        {
+          type: 'gem_conversion',
+          gemsSpent: gems,
+          goldReceived: goldToAdd,
+          conversionRate,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      Alert.alert('Conversion Successful!', `Converted ${gems} gems to ${goldToAdd} gold!`);
+    } catch (error: any) {
+      console.error('Failed to convert gems to gold:', error);
+      Alert.alert('Conversion Failed', error.message || 'Failed to convert gems. Please try again.');
+    }
   };
 
   // Additional state for gold currency popup
@@ -1612,19 +2074,26 @@ const HomeScreen = () => {
   };
   
   // Convert gems to gold with the current slider value
-  const convertGemToGold = () => {
+  const convertGemToGold = async () => {
+    if (!user || isGuest) {
+      handleGuestRestriction('gem conversion');
+      return;
+    }
+
     // Check if the user has enough gems
     if (sliderValue <= gemBalance) {
-      // Conversion logic here
-      const newGemBalance = gemBalance - sliderValue;
-      const newGoldBalance = goldBalance + goldToReceive;
-      
-      // Update balances
-      setGemBalance(newGemBalance);
-      setGoldBalance(newGoldBalance);
-      
-      // Hide the popup
-      hideGoldConversionPopup();
+      try {
+        // Use the existing handleConvertGemToGold function
+        await handleConvertGemToGold(sliderValue);
+
+        // Hide the popup
+        hideGoldConversionPopup();
+      } catch (error: any) {
+        console.error('Failed to convert gems:', error);
+        Alert.alert('Conversion Failed', 'Failed to convert gems. Please try again.');
+      }
+    } else {
+      Alert.alert('Insufficient Gems', `You need ${sliderValue} gems to make this conversion.`);
     }
   };
   
@@ -1767,45 +2236,75 @@ const HomeScreen = () => {
   };
 
   // Update the handleEventEntry function
-  const handleEventEntry = () => {
+  const handleEventEntry = async () => {
     if (hasWonEvent) {
       // If user has won, handle claiming the prize
-      claimEventPrize();
+      await claimEventPrize();
     } else if (!hasEnteredEvent) {
       // Make sure the event isn't expired (timer at 0)
       if (eventTimeLeft <= 0) {
+        Alert.alert('Event Expired', 'This event has ended. Please wait for the next one.');
         return;
       }
-      
+
+      if (!user || isGuest) {
+        handleGuestRestriction('event entry');
+        return;
+      }
+
       // If user hasn't entered current cycle
       if (goldBalance >= eventEntryCost) {
-        // Deduct entry cost from balance
-        setGoldBalance(prev => prev - eventEntryCost);
-        setHasEnteredEvent(true);
-        
-        // Increment entries
-        const newEntryCount = eventEntries + 1;
-        setEventEntries(newEntryCount);
-        
-        // Record the entry count for this event cycle
-        setEventEntriesRecord(prev => ({
-          ...prev,
-          [eventCycleCount]: newEntryCount
-        }));
+        try {
+          // Deduct entry cost using virtual currency service
+          await virtualCurrencyService.spendCurrency(
+            user.uid,
+            'gold',
+            eventEntryCost,
+            `Event entry fee - Cycle ${eventCycleCount}`,
+            {
+              type: 'event_entry',
+              eventCycle: eventCycleCount,
+              entryCost: eventEntryCost,
+              timestamp: new Date().toISOString()
+            }
+          );
+
+          setHasEnteredEvent(true);
+
+          // Increment entries
+          const newEntryCount = eventEntries + 1;
+          setEventEntries(newEntryCount);
+
+          // Record the entry count for this event cycle
+          setEventEntriesRecord(prev => ({
+            ...prev,
+            [eventCycleCount]: newEntryCount
+          }));
+
+          Alert.alert('Entry Successful!', `You've entered the event for ${eventEntryCost} gold!`);
+        } catch (error: any) {
+          console.error('Failed to enter event:', error);
+          Alert.alert('Entry Failed', error.message || 'Failed to enter event. Please try again.');
+        }
       } else {
-        // Not enough gold
+        Alert.alert('Insufficient Gold', `You need ${eventEntryCost} gold to enter this event.`);
       }
     }
   };
 
   // Update the claimEventPrize function
-  const claimEventPrize = () => {
+  const claimEventPrize = async () => {
+    if (!user || isGuest) {
+      handleGuestRestriction('prize claiming');
+      return;
+    }
+
     // Get the stored number of entries from when the user won
     const entriesWhenWon = eventEntriesRecord[wonEventCycle] || 0;
-    
+
     // Calculate the prize amount
     let prizeAmount = 0;
-    
+
     if (entriesWhenWon === 1) {
       // Full refund case
       prizeAmount = eventEntryCost;
@@ -1813,16 +2312,34 @@ const HomeScreen = () => {
       // Normal prize pool (70% of all entries)
       prizeAmount = Math.floor(entriesWhenWon * eventEntryCost * 0.7);
     }
-    
-    // Add the prize to user's gold balance
-    setGoldBalance(prevGold => prevGold + prizeAmount);
-    
-    // Reset won status to allow re-entry for next event
-    setWonEventCycle(-1);
-    setHasWonEvent(false);
-    setHasEnteredEvent(false);
-    
-    showNotification(`Claimed ${prizeAmount} gold!`);
+
+    try {
+      // Add the prize to user's gold balance using virtual currency service
+      await virtualCurrencyService.addCurrency(
+        user.uid,
+        'gold',
+        prizeAmount,
+        `Event prize - Cycle ${wonEventCycle}`,
+        {
+          type: 'event_prize',
+          eventCycle: wonEventCycle,
+          entriesWhenWon,
+          prizeAmount,
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      // Reset won status to allow re-entry for next event
+      setWonEventCycle(-1);
+      setHasWonEvent(false);
+      setHasEnteredEvent(false);
+
+      showNotification(`Claimed ${prizeAmount} gold!`);
+      Alert.alert('Prize Claimed!', `You've received ${prizeAmount} gold!`);
+    } catch (error: any) {
+      console.error('Failed to claim event prize:', error);
+      Alert.alert('Claim Failed', error.message || 'Failed to claim prize. Please try again.');
+    }
   };
 
   // Function to add a notification when user wins an event
@@ -1859,9 +2376,92 @@ const HomeScreen = () => {
   const [isLoadingGlobalChat, setIsLoadingGlobalChat] = useState(false);
   const [globalChatError, setGlobalChatError] = useState<string | null>(null);
 
+  // State for Friend Activities
+  const [friendActivities, setFriendActivities] = useState<FriendActivity[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+  // Virtual currency state moved up to be available earlier
+
   // Get auth and guest restrictions
   const { user, isGuest } = useAuth();
   const { canSendMessages, handleGuestRestriction } = useGuestRestrictions();
+
+  // Load virtual currency balances
+  useEffect(() => {
+    if (!user || isGuest) {
+      setCurrencyBalances({
+        gold: 0,
+        gems: 0,
+        tokens: 0,
+        lastUpdated: new Date()
+      });
+      return;
+    }
+
+    let unsubscribeCurrency: (() => void) | undefined;
+
+    const loadCurrencyBalances = async () => {
+      setIsLoadingCurrency(true);
+      try {
+        // Get initial currency balances
+        const balances = await virtualCurrencyService.getCurrencyBalances(user.uid);
+        setCurrencyBalances(balances);
+
+        // Set up real-time listener for currency changes
+        unsubscribeCurrency = virtualCurrencyService.onCurrencyBalances(user.uid, (newBalances) => {
+          setCurrencyBalances(newBalances);
+        });
+      } catch (error) {
+        console.error('Failed to load currency balances:', error);
+      } finally {
+        setIsLoadingCurrency(false);
+      }
+    };
+
+    loadCurrencyBalances();
+
+    return () => {
+      if (unsubscribeCurrency) {
+        unsubscribeCurrency();
+      }
+    };
+  }, [user, isGuest]);
+
+  // Load friend activities
+  useEffect(() => {
+    if (!user || isGuest) {
+      setFriendActivities([]);
+      return;
+    }
+
+    let unsubscribeActivities: (() => void) | undefined;
+
+    const loadFriendActivities = async () => {
+      setIsLoadingActivities(true);
+      try {
+        // Get initial friend activities
+        const activities = await friendActivityService.getFriendActivities(user.uid);
+        setFriendActivities(activities);
+
+        // Set up real-time listener for friend activities
+        unsubscribeActivities = friendActivityService.onFriendActivities(user.uid, (newActivities) => {
+          setFriendActivities(newActivities);
+        });
+      } catch (error) {
+        console.error('Failed to load friend activities:', error);
+      } finally {
+        setIsLoadingActivities(false);
+      }
+    };
+
+    loadFriendActivities();
+
+    return () => {
+      if (unsubscribeActivities) {
+        unsubscribeActivities();
+      }
+    };
+  }, [user, isGuest]);
 
   // Set up global chat listener
   useEffect(() => {
@@ -2419,6 +3019,10 @@ const HomeScreen = () => {
             {renderFriendWatchingLive()}
             {/* Listening music widget */}
             {renderFriendListeningMusic()}
+            {/* Gaming status widget */}
+            {renderGamingStatusWidget()}
+            {/* Shop widget */}
+            {renderShopWidget()}
             {/* Other random friend widgets */}
             {renderRandomFriendWidgets()}
           </ScrollView>

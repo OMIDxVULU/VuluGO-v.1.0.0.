@@ -12,6 +12,9 @@ import { UserProfileProvider } from '../src/context/UserProfileContext';
 import { UserStatusProvider } from '../src/context/UserStatusContext';
 import { LiveStreamProvider } from '../src/context/LiveStreamContext';
 import { NotificationProvider } from '../src/context/NotificationContext';
+import { MusicProvider } from '../src/context/MusicContext';
+import { GamingProvider } from '../src/context/GamingContext';
+import { ShopProvider } from '../src/context/ShopContext';
 import { AuthProvider } from '../src/context/AuthContext';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import WebResponsiveWrapper from '../src/components/WebResponsiveWrapper';
@@ -126,7 +129,10 @@ export default function RootLayout() {
               <UserProfileProvider>
                 <LiveStreamProvider>
                   <NotificationProvider>
-                    <AppContext.Provider value={{ fontsLoaded }}>
+                    <MusicProvider>
+                      <GamingProvider>
+                        <ShopProvider>
+                          <AppContext.Provider value={{ fontsLoaded }}>
                       <MenuPositionProvider>
                         <SafeAreaProvider>
                           <PaperProvider theme={paperTheme}>
@@ -147,7 +153,10 @@ export default function RootLayout() {
                           </PaperProvider>
                         </SafeAreaProvider>
                       </MenuPositionProvider>
-                    </AppContext.Provider>
+                          </AppContext.Provider>
+                        </ShopProvider>
+                      </GamingProvider>
+                    </MusicProvider>
                   </NotificationProvider>
                 </LiveStreamProvider>
               </UserProfileProvider>
