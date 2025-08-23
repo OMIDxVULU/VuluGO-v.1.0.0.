@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TouchableOpacity, 
-  Image, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Image,
   TextInput,
   StatusBar,
   Platform,
@@ -17,8 +17,10 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   Vibration,
+  Easing,
 } from 'react-native';
 import { LongPressGestureHandler, State, PanGestureHandler } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,11 +28,24 @@ import { MaterialIcons, Feather, FontAwesome, AntDesign, Ionicons, MaterialCommu
 import { useRouter } from 'expo-router';
 import BackButton from '../components/BackButton';
 import MenuButton from '../components/MenuButton';
+import {
+  createIsolatedAnimatedValue,
+  startIsolatedAnimation,
+  createIsolatedTiming,
+  createIsolatedSpring,
+  createIsolatedParallel,
+  createIsolatedSequence,
+  createIsolatedLoop,
+  createIsolatedScrollEvent,
+  stopIsolatedAnimation,
+  resetIsolatedAnimatedValue,
+} from '../utils/animationUtils';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { useUserProfile } from '../context/UserProfileContext';
 import { useUserStatus, STATUS_TYPES, StatusType } from '../context/UserStatusContext';
 import { useAuth } from '../context/AuthContext';
 import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
+import firestoreService from '../services/firestoreService';
 
 const { width } = Dimensions.get('window');
 
@@ -49,11 +64,11 @@ interface Photo {
 
 const ProfileScreen = () => {
   const router = useRouter();
-  const { isGuest } = useAuth();
+  const { user, isGuest } = useAuth();
   const { canManagePhotos, canEditProfile, canChangeStatus } = useGuestRestrictions();
-  const { 
-    profileImage, 
-    setProfileImage, 
+  const {
+    profileImage,
+    setProfileImage,
     hasGemPlus,
     setHasGemPlus,
     displayName,
@@ -81,92 +96,43 @@ const ProfileScreen = () => {
     { id: 'photo1', uri: 'https://randomuser.me/api/portraits/women/34.jpg', isProfile: false },
     { id: 'photo2', uri: 'https://randomuser.me/api/portraits/women/32.jpg', isProfile: false },
   ]);
+  // Enhanced drag and drop state
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [draggedPhotoPosition, setDraggedPhotoPosition] = useState({ x: 0, y: 0 });
   const [photoLayouts, setPhotoLayouts] = useState<{ [key: string]: { x: number, y: number, width: number } }>({});
+  const [longPressPhotoId, setLongPressPhotoId] = useState<string | null>(null);
+  const [dragMode, setDragMode] = useState<'inactive' | 'preparing' | 'ready' | 'dragging'>('inactive');
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+
+  // Animation refs for enhanced feedback - using isolated animation values
+  const longPressScaleAnim = useRef(createIsolatedAnimatedValue(1)).current;
+  const longPressShadowAnim = useRef(createIsolatedAnimatedValue(0)).current;
+  const dragReadyPulseAnim = useRef(createIsolatedAnimatedValue(1)).current;
+
+  const dropIndicatorAnim = useRef(createIsolatedAnimatedValue(0)).current;
   
-  const statusSelectorAnim = useRef(new Animated.Value(0)).current;
-  const profileScaleAnim = useRef(new Animated.Value(1)).current;
-  const headerOpacityAnim = useRef(new Animated.Value(1)).current;
+  const statusSelectorAnim = useRef(createIsolatedAnimatedValue(0)).current;
+  const profileScaleAnim = useRef(createIsolatedAnimatedValue(1)).current;
+  const headerOpacityAnim = useRef(createIsolatedAnimatedValue(1)).current;
   
   // Improve the PanResponder implementation to ensure all elements are draggable
-  const panY = useRef(new Animated.Value(0)).current;
+  const panY = useRef(createIsolatedAnimatedValue(0)).current;
   const [isDismissing, setIsDismissing] = useState(false);
   
   // Add new state for the photo selection modal
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   
   // Add animation ref for photo options modal
-  const photoOptionsAnim = useRef(new Animated.Value(0)).current;
+  const photoOptionsAnim = useRef(createIsolatedAnimatedValue(0)).current;
+
+  // Create isolated scroll tracking value
+  const scrollY = useRef(createIsolatedAnimatedValue(0)).current;
   
-  // Add new state for friends modal and mock friends data
+  // Add new state for friends modal and Firebase friends data
   const [showFriendsModal, setShowFriendsModal] = useState(false);
-  const [friends, setFriends] = useState([
-    {
-      id: '1',
-      name: 'Emma Wilson',
-      username: '@emmaw',
-      avatar: 'https://randomuser.me/api/portraits/women/22.jpg',
-      online: true,
-      status: 'online'
-    },
-    {
-      id: '2',
-      name: 'Jack Reynolds',
-      username: '@jackr',
-      avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-      online: true,
-      status: 'busy'
-    },
-    {
-      id: '3',
-      name: 'Sophie Turner',
-      username: '@sophiet',
-      avatar: 'https://randomuser.me/api/portraits/women/28.jpg',
-      online: false,
-      status: 'offline'
-    },
-    {
-      id: '4',
-      name: 'Liam Chen',
-      username: '@liamc',
-      avatar: 'https://randomuser.me/api/portraits/men/44.jpg',
-      online: true,
-      status: 'happy'
-    },
-    {
-      id: '5',
-      name: 'Olivia Baker',
-      username: '@oliviab',
-      avatar: 'https://randomuser.me/api/portraits/women/15.jpg',
-      online: true,
-      status: 'online'
-    },
-    {
-      id: '6',
-      name: 'Noah Garcia',
-      username: '@noahg',
-      avatar: 'https://randomuser.me/api/portraits/men/23.jpg',
-      online: false,
-      status: 'offline'
-    },
-    {
-      id: '7',
-      name: 'Ava Martinez',
-      username: '@avam',
-      avatar: 'https://randomuser.me/api/portraits/women/19.jpg',
-      online: true,
-      status: 'excited'
-    },
-    {
-      id: '8',
-      name: 'James Johnson',
-      username: '@jamesj',
-      avatar: 'https://randomuser.me/api/portraits/men/12.jpg',
-      online: true,
-      status: 'busy'
-    }
-  ]);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+
   
   // Add state for filtered friends and search query
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
@@ -193,6 +159,36 @@ const ProfileScreen = () => {
     setFriendSearchQuery(text);
   };
 
+  // Load friends data from Firebase
+  useEffect(() => {
+    if (!user?.uid || isGuest) {
+      setFriends([]);
+      return;
+    }
+
+    const loadFriends = async () => {
+      setFriendsLoading(true);
+      try {
+        const userFriends = await firestoreService.getUserFriends(user.uid);
+        setFriends(userFriends);
+      } catch (error) {
+        // Silently handle friends loading error to avoid console noise
+        setFriends([]);
+      } finally {
+        setFriendsLoading(false);
+      }
+    };
+
+    loadFriends();
+
+    // Set up real-time listener for friends updates
+    const unsubscribe = firestoreService.onUserFriends(user.uid, (updatedFriends) => {
+      setFriends(updatedFriends);
+    });
+
+    return unsubscribe;
+  }, [user?.uid, isGuest]);
+
   const navigateToAccount = () => {
     router.push('/(main)/account');
   };
@@ -204,13 +200,15 @@ const ProfileScreen = () => {
       return;
     }
     
-    photoOptionsAnim.setValue(0);
-    Animated.spring(photoOptionsAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
+    resetIsolatedAnimatedValue(photoOptionsAnim, 0);
+    startIsolatedAnimation(
+      createIsolatedSpring(photoOptionsAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      })
+    );
     setShowPhotoOptions(true);
   };
 
@@ -244,53 +242,244 @@ const ProfileScreen = () => {
 
 
 
-  const handleLongPressPhoto = (photoId: string) => {
-    if (!canManagePhotos()) {
-      return;
+  // Refs for cleanup
+  const readyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Enhanced long press handler with progressive feedback
+  const handleLongPressPhoto = useCallback((photoId: string) => {
+    try {
+      if (!canManagePhotos() || !photoId) {
+        return;
+      }
+
+      // Clear any existing timeout and animation
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current);
+        readyTimeoutRef.current = null;
+      }
+      if (pulseAnimationRef.current) {
+        pulseAnimationRef.current.stop();
+        pulseAnimationRef.current = null;
+      }
+
+      setLongPressPhotoId(photoId);
+      setDragMode('preparing');
+
+      // Phase 1: Immediate visual feedback (scale + shadow)
+      // Use isolated animations to prevent conflicts with Reanimated
+      startIsolatedAnimation(
+        createIsolatedTiming(longPressScaleAnim, {
+          toValue: 1.05,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        })
+      );
+
+      startIsolatedAnimation(
+        createIsolatedTiming(longPressShadowAnim, {
+          toValue: 1,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        })
+      );
+
+      // Phase 2: After 1 second, trigger "ready to drag" state
+      readyTimeoutRef.current = setTimeout(() => {
+        try {
+          if (longPressPhotoId === photoId && dragMode === 'preparing') {
+            setDragMode('ready');
+
+            // Haptic feedback to indicate ready state
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {
+              // Ignore haptic errors on unsupported devices
+            });
+
+            // Pulsing animation to indicate ready state
+            pulseAnimationRef.current = createIsolatedLoop(
+              createIsolatedSequence([
+                createIsolatedTiming(dragReadyPulseAnim, {
+                  toValue: 1.1,
+                  duration: 600,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+                createIsolatedTiming(dragReadyPulseAnim, {
+                  toValue: 1.05,
+                  duration: 600,
+                  easing: Easing.inOut(Easing.sin),
+                  useNativeDriver: true,
+                }),
+              ])
+            );
+            startIsolatedAnimation(pulseAnimationRef.current);
+          }
+        } catch (error) {
+          // Silently handle drag ready state error
+        }
+      }, 1000);
+    } catch (error) {
+      // Silently handle long press error
     }
+  }, [canManagePhotos, longPressPhotoId, dragMode, longPressScaleAnim, longPressShadowAnim, dragReadyPulseAnim]);
 
-    Vibration.vibrate(50);
-    setDraggedPhotoId(photoId);
-  };
-
+  // Enhanced drag handler with visual feedback
   const handlePhotoDrag = useCallback((photoId: string, event: any) => {
-    if (draggedPhotoId !== photoId) return;
+    if (draggedPhotoId !== photoId || dragMode !== 'dragging') return;
 
-    const { translationX, translationY, absoluteX } = event.nativeEvent;
-    
-    // Update dragged photo position
-    setDraggedPhotoPosition({ x: absoluteX, y: translationY });
-    
+    // Safely extract gesture event properties
+    const nativeEvent = event.nativeEvent;
+    if (!nativeEvent) return;
+
+    const { translationX = 0, translationY = 0, x = 0, y = 0 } = nativeEvent;
+
+    // Update dragged photo position using translation values
+    setDraggedPhotoPosition({ x: translationX, y: translationY });
+
     // Calculate which photo position this should snap to
-    const photoWidth = 132; // Photo width + margin
+    const photoWidth = 95; // Photo width (83) + margin (12)
     const containerStartX = 12; // Starting X position of photos container
-    
-    const relativeX = absoluteX - containerStartX;
-    const targetIndex = Math.max(0, Math.min(photos.length - 1, 
-      Math.round(relativeX / photoWidth)));
-    
-    const currentIndex = photos.findIndex(photo => photo.id === photoId);
-    
-    if (targetIndex !== currentIndex) {
-      setPhotos(prevPhotos => {
-        const newPhotos = [...prevPhotos];
-        const [movedPhoto] = newPhotos.splice(currentIndex, 1);
-        newPhotos.splice(targetIndex, 0, movedPhoto);
-        
-        // Update profile picture to be the first photo
-        newPhotos.forEach((photo, index) => {
-          photo.isProfile = index === 0;
-        });
-        
-        return newPhotos;
-      });
-    }
-  }, [draggedPhotoId, photos]);
 
-  const handlePhotoDragEnd = () => {
+    // Use translationX for relative positioning
+    const relativeX = Math.abs(translationX);
+    const targetIndex = Math.max(0, Math.min(photos.length - 1,
+      Math.round(relativeX / photoWidth)));
+
+    // Update drop target indicator
+    if (targetIndex !== dropTargetIndex) {
+      setDropTargetIndex(targetIndex);
+
+      // Animate drop indicator with isolated animations
+      startIsolatedAnimation(
+        createIsolatedSequence([
+          createIsolatedTiming(dropIndicatorAnim, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          createIsolatedTiming(dropIndicatorAnim, {
+            toValue: 1,
+            duration: 200,
+            easing: Easing.out(Easing.back(1.2)),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    }
+  }, [draggedPhotoId, dragMode, photos, dropTargetIndex, dropIndicatorAnim]);
+
+  // Enhanced drag end handler with photo reordering
+  const handlePhotoDragEnd = useCallback(() => {
+    if (draggedPhotoId && dropTargetIndex !== null) {
+      const currentIndex = photos.findIndex(photo => photo.id === draggedPhotoId);
+
+      if (dropTargetIndex !== currentIndex) {
+        // Perform the final reorder
+        setPhotos(prevPhotos => {
+          const newPhotos = [...prevPhotos];
+          const [movedPhoto] = newPhotos.splice(currentIndex, 1);
+          newPhotos.splice(dropTargetIndex, 0, movedPhoto);
+
+          // Update profile picture to be the first photo
+          newPhotos.forEach((photo, index) => {
+            photo.isProfile = index === 0;
+          });
+
+          return newPhotos;
+        });
+
+        // Success haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
+
+    // Reset all drag states and animations
+    resetDragState();
+  }, [draggedPhotoId, dropTargetIndex, photos]);
+
+  // Helper function to reset all drag-related state
+  const resetDragState = useCallback(() => {
+    // Clean up timers and animations first
+    if (readyTimeoutRef.current) {
+      clearTimeout(readyTimeoutRef.current);
+      readyTimeoutRef.current = null;
+    }
+    if (pulseAnimationRef.current) {
+      pulseAnimationRef.current.stop();
+      pulseAnimationRef.current = null;
+    }
+
     setDraggedPhotoId(null);
+    setLongPressPhotoId(null);
+    setDragMode('inactive');
+    setDropTargetIndex(null);
     setDraggedPhotoPosition({ x: 0, y: 0 });
-  };
+
+    // Reset all animations - use isolated animations to prevent conflicts
+    // Native driver animations (transform properties)
+    startIsolatedAnimation(
+      createIsolatedParallel([
+        createIsolatedTiming(longPressScaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        createIsolatedTiming(dragReadyPulseAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        createIsolatedTiming(dropIndicatorAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // JavaScript driver animation (shadow properties)
+    startIsolatedAnimation(
+      createIsolatedTiming(longPressShadowAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      })
+    );
+  }, [longPressScaleAnim, longPressShadowAnim, dragReadyPulseAnim, dropIndicatorAnim]);
+
+  // Handle drag start (when user starts dragging after long press)
+  const handleDragStart = useCallback((photoId: string) => {
+    try {
+      if (dragMode === 'ready' && longPressPhotoId === photoId) {
+        setDraggedPhotoId(photoId);
+        setDragMode('dragging');
+
+        // Phase 3: Dragging visual feedback (handled in styling)
+
+        // Strong haptic feedback for drag start
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {
+          // Ignore haptic errors on unsupported devices
+        });
+      }
+    } catch (error) {
+      // Silently handle drag start error
+    }
+  }, [dragMode, longPressPhotoId]);
+
+  // Cleanup effect for timers and animations
+  useEffect(() => {
+    return () => {
+      // Clean up on unmount
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current);
+      }
+      if (pulseAnimationRef.current) {
+        pulseAnimationRef.current.stop();
+      }
+    };
+  }, []);
 
   // Update profile image when photos change
   useEffect(() => {
@@ -300,14 +489,43 @@ const ProfileScreen = () => {
     }
   }, [photos, setProfileImage]);
 
+  // Save photo order to persistent storage
+  useEffect(() => {
+    if (user?.uid && !isGuest && photos.length > 0) {
+      const savePhotoOrder = async () => {
+        try {
+          const photoOrder = photos.map((photo, index) => ({
+            id: photo.id,
+            uri: photo.uri,
+            isProfile: photo.isProfile,
+            order: index,
+          }));
+
+          // Save to Firebase (implement this method in firestoreService if needed)
+          // await firestoreService.updateUserPhotos(user.uid, photoOrder);
+          // Photo order saved successfully (removed console.log to reduce noise)
+        } catch (error) {
+          console.error('Failed to save photo order:', error);
+        }
+      };
+
+      // Debounce the save operation to avoid too many writes
+      const timeoutId = setTimeout(savePhotoOrder, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [photos, user?.uid, isGuest]);
+
   const hidePhotoOptions = () => {
-    Animated.timing(photoOptionsAnim, {
-      toValue: 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowPhotoOptions(false);
-    });
+    startIsolatedAnimation(
+      createIsolatedTiming(photoOptionsAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      () => {
+        setShowPhotoOptions(false);
+      }
+    );
   };
 
   const handleTakePhoto = () => {
@@ -340,22 +558,27 @@ const ProfileScreen = () => {
     }
     
     setShowStatusSelector(true);
-    Animated.timing(statusSelectorAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    startIsolatedAnimation(
+      createIsolatedTiming(statusSelectorAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      })
+    );
   };
 
   // Function to hide status selector with animation
   const hideStatusMenu = () => {
-    Animated.timing(statusSelectorAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowStatusSelector(false);
-    });
+    startIsolatedAnimation(
+      createIsolatedTiming(statusSelectorAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      () => {
+        setShowStatusSelector(false);
+      }
+    );
   };
 
   // Function to change status and close menu
@@ -405,49 +628,54 @@ const ProfileScreen = () => {
 
   // Function to reset preview when opening
   const openPreview = () => {
-    panY.setValue(0);
+    resetIsolatedAnimatedValue(panY, 0);
     setPreviewCurrentPage(0);
     setShowProfilePreview(true);
   };
 
-  // Add scroll handler for animations
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: new Animated.Value(0) } } }],
-    {
-      useNativeDriver: false,
-      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const scrollY = event.nativeEvent.contentOffset.y;
-        // Scale profile image down slightly when scrolling
-        if (scrollY > 0) {
-          Animated.spring(profileScaleAnim, {
+  // Add scroll handler for animations with proper isolation
+  const handleScroll = createIsolatedScrollEvent(scrollY, {
+    useNativeDriver: false,
+    listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const scrollYValue = event.nativeEvent.contentOffset.y;
+      // Scale profile image down slightly when scrolling
+      if (scrollYValue > 0) {
+        startIsolatedAnimation(
+          createIsolatedSpring(profileScaleAnim, {
             toValue: 0.95,
             tension: 100,
             friction: 5,
             useNativeDriver: true,
-          }).start();
-          // Fade header
-          Animated.timing(headerOpacityAnim, {
+          })
+        );
+        // Fade header
+        startIsolatedAnimation(
+          createIsolatedTiming(headerOpacityAnim, {
             toValue: 0.8,
             duration: 150,
             useNativeDriver: true,
-          }).start();
-        } else {
-          Animated.spring(profileScaleAnim, {
+          })
+        );
+      } else {
+        startIsolatedAnimation(
+          createIsolatedSpring(profileScaleAnim, {
             toValue: 1,
             tension: 100,
             friction: 5,
             useNativeDriver: true,
-          }).start();
-          // Restore header
-          Animated.timing(headerOpacityAnim, {
+          })
+        );
+        // Restore header
+        startIsolatedAnimation(
+          createIsolatedTiming(headerOpacityAnim, {
             toValue: 1,
             duration: 150,
             useNativeDriver: true,
-          }).start();
-        }
-      },
-    }
-  );
+          })
+        );
+      }
+    },
+  });
 
   // Update dismiss function to prevent flash
   const dismissPreview = () => {
@@ -456,19 +684,22 @@ const ProfileScreen = () => {
     setIsDismissing(true);
     
     // Run animation
-    Animated.timing(panY, {
-      toValue: -1500,
-      duration: 350,
-      useNativeDriver: true,
-    }).start(() => {
-      // Only hide the modal after animation completes
-      setShowProfilePreview(false);
-      // Reset state after hiding
-      setTimeout(() => {
-        panY.setValue(0);
-        setIsDismissing(false);
-      }, 200);
-    });
+    startIsolatedAnimation(
+      createIsolatedTiming(panY, {
+        toValue: -1500,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      () => {
+        // Only hide the modal after animation completes
+        setShowProfilePreview(false);
+        // Reset state after hiding
+        setTimeout(() => {
+          resetIsolatedAnimatedValue(panY, 0);
+          setIsDismissing(false);
+        }, 200);
+      }
+    );
   };
 
   // Update PanResponder to use the new dismiss function
@@ -494,22 +725,26 @@ const ProfileScreen = () => {
         if (gestureState.dy < -60 || gestureState.vy < -0.5) {
           dismissPreview();
         } else {
-          Animated.spring(panY, {
-            toValue: 0,
-            tension: 40,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
+          startIsolatedAnimation(
+            createIsolatedSpring(panY, {
+              toValue: 0,
+              tension: 40,
+              friction: 8,
+              useNativeDriver: true,
+            })
+          );
         }
       },
       onPanResponderTerminate: () => {
         panY.flattenOffset();
-        Animated.spring(panY, {
-          toValue: 0,
-          tension: 40,
-          friction: 5,
-          useNativeDriver: true,
-        }).start();
+        startIsolatedAnimation(
+          createIsolatedSpring(panY, {
+            toValue: 0,
+            tension: 40,
+            friction: 5,
+            useNativeDriver: true,
+          })
+        );
       }
     })
   ).current;
@@ -676,27 +911,79 @@ const ProfileScreen = () => {
             
                         {/* Photos */}
             {photos.map((photo, index) => (
-                                              <LongPressGestureHandler
-                  key={photo.id}
+              <View key={photo.id} style={styles.photoWrapper}>
+                {/* Drop indicator */}
+                {dropTargetIndex === index && draggedPhotoId && draggedPhotoId !== photo.id && (
+                  <Animated.View
+                    style={[
+                      styles.dropIndicator,
+                      {
+                        opacity: dropIndicatorAnim,
+                        transform: [{ scaleY: dropIndicatorAnim }],
+                      },
+                    ]}
+                  />
+                )}
+
+                <LongPressGestureHandler
                   onHandlerStateChange={({ nativeEvent }) => {
-                    if (nativeEvent.state === State.ACTIVE) {
+                    if (nativeEvent.state === State.BEGAN) {
                       handleLongPressPhoto(photo.id);
+                    } else if (nativeEvent.state === State.CANCELLED || nativeEvent.state === State.FAILED) {
+                      if (dragMode === 'preparing' && longPressPhotoId === photo.id) {
+                        resetDragState();
+                      }
                     }
                   }}
-                  minDurationMs={200}
-                  enabled={!draggedPhotoId}
+                  minDurationMs={100}
+                  enabled={dragMode === 'inactive'}
                 >
                   <PanGestureHandler
-                    onGestureEvent={(event) => handlePhotoDrag(photo.id, event)}
-                    onEnded={handlePhotoDragEnd}
-                    enabled={!!draggedPhotoId}
-                    activeOffsetX={[-5, 5]}
+                    onHandlerStateChange={({ nativeEvent }) => {
+                      if (nativeEvent.state === State.BEGAN) {
+                        handleDragStart(photo.id);
+                      } else if (nativeEvent.state === State.ACTIVE) {
+                        // Handle drag during active state
+                        handlePhotoDrag(photo.id, { nativeEvent });
+                      } else if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED) {
+                        handlePhotoDragEnd();
+                      }
+                    }}
+                    enabled={dragMode === 'ready' && longPressPhotoId === photo.id}
+                    activeOffsetX={[-10, 10]}
+                    activeOffsetY={[-10, 10]}
                   >
-                    <Animated.View 
+                    <Animated.View
                       style={[
                         styles.photoItemContainer,
-                        draggedPhotoId === photo.id && styles.draggingPhoto,
-                        draggedPhotoId === photo.id && { opacity: 0.3 }
+                        // Phase 1: Long press feedback
+                        longPressPhotoId === photo.id && dragMode === 'preparing' && {
+                          transform: [{ scale: longPressScaleAnim }],
+                          shadowColor: '#6E69F4',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: longPressShadowAnim,
+                          shadowRadius: 8,
+                          elevation: 8,
+                        },
+                        // Phase 2: Ready to drag feedback
+                        longPressPhotoId === photo.id && dragMode === 'ready' && {
+                          transform: [{ scale: dragReadyPulseAnim }],
+                          shadowColor: '#4CAF50',
+                          shadowOffset: { width: 0, height: 6 },
+                          shadowOpacity: 0.4,
+                          shadowRadius: 12,
+                          elevation: 12,
+                        },
+                        // Phase 3: Dragging feedback
+                        draggedPhotoId === photo.id && dragMode === 'dragging' && {
+                          opacity: 0.3,
+                          transform: [{ scale: 1.1 }],
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 8 },
+                          shadowOpacity: 0.4,
+                          shadowRadius: 16,
+                          elevation: 16,
+                        },
                       ]}
                     >
                     <Image 
@@ -709,20 +996,27 @@ const ProfileScreen = () => {
                       style={styles.photoGradient}
                     />
                     
-                    {/* Delete Button */}
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => handleDeletePhoto(photo.id)}
-                    >
-                      <MaterialIcons name="close" size={16} color="#FFFFFF" />
-                    </TouchableOpacity>
-                    
+                    {/* Delete Button - only show when not in drag mode */}
+                    {dragMode === 'inactive' && (
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDeletePhoto(photo.id)}
+                      >
+                        <MaterialIcons name="close" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
 
-                    
- 
+                    {/* Drag mode indicator */}
+                    {longPressPhotoId === photo.id && dragMode === 'ready' && (
+                      <View style={styles.dragReadyIndicator}>
+                        <MaterialIcons name="drag-indicator" size={20} color="#4CAF50" />
+                        <Text style={styles.dragReadyText}>Ready to drag</Text>
+                      </View>
+                    )}
                   </Animated.View>
                 </PanGestureHandler>
               </LongPressGestureHandler>
+              </View>
             ))}
           </ScrollView>
         </View>
@@ -922,7 +1216,6 @@ const ProfileScreen = () => {
                 <TouchableOpacity 
                   style={styles.manageFriendsButton}
                   onPress={() => {
-                    console.log("Navigating to Close Friends screen");
                     hideStatusMenu();
                     router.push({
                       pathname: '/(main)/close-friends',
@@ -1716,6 +2009,41 @@ const styles = StyleSheet.create({
     width: 83,
     height: 126,
     borderRadius: 12,
+  },
+
+  // Enhanced drag and drop styles
+  photoWrapper: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  dropIndicator: {
+    position: 'absolute',
+    left: -6,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: '#4CAF50',
+    borderRadius: 2,
+    zIndex: 10,
+  },
+  dragReadyIndicator: {
+    position: 'absolute',
+    top: -30,
+    left: '50%',
+    transform: [{ translateX: -50 }],
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  dragReadyText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 
   photoItem: {
