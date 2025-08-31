@@ -20,8 +20,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import CommonHeader from '../components/CommonHeader';
 import { firestoreService } from '../services/firestoreService';
 import { useAuth } from '../context/AuthContext';
-import { LoadingState, ErrorState } from '../components/ErrorHandling';
+import { useGuestRestrictions } from '../hooks/useGuestRestrictions';
+import { LoadingState, ErrorState, EmptyState } from '../components/ErrorHandling';
 import { Conversation } from '../services/types';
+import { FirebaseErrorHandler } from '../utils/firebaseErrorHandler';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,52 +101,8 @@ const conversationToChatPreview = (conversation: Conversation, currentUserId: st
   };
 };
 
-// Active users for the horizontal scroll
-const ACTIVE_USERS = [
-  {
-    id: 'user_1',
-    name: 'David',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    status: 'busy',
-    isLive: true,
-  },
-  {
-    id: 'user_2',
-    name: 'Sophia',
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    status: 'online',
-  },
-  {
-    id: 'user_3',
-    name: 'Michael',
-    avatar: 'https://randomuser.me/api/portraits/men/4.jpg',
-    status: 'online',
-  },
-  {
-    id: 'user_4',
-    name: 'Jessica',
-    avatar: 'https://randomuser.me/api/portraits/women/3.jpg',
-    status: 'idle',
-  },
-  {
-    id: 'user_5',
-    name: 'Emma',
-    avatar: 'https://randomuser.me/api/portraits/women/6.jpg',
-    status: 'online',
-  },
-  {
-    id: 'user_6',
-    name: 'John',
-    avatar: 'https://randomuser.me/api/portraits/men/7.jpg',
-    status: 'online',
-  },
-  {
-    id: 'user_7',
-    name: 'Sarah',
-    avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
-    status: 'idle',
-  },
-];
+// Active users will be loaded from real friends data
+// Removed dummy ACTIVE_USERS array - now using real Firebase data
 
 // Enhanced Status Indicator Component
 const StatusIndicator = ({ status, size = 'normal' }: { status: ChatPreview['status'], size?: 'small' | 'normal' | 'large' }) => {
@@ -194,41 +152,119 @@ const StatusIndicator = ({ status, size = 'normal' }: { status: ChatPreview['sta
 
 const DirectMessagesScreen = () => {
   const { user: currentUser } = useAuth();
+  const { canAddFriends } = useGuestRestrictions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [chats, setChats] = useState<ChatPreview[]>([]);
+  const [activeFriends, setActiveFriends] = useState<ChatPreview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGuestUser, setIsGuestUser] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const searchAnimation = useRef(new Animated.Value(0)).current;
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load conversations from Firebase with real-time updates
   useEffect(() => {
     const loadConversations = async () => {
-      if (!currentUser) return;
+      if (!currentUser) {
+        setIsLoading(false);
+        setError('Please sign in to view your messages.');
+        return;
+      }
+
+      // Check if user is a guest user - prevent Firestore operations entirely
+      if (FirebaseErrorHandler.isGuestUser(currentUser)) {
+        setIsLoading(false);
+        setIsGuestUser(true);
+        setError(null); // Clear any existing errors
+        return;
+      }
+
+      // Verify user authentication state
+      if (!currentUser.uid) {
+        setIsLoading(false);
+        setError('Authentication required. Please sign in again.');
+        return;
+      }
 
       try {
         setIsLoading(true);
         setError(null);
 
-        // Set up real-time listener for conversations
-        unsubscribeRef.current = firestoreService.onUserConversations(currentUser.uid, (updatedConversations) => {
-          setConversations(updatedConversations);
+        // Set up a timeout to handle cases where no data is returned
+        loadingTimeoutRef.current = setTimeout(() => {
+          if (isLoading) {
+            setIsLoading(false);
+            // Don't set error here - let the empty state handle it
+          }
+        }, 5000); // 5 second timeout
 
-          // Convert conversations to chat previews
-          const chatPreviews = updatedConversations
-            .map(conversation => conversationToChatPreview(conversation, currentUser.uid))
-            .filter((chat): chat is ChatPreview => chat !== null);
+        // Set up real-time listener for conversations with error handling
+        unsubscribeRef.current = firestoreService.onUserConversations(
+          currentUser.uid,
+          (updatedConversations) => {
+            // Clear the loading timeout since we got data
+            if (loadingTimeoutRef.current) {
+              clearTimeout(loadingTimeoutRef.current);
+              loadingTimeoutRef.current = null;
+            }
 
-          setChats(chatPreviews);
-          setIsLoading(false);
-        });
+            setConversations(updatedConversations);
+
+            // Convert conversations to chat previews
+            const chatPreviews = updatedConversations
+              .map(conversation => conversationToChatPreview(conversation, currentUser.uid))
+              .filter((chat): chat is ChatPreview => chat !== null);
+
+            setChats(chatPreviews);
+
+            // Extract active friends (online friends) for the "Active Now" section
+            const onlineFriends = chatPreviews.filter(chat =>
+              chat.status === 'online' || chat.status === 'busy'
+            );
+            setActiveFriends(onlineFriends);
+
+            setIsLoading(false);
+          },
+          (error) => {
+            // Clear the loading timeout since we got an error
+            if (loadingTimeoutRef.current) {
+              clearTimeout(loadingTimeoutRef.current);
+              loadingTimeoutRef.current = null;
+            }
+
+            console.error('Error in conversations listener:', error);
+
+            // Handle Firebase permission errors specifically
+            const errorInfo = FirebaseErrorHandler.handleError(error);
+
+            if (FirebaseErrorHandler.isPermissionError(error)) {
+              setError('Unable to access your messages. Please sign in again or check your account permissions.');
+              // Optionally, you could trigger a re-authentication flow here
+              // router.push('/auth');
+            } else if (FirebaseErrorHandler.isNetworkError(error)) {
+              setError('Network connection issue. Please check your internet connection and try again.');
+            } else {
+              setError(errorInfo.userFriendlyMessage);
+            }
+
+            setIsLoading(false);
+            FirebaseErrorHandler.logError('DirectMessagesScreen.onUserConversations', error, { userId: currentUser.uid });
+          }
+        );
 
       } catch (error: any) {
         console.error('Error loading conversations:', error);
         setError('Failed to load conversations');
         setIsLoading(false);
+
+        // Clear timeout on error
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
       }
     };
 
@@ -239,6 +275,10 @@ const DirectMessagesScreen = () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
+      }
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
     };
   }, [currentUser]);
@@ -270,13 +310,19 @@ const DirectMessagesScreen = () => {
   };
 
   const handleAddFriend = () => {
-    // TODO: Implement navigation or modal for adding friends
-    console.log("Add Friends Pressed");
+    if (!canAddFriends()) {
+      return; // Guest restriction will be handled by the hook
+    }
+    // Navigate to Add Friends screen
+    router.push('/(main)/add-friends');
   };
 
   const handleCreateGroup = () => {
     // TODO: Implement navigation or modal for creating group chat
     console.log("Group Chat Pressed");
+    // For now, show a simple alert to indicate the button is working
+    // In a real implementation, this would open a group creation modal
+    alert("Group chat feature coming soon!");
   };
   
   // Navigate to chat screen
@@ -292,22 +338,17 @@ const DirectMessagesScreen = () => {
   };
   
   // Render active user item in horizontal scroll
-  const renderActiveUser = ({ item }: { item: typeof ACTIVE_USERS[0] }) => {
+  const renderActiveUser = ({ item }: { item: ChatPreview }) => {
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={`active-user-${item.id}`}
-        style={styles.activeUserContainer} 
-        onPress={() => navigateToChat(item as unknown as ChatPreview)}
+        style={styles.activeUserContainer}
+        onPress={() => navigateToChat(item)}
         activeOpacity={0.8}
       >
         <View style={styles.activeAvatarContainer}>
           <Image source={{ uri: item.avatar }} style={styles.activeAvatar} />
-          <StatusIndicator status={item.status as 'online' | 'offline' | 'busy' | 'idle'} size="small" />
-          {item.isLive && (
-            <View style={styles.liveIndicator}>
-              <Text style={styles.liveText}>LIVE</Text>
-            </View>
-          )}
+          <StatusIndicator status={item.status} size="small" />
         </View>
         <Text style={styles.activeUserName} numberOfLines={1}>{item.name}</Text>
       </TouchableOpacity>
@@ -442,75 +483,74 @@ const DirectMessagesScreen = () => {
           </Animated.View>
         </View>
         
-        {/* Active Users Horizontal Scroll */}
-        <View style={styles.activeUsersSection}>
-          <Text style={styles.sectionTitle}>Active Now</Text>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.activeUsersScrollContent}
-            data={ACTIVE_USERS}
-            keyExtractor={(item) => `active-user-${item.id}`} 
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                style={styles.activeUserContainer} 
-                onPress={() => navigateToChat(item as unknown as ChatPreview)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.activeAvatarContainer}>
-                  <Image source={{ uri: item.avatar }} style={styles.activeAvatar} />
-                  <StatusIndicator status={item.status as 'online' | 'offline' | 'busy' | 'idle'} size="small" />
-                  {item.isLive && (
-                    <View style={styles.liveIndicator}>
-                      <Text style={styles.liveText}>LIVE</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.activeUserName} numberOfLines={1}>{item.name}</Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+        {/* Active Users Horizontal Scroll - Only show if there are active friends */}
+        {!isGuestUser && activeFriends.length > 0 && (
+          <View style={styles.activeUsersSection}>
+            <Text style={styles.sectionTitle}>Active Now</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.activeUsersScrollContent}
+              data={activeFriends}
+              keyExtractor={(item) => `active-user-${item.id}`}
+              renderItem={renderActiveUser}
+            />
+          </View>
+        )}
         
-        {/* Messages Header */}
+        {/* Recent Chats Header */}
         <View style={styles.messagesHeaderContainer}>
-          <Text style={styles.sectionTitle}>Messages</Text>
-          <TouchableOpacity 
-            style={styles.addFriendsButton} 
-            onPress={handleAddFriend}
-          >
-            <MaterialIcons name="person-add" size={20} color="#FFFFFF" />
-            <Text style={styles.addFriendsText}>Add Friends</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Recent Chats</Text>
+          {!isGuestUser && (
+            <TouchableOpacity
+              style={styles.addFriendsButton}
+              onPress={handleAddFriend}
+            >
+              <MaterialIcons name="person-add" size={20} color="#FFFFFF" />
+              <Text style={styles.addFriendsText}>Add Friends</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Messages List with Loading and Error States */}
-        {isLoading ? (
-          <LoadingState />
+        {/* Messages List with Loading, Error, Guest, and Empty States */}
+        {isGuestUser ? (
+          <EmptyState
+            message="Sign in to view your messages"
+            actionText="Sign In"
+            onAction={() => {
+              // Navigate to auth screen
+              router.push('/auth');
+            }}
+          />
+        ) : isLoading ? (
+          <LoadingState message="Loading your messages..." />
         ) : error ? (
           <ErrorState
             error={error}
             onRetry={() => {
               setError(null);
               setIsLoading(true);
-              // Reload conversations
+              // For permission errors, we need to restart the entire loading process
+              // which includes authentication verification
               if (currentUser) {
-                firestoreService.getUserConversations(currentUser.uid)
-                  .then(userConversations => {
-                    setConversations(userConversations);
-                    const chatPreviews = userConversations
-                      .map(conversation => conversationToChatPreview(conversation, currentUser.uid))
-                      .filter((chat): chat is ChatPreview => chat !== null);
-                    setChats(chatPreviews);
-                    setIsLoading(false);
-                  })
-                  .catch(error => {
-                    console.error('Error reloading conversations:', error);
-                    setError('Failed to load conversations');
-                    setIsLoading(false);
-                  });
+                // Restart the useEffect logic by clearing and reloading
+                if (unsubscribeRef.current) {
+                  unsubscribeRef.current();
+                  unsubscribeRef.current = null;
+                }
+                // The useEffect will handle the reload automatically
+                // since we're clearing the error and setting loading to true
+              } else {
+                setError('Please sign in to view your messages.');
+                setIsLoading(false);
               }
             }}
+          />
+        ) : getFilteredChats().length === 0 ? (
+          <EmptyState
+            message={searchQuery.trim() ? "No messages found matching your search" : "You don't have any messages yet"}
+            actionText={searchQuery.trim() || isGuestUser ? undefined : "Start a conversation"}
+            onAction={searchQuery.trim() || isGuestUser ? undefined : handleAddFriend}
           />
         ) : (
           <FlatList
@@ -663,7 +703,7 @@ const styles = StyleSheet.create({
   },
   chatListContent: {
     paddingHorizontal: 16,
-    paddingBottom: 80, // Space for floating button
+    paddingBottom: 200, // Increased space for floating button positioned above tab bar
   },
   chatItemContainer: {
     flexDirection: 'row',
@@ -778,15 +818,16 @@ const styles = StyleSheet.create({
   groupChatButton: {
     position: 'absolute',
     right: 16,
-    bottom: 16,
+    bottom: 130, // Positioned above tab bar (100px height + 20px padding + 10px margin)
     width: 60,
     height: 60,
     borderRadius: 30,
-    elevation: 5,
+    elevation: 8, // Increased elevation for better visibility
     shadowColor: '#6E69F4',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.4, // Increased shadow opacity
+    shadowRadius: 10, // Increased shadow radius
+    zIndex: 1000, // Ensure button is above other elements
   },
   groupChatGradient: {
     width: 60,

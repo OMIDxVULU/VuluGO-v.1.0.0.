@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import profileAnalyticsService, { ProfileViewer, ProfileAnalytics } from '../services/profileAnalyticsService';
+import FirebaseErrorHandler from '../utils/firebaseErrorHandler';
 
 interface UserProfileContextType {
   profileImage: string;
@@ -57,7 +58,20 @@ interface UserProfileProviderProps {
 }
 
 export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ children }) => {
-  const { isGuest, userProfile } = useAuth();
+  // Safely get auth context - handle case where AuthProvider isn't ready yet
+  let isGuest = false;
+  let userProfile = null;
+
+  try {
+    const authContext = useAuth();
+    isGuest = authContext.isGuest;
+    userProfile = authContext.userProfile;
+  } catch (error) {
+    // AuthProvider not ready yet - use default values
+    console.warn('AuthProvider not ready in UserProfileProvider, using defaults');
+    isGuest = false;
+    userProfile = null;
+  }
   
   // Guest profile settings
   const guestProfileImage = 'https://via.placeholder.com/150/6E69F4/FFFFFF?text=G';
@@ -93,7 +107,15 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
 
   // Load profile analytics from Firebase
   const loadProfileAnalytics = async () => {
-    if (!userProfile?.uid || isGuest) return;
+    if (!userProfile?.uid || isGuest) {
+      // Set default values for guest users
+      setProfileAnalytics(null);
+      setTotalViews(0);
+      setDailyViews(0);
+      setRecentViewers([]);
+      setTopViewers([]);
+      return;
+    }
 
     setIsLoadingAnalytics(true);
     try {
@@ -107,8 +129,20 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
       const viewers = await profileAnalyticsService.getProfileViewers(userProfile.uid);
       setRecentViewers(viewers.slice(0, 20));
       setTopViewers(viewers.sort((a, b) => b.viewCount - a.viewCount).slice(0, 10));
-    } catch (error) {
-      console.error('Failed to load profile analytics:', error);
+    } catch (error: any) {
+      // Handle permission errors gracefully
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for loadProfileAnalytics - setting default values for guest user');
+        // Set default values for permission errors (guest users)
+        setProfileAnalytics(null);
+        setTotalViews(0);
+        setDailyViews(0);
+        setRecentViewers([]);
+        setTopViewers([]);
+      } else {
+        console.error('Failed to load profile analytics:', error);
+        FirebaseErrorHandler.logError('loadProfileAnalytics', error);
+      }
     } finally {
       setIsLoadingAnalytics(false);
     }
@@ -130,8 +164,14 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
         setDailyViews(analytics.dailyViews);
         setProfileAnalytics(analytics);
       }
-    } catch (error) {
-      console.error('Failed to update viewers:', error);
+    } catch (error: any) {
+      // Handle permission errors gracefully
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for updateViewersFromViews - skipping update for guest user');
+      } else {
+        console.error('Failed to update viewers:', error);
+        FirebaseErrorHandler.logError('updateViewersFromViews', error);
+      }
     }
   };
 
@@ -179,12 +219,21 @@ export const UserProfileProvider: React.FC<UserProfileProviderProps> = ({ childr
 
   // Record a profile view
   const recordProfileView = async (viewerData: any) => {
-    if (!userProfile?.uid || isGuest) return;
+    if (!userProfile?.uid || isGuest) {
+      console.warn('Skipping recordProfileView for guest user');
+      return;
+    }
 
     try {
       await profileAnalyticsService.recordProfileView(userProfile.uid, viewerData);
-    } catch (error) {
-      console.error('Failed to record profile view:', error);
+    } catch (error: any) {
+      // Handle permission errors gracefully
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for recordProfileView - skipping for guest user');
+      } else {
+        console.error('Failed to record profile view:', error);
+        FirebaseErrorHandler.logError('recordProfileView', error);
+      }
     }
   };
 

@@ -1,56 +1,182 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own profile
-    match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Users can read other users' basic profiles (only when authenticated)
-    match /users/{userId} {
-      allow read: if request.auth != null;
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Streams - PUBLIC READ ACCESS for live streams, authenticated users can write
-    // This allows the app to show live streams to all users (including guests)
+    // USERS COLLECTION - Core user profiles
+    match /users/{userId} {
+      // Allow creation only by the user themselves
+      allow create: if isOwner(userId);
+      // Users can read/update/delete their own profile
+      allow read, update, delete: if isOwner(userId);
+      // Authenticated users can read other users' basic profiles
+      allow read: if isAuthenticated();
+      // Allow public read for username checking during registration
+      allow read: if true;
+    }
+
+    // SHOP & COMMERCE COLLECTIONS
+    match /products/{productId} {
+      allow read: if true; // Public read access for browsing products
+      allow write: if false; // Only admin can modify products (server-side)
+    }
+
+    match /purchases/{purchaseId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /userInventory/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // GAMING COLLECTIONS
+    match /miningSessions/{sessionId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /slotsSessions/{sessionId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /goldMinerSessions/{sessionId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /gameStats/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // MUSIC COLLECTIONS
+    match /musicActivities/{activityId} {
+      allow read: if isAuthenticated(); // Users can see friends' music activities
+      allow write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /musicPreferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // SOCIAL & ACTIVITY COLLECTIONS
+    match /friendActivities/{activityId} {
+      allow read: if isAuthenticated(); // Users can see friends' activities
+      allow write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // NOTIFICATIONS COLLECTIONS
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /notificationCounts/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // PROFILE ANALYTICS COLLECTIONS
+    match /profileViews/{viewId} {
+      allow read: if isAuthenticated() && (
+        resource.data.profileOwnerId == request.auth.uid ||
+        resource.data.viewerId == request.auth.uid
+      );
+      allow write: if isAuthenticated() && resource.data.viewerId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.viewerId == request.auth.uid;
+    }
+
+    match /profileAnalytics/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // VIRTUAL CURRENCY COLLECTIONS
+    match /currencyTransactions/{transactionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    match /currencyBalances/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // STREAMS - PUBLIC READ ACCESS for live streams, authenticated users can write
     match /streams/{streamId} {
       allow read: if true; // Public read access for live streams
-      allow create, update, delete: if request.auth != null;
+      allow create, update, delete: if isAuthenticated();
     }
 
     // Stream messages - PUBLIC READ for viewing, authenticated users can write
     match /streams/{streamId}/messages/{messageId} {
       allow read: if true; // Public read access for stream messages
-      allow write: if request.auth != null;
+      allow write: if isAuthenticated();
     }
 
-    // Conversations - users can access conversations they participate in
+    // CONVERSATIONS - users can access conversations they participate in
     match /conversations/{conversationId} {
-      allow read, write: if request.auth != null &&
+      allow read: if isAuthenticated() &&
         request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
+      allow delete: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
+    }
+
+    // Allow querying conversations collection for authenticated users
+    match /conversations/{document=**} {
+      allow list: if isAuthenticated();
     }
 
     // Conversation messages - users can access messages in conversations they participate in
     match /conversations/{conversationId}/messages/{messageId} {
-      allow read, write: if request.auth != null &&
+      allow read, write: if isAuthenticated() &&
         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
     }
 
-    // Allow authenticated users to read conversations where they are participants
-    match /conversations/{conversationId} {
-      allow read: if request.auth != null &&
-        request.auth.uid in resource.data.participants;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null &&
-        request.auth.uid in resource.data.participants;
-    }
-
-    // Global Chat - PUBLIC READ ACCESS, authenticated users can write
+    // GLOBAL CHAT - PUBLIC READ ACCESS, authenticated users can write
     match /globalChat/{messageId} {
       allow read: if true; // Public read access for global chat messages
-      allow create: if request.auth != null; // Only authenticated users can send messages
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+      allow create: if isAuthenticated(); // Only authenticated users can send messages
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+    }
+
+    // SHOP STATS & PROMOTIONS
+    match /shopStats/{document=**} {
+      allow read: if true; // Public read for shop statistics
+    }
+
+    match /promotions/{promotionId} {
+      allow read: if true; // Public read for active promotions
+    }
+
+    // LEADERBOARDS & ACHIEVEMENTS
+    match /leaderboards/{document=**} {
+      allow read: if true; // Public read for leaderboards
+    }
+
+    match /achievements/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
+    // SYSTEM COLLECTIONS (read-only for users)
+    match /systemConfig/{document=**} {
+      allow read: if true; // Public read for system configuration
+    }
+
+    match /appVersion/{document=**} {
+      allow read: if true; // Public read for app version info
     }
   }
 }

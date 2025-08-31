@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, ScrollView, Animated, Platform, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Modal, TouchableWithoutFeedback, PanResponder, StatusBar, TextInput, Alert } from 'react-native';
 import { Text, Card, Avatar } from 'react-native-paper';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons, FontAwesome5, AntDesign } from '@expo/vector-icons';
@@ -164,7 +164,7 @@ const HomeScreen = () => {
     return {
       shadowOpacity: yourShadowOpacity.value,
     };
-  });
+  }, []); // Add empty dependency array to prevent reading during render
   // --- End Your Animation Setup ---
 
   // --- Animation Setup for Other Spotlight Shadow ---
@@ -197,7 +197,7 @@ const HomeScreen = () => {
     return {
       shadowOpacity: otherShadowOpacity.value,
     };
-  });
+  }, []); // Add empty dependency array to prevent reading during render
   // --- End Other Animation Setup ---
   
   // Random user spotlight candidate
@@ -252,14 +252,16 @@ const HomeScreen = () => {
   };
   
   // Function to handle container width measurement
-  const handleContainerLayout = (event: LayoutChangeEvent) => {
+  const handleContainerLayout = useCallback((event: LayoutChangeEvent) => {
     setContainerWidth(event.nativeEvent.layout.width);
-  };
-  
+  }, []);
+
   // Function to handle content width measurement
-  const handleContentLayout = (width: number) => {
+  const handleContentLayout = useCallback((width: number) => {
     setContentWidth(width);
-  };
+  }, []);
+
+  // Placeholder for handleScrollContentSizeChange - will be defined after actualChildrenCount
   
   // Simplified scroll handler without haptics or rubber band effects
   const handleScroll = Animated.event(
@@ -338,9 +340,9 @@ const HomeScreen = () => {
         {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
           {stream.hosts.slice(0, 3).map((host, index) => (
-            <View key={`host-${index}`} style={styles.avatarWrapperRed}>
-              <Image 
-                source={{ uri: host.avatar }} 
+            <View key={`${stream.id}-host-${host.name || index}`} style={styles.avatarWrapperRed}>
+              <Image
+                source={{ uri: host.avatar }}
                 style={styles.gridAvatar}
               />
             </View>
@@ -408,9 +410,9 @@ const HomeScreen = () => {
         {/* Left section with 4 avatars in a grid - hosts should be red */}
         <View style={styles.avatarGrid}>
           {stream.hosts.slice(0, 3).map((host, index) => (
-            <View key={`host-${index}`} style={styles.avatarWrapperRed}>
-              <Image 
-                source={{ uri: host.avatar }} 
+            <View key={`${stream.id}-host-${host.name || index}`} style={styles.avatarWrapperRed}>
+              <Image
+                source={{ uri: host.avatar }}
                 style={styles.gridAvatar}
               />
             </View>
@@ -1285,35 +1287,42 @@ const HomeScreen = () => {
   // Add a new animation value for smooth transitions
   const eventExpandAnim = useSharedValue(0);
 
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      cancelAnimation(eventExpandAnim);
+    };
+  }, [eventExpandAnim]);
+
   // Add animated styles for the event widget
   const eventAnimatedStyle = useAnimatedStyle(() => {
     const minHeight = 60; // Just enough height for title and progress bar
     const maxHeight = 200; // Full expanded height
-    
+
     return {
       height: withTiming(
-        isEventExpanded ? maxHeight : minHeight, 
+        isEventExpanded ? maxHeight : minHeight,
         { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
       ),
       overflow: 'hidden'
     };
-  });
+  }, [isEventExpanded]); // Add dependency array
 
   // Add animated styles for the event content
   const eventContentAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(
-        isEventExpanded ? 1 : 0, 
+        isEventExpanded ? 1 : 0,
         { duration: 250, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
       ),
-      transform: [{ 
+      transform: [{
         translateY: withTiming(
-          isEventExpanded ? 0 : 10, 
+          isEventExpanded ? 0 : 10,
           { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }
-        ) 
+        )
       }]
     };
-  });
+  }, [isEventExpanded]); // Add dependency array
 
   /* First declaration of renderMinimalEventWidget removed */
   const openSpotlightModal = () => setSpotlightModalVisible(true);
@@ -2175,53 +2184,41 @@ const HomeScreen = () => {
   
   // Update the useEffect for the automatic event timer to properly detect winners
   useEffect(() => {
-    
     // Always run the timer, regardless of user participation
     const timer = setInterval(() => {
       setEventTimeLeft(prev => {
         const newValue = Math.max(prev - 1, 0);
-        
+
         // When timer reaches zero, determine winners and reset
         if (newValue === 0) {
-
-          
           // GUARANTEED WIN: If user has entered this cycle and hasn't won yet, they win
           if (hasEnteredEvent && !hasWonEvent) {
-            // Force this to happen synchronously before any state updates
-            setTimeout(() => {
-              setHasWonEvent(true);
-              setWonEventCycle(eventCycleCount); // Track which cycle they won in
-              
-              // Add notification
-              const winAmount = calculateWinAmount();
-              addEventWinNotification(winAmount);
-            }, 0);
+            // Use immediate state update instead of setTimeout to prevent memory leaks
+            setHasWonEvent(true);
+            setWonEventCycle(eventCycleCount); // Track which cycle they won in
+
+            // Add notification
+            const winAmount = calculateWinAmount();
+            addEventWinNotification(winAmount);
           }
-          
-          // Always start a new cycle after a delay
-          setTimeout(() => {
-            setEventTimeLeft(180); // Reset to 3 minutes
-            setEventCycleCount(prev => prev + 1); // Increment cycle count
-            
-            // Reset event entries for the new cycle
-            setEventEntries(0);
-            
-            // Don't modify hasEnteredEvent or hasWonEvent here
-            // These should only be reset when user claims their reward
-          }, 2000); // Small delay before starting new cycle
-          
+
+          // Reset for new cycle immediately to prevent multiple setTimeout calls
+          setEventTimeLeft(180); // Reset to 3 minutes
+          setEventCycleCount(prev => prev + 1); // Increment cycle count
+          setEventEntries(0); // Reset event entries for the new cycle
+
           return 0;
         }
-        
+
         return newValue;
       });
     }, 1000);
-    
+
     // Clean up on unmount
     return () => {
       clearInterval(timer);
     };
-  }, [hasEnteredEvent, hasWonEvent, eventEntries, eventCycleCount]); // Add eventCycleCount dependency
+  }, [hasEnteredEvent, hasWonEvent, eventCycleCount]); // Remove function dependencies to avoid hoisting issues
 
   // Helper function to calculate win amount
   const calculateWinAmount = () => {
@@ -2386,6 +2383,35 @@ const HomeScreen = () => {
   const { user, isGuest } = useAuth();
   const { canSendMessages, handleGuestRestriction } = useGuestRestrictions();
 
+  // Calculate actual children count for layout
+  const actualChildrenCount = useMemo(() => {
+    let count = 0;
+
+    // Spotlight pills (only for non-guest users)
+    if (!isGuest) {
+      count += 1; // Your spotlight pill (always present)
+      if (showOtherPill && otherSpotlightTimeLeft > 0) {
+        count += 1; // Other user's spotlight pill
+      }
+    }
+
+    // Friend activity widgets (limited to 5)
+    if (!isLoadingActivities && friendActivities.length > 0) {
+      count += Math.min(friendActivities.length, 5);
+    }
+
+    // Fixed widgets that are always present
+    count += 4; // Friend hosting, friend watching, listening music, gaming status, shop, random friends
+
+    return count;
+  }, [isGuest, showOtherPill, otherSpotlightTimeLeft, isLoadingActivities, friendActivities.length]);
+
+  // Memoized callback for scroll content size change to prevent infinite re-renders
+  const handleScrollContentSizeChange = useCallback((_width: number) => {
+    // Use actual children count instead of hardcoded estimate
+    handleContentLayout(actualChildrenCount * 320);
+  }, [handleContentLayout, actualChildrenCount]);
+
   // Load virtual currency balances
   useEffect(() => {
     if (!user || isGuest) {
@@ -2411,8 +2437,21 @@ const HomeScreen = () => {
         unsubscribeCurrency = virtualCurrencyService.onCurrencyBalances(user.uid, (newBalances) => {
           setCurrencyBalances(newBalances);
         });
-      } catch (error) {
-        console.error('Failed to load currency balances:', error);
+      } catch (error: any) {
+        // Handle Firebase permission errors gracefully
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          // For permission errors, set default balances and don't log error
+          setCurrencyBalances({
+            gold: 1000, // Default guest balance
+            gems: 50,   // Default guest balance
+            tokens: 0,
+            lastUpdated: new Date()
+          });
+        } else {
+          // Log non-permission errors
+          console.error('Failed to load currency balances:', error);
+          FirebaseErrorHandler.logError('loadCurrencyBalances', error);
+        }
       } finally {
         setIsLoadingCurrency(false);
       }
@@ -2922,64 +2961,61 @@ const HomeScreen = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingRight: 16 }}
             style={styles.horizontalWidgetContainer}
-            onContentSizeChange={(width) => {
-              const childrenCount = 2 + // Spotlight pills (always 2 slots, even if not all shown)
-                React.Children.count(renderFriendHostingLive()) +
-                React.Children.count(renderFriendWatchingLive()) +
-                React.Children.count(renderFriendListeningMusic()) +
-                React.Children.count(renderRandomFriendWidgets()) + 10; // Buffer
-              handleContentLayout(childrenCount * 320);
-            }}
+            onContentSizeChange={handleScrollContentSizeChange}
             onScroll={handleScroll}
             scrollEventThrottle={16}
             bounces={true}
             decelerationRate="normal"
           >
-            {/* Spotlight pills */}
-            {/* Your Spotlight pill - always visible */}
-            <View style={styles.pillContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.squareWidget,
-                  yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget,
-                  yourSpotlightTimeLeft > 0 && styles.activeShadow,
-                  yourSpotlightTimeLeft > 0 && yourAnimatedShadowStyle
-                ]}
-                onPress={() => openSpotlightModal()}
-                activeOpacity={0.9}
-              >
-                {/* Progress bar positioned absolutely inside */}
-                {yourSpotlightTimeLeft > 0 && (
-                  <SpotlightProgressBar 
-                    width={80} // Explicitly use squareWidget width
-                    height={110} // Explicitly use squareWidget height
-                    borderRadius={16} // Explicitly use squareWidget borderRadius
-                    progress={Math.min(1, yourSpotlightTimeLeft / 300)} // 5 min default
-                    color="#34C759" // NEO_GREEN
-                    strokeWidth={2.5} // Slightly smaller for the pill
-                    glowIntensity={2}
-                  />
-                )}
-                {/* Content with higher zIndex */}
-                <View style={styles.pillContentWrapper}>
-                <View style={[
-                  styles.avatarContainer,
-                  { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
-                ]}>  
-                  <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
+            {/* Spotlight pills - Hidden for guest users */}
+            {!isGuest && (
+              <>
+                {/* Your Spotlight pill - always visible */}
+                <View style={styles.pillContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.squareWidget,
+                      yourSpotlightTimeLeft > 0 ? styles.activeWidget : styles.inactiveWidget,
+                      yourSpotlightTimeLeft > 0 && styles.activeShadow,
+                      yourSpotlightTimeLeft > 0 && yourAnimatedShadowStyle
+                    ]}
+                    onPress={() => openSpotlightModal()}
+                    activeOpacity={0.9}
+                  >
+                    {/* Progress bar positioned absolutely inside */}
+                    {yourSpotlightTimeLeft > 0 && (
+                      <SpotlightProgressBar
+                        width={80} // Explicitly use squareWidget width
+                        height={110} // Explicitly use squareWidget height
+                        borderRadius={16} // Explicitly use squareWidget borderRadius
+                        progress={Math.min(1, yourSpotlightTimeLeft / 300)} // 5 min default
+                        color="#34C759" // NEO_GREEN
+                        strokeWidth={2.5} // Slightly smaller for the pill
+                        glowIntensity={2}
+                      />
+                    )}
+                    {/* Content with higher zIndex */}
+                    <View style={styles.pillContentWrapper}>
+                    <View style={[
+                      styles.avatarContainer,
+                      { borderColor: yourSpotlightTimeLeft > 0 ? '#4CAF50' : 'transparent' }
+                    ]}>
+                      <Image source={{ uri: profileImage || defaultSpotlightAvatar }} style={styles.gridAvatar} />
+                    </View>
+                    <Text style={styles.nameLabel}>You</Text>
+                    <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
+                      Spotlight
+                    </Text>
+                    {yourSpotlightTimeLeft > 0 && (
+                      <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
+                    )}
+                    </View>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.nameLabel}>You</Text>
-                <Text style={yourSpotlightTimeLeft > 0 ? styles.statusLabel : styles.statusLabelInactive}>
-                  Spotlight
-                </Text>
-                {yourSpotlightTimeLeft > 0 && (
-                  <Text style={styles.timerLabel}>{formatTime(yourSpotlightTimeLeft)}</Text>
-                )}
-                </View>
-              </TouchableOpacity>
-            </View>
-            {/* Random user boosting pill */}
-            {showOtherPill && otherSpotlightTimeLeft > 0 && (
+              </>
+            )}
+            {/* Random user boosting pill - Hidden for guest users */}
+            {!isGuest && showOtherPill && otherSpotlightTimeLeft > 0 && (
               <View style={styles.pillContainer}>
                 <TouchableOpacity
                   style={[
@@ -2992,7 +3028,7 @@ const HomeScreen = () => {
                   activeOpacity={0.9}
                 >
                   {/* Progress bar positioned absolutely inside */}
-                  <SpotlightProgressBar 
+                  <SpotlightProgressBar
                     width={80} // Explicitly use squareWidget width
                     height={110} // Explicitly use squareWidget height
                     borderRadius={16} // Explicitly use squareWidget borderRadius
@@ -3003,7 +3039,7 @@ const HomeScreen = () => {
                   />
                   {/* Content with higher zIndex */}
                   <View style={styles.pillContentWrapper}>
-                    <View style={[styles.avatarContainer, { borderColor: '#FFC107' }]}>  
+                    <View style={[styles.avatarContainer, { borderColor: '#FFC107' }]}>
                     <Image source={{ uri: otherSpotlightCandidate.avatar }} style={styles.gridAvatar} />
                   </View>
                   <Text style={styles.nameLabel}>{otherSpotlightCandidate.name}</Text>

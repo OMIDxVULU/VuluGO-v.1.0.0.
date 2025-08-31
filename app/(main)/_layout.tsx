@@ -79,25 +79,25 @@ const Layout = () => {
               )
             }} 
           />
-          <Tabs.Screen 
-            name="notifications" 
-            options={{ 
+          <Tabs.Screen
+            name="notifications"
+            options={{
               title: 'Notifications',
               tabBarIcon: ({ color, size }) => (
                 <MaterialIcons name="notifications" size={size} color={color} />
               ),
-              tabBarBadge: 9
-            }} 
+              // Badge will be handled by CustomTabBar using real notification data
+            }}
           />
-          <Tabs.Screen 
-            name="profile" 
-            options={{ 
+          <Tabs.Screen
+            name="profile"
+            options={{
               title: 'Profile',
               tabBarIcon: ({ color, size }) => (
                 <MaterialIcons name="person" size={size} color={color} />
               ),
-              tabBarBadge: 3
-            }} 
+              // Badge removed - profile doesn't need a badge
+            }}
           />
           
           {/* THESE SCREENS ARE HIDDEN FROM THE NAVBAR - Only accessible via the sidebar menu */}
@@ -109,6 +109,7 @@ const Layout = () => {
           <Tabs.Screen name="leaderboard" options={{ href: null }} />
           <Tabs.Screen name="shop" options={{ href: null }} />
           <Tabs.Screen name="account" options={{ href: null }} />
+          <Tabs.Screen name="add-friends" options={{ href: null }} />
           <Tabs.Screen 
             name="chat" 
             options={{

@@ -6,29 +6,21 @@ export const useGuestRestrictions = () => {
   const { isGuest, signOut } = useAuth();
   const router = useRouter();
 
-  const forceSignOutAndNavigate = async () => {
-    try {
-      // Clear guest state immediately
-      await signOut();
-      // Navigate to auth screen
-      router.push('/auth');
-    } catch (error) {
-      console.error('Error signing out guest:', error);
-      // Even if signOut fails, navigate to auth
-      router.push('/auth');
-    }
+  const navigateToUpgrade = () => {
+    console.log('🔄 Guest user navigating to upgrade screen');
+    router.push('/auth/upgrade');
   };
 
   const handleGuestRestriction = (feature: string) => {
     Alert.alert(
-      'Guest Mode Restriction',
-      `This feature requires a full account. You'll be signed out of guest mode to sign in.`,
+      'Upgrade Account',
+      `Guest users can browse but need a full account to access ${feature}. Would you like to upgrade your account?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign In', 
+        {
+          text: 'Upgrade Account',
           style: 'default',
-          onPress: forceSignOutAndNavigate
+          onPress: navigateToUpgrade
         }
       ]
     );
@@ -106,6 +98,38 @@ export const useGuestRestrictions = () => {
     return true;
   };
 
+  const canUseSpotlight = () => {
+    if (isGuest) {
+      handleGuestRestriction('spotlight features');
+      return false;
+    }
+    return true;
+  };
+
+  const canBoostOthers = () => {
+    if (isGuest) {
+      handleGuestRestriction('boosting other users');
+      return false;
+    }
+    return true;
+  };
+
+  const canViewFriends = () => {
+    if (isGuest) {
+      handleGuestRestriction('viewing friends');
+      return false;
+    }
+    return true;
+  };
+
+  const canViewActiveStatus = () => {
+    if (isGuest) {
+      handleGuestRestriction('viewing active status');
+      return false;
+    }
+    return true;
+  };
+
   const getGuestGoldLimit = () => 500;
   const getGuestGemsLimit = () => 10;
 
@@ -128,6 +152,10 @@ export const useGuestRestrictions = () => {
     canEditProfile,
     canManagePhotos,
     canChangeStatus,
+    canUseSpotlight,
+    canBoostOthers,
+    canViewFriends,
+    canViewActiveStatus,
     getGuestGoldLimit,
     getGuestGemsLimit,
     isAtGoldLimit,

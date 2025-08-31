@@ -4,6 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { IconButton } from 'react-native-paper';
 import { ChatIcon, MusicIcon, GoldMinerIcon, SlotsIcon, LeaderboardIcon, ShopIcon } from './icons/SidebarIcons';
+import { useAuth } from '../context/AuthContext';
+import { FirebaseErrorHandler } from '../utils/firebaseErrorHandler';
 
 interface SidebarMenuProps {
   onMenuStateChange?: (expanded: boolean) => void;
@@ -65,6 +67,7 @@ export const useMenuPosition = () => useContext(MenuPositionContext);
 const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const { user: currentUser } = useAuth();
   
   // Get both position and expanded state from context
   const menuPositionContext = useContext(MenuPositionContext);
@@ -100,17 +103,14 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
     }
   }, [menuPositionContext?.position]);
   
-  // Determine active menu item based on current route
-  const [activeIndex, setActiveIndex] = useState(0);
-  
-  // Define menu items
+  // Define menu items first
   const menuItems = [
     {
       id: 'chat',
       route: 'directmessages',
       icon: (color: string, isActive: boolean) => <ChatIcon color={color} active={isActive} />,
       label: 'Messages',
-      badge: 5,
+      // Remove hardcoded badge - use real unread message count if needed
     },
     {
       id: 'music',
@@ -141,31 +141,41 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
       route: 'shop',
       icon: (color: string, isActive: boolean) => <ShopIcon color={color} active={isActive} />,
       label: 'Shop',
-      badge: 1,
+      // Remove hardcoded badge - use real shop notification count if needed
     },
   ];
-  
+
+  // Get active index based on current route
+  const getActiveIndex = () => {
+    if (!pathname) return -1; // Return -1 when no pathname to avoid highlighting any item
+
+    const index = menuItems.findIndex(item => {
+      return pathname.includes(item.route);
+    });
+
+    // For guest users, don't highlight the Messages button even if on directmessages route
+    if (index >= 0 && menuItems[index].route === 'directmessages' && FirebaseErrorHandler.isGuestUser(currentUser)) {
+      return -1; // Don't highlight Messages for guest users
+    }
+
+    return index >= 0 ? index : -1; // Return -1 instead of 0 when no match found
+  };
+
+  // Determine active menu item based on current route - initialize with proper detection
+  const [activeIndex, setActiveIndex] = useState(() => getActiveIndex());
+
   // Calculate total notifications with useMemo instead of state + useEffect
+  // Removed dummy badge counts - now using real notification data
   const totalNotifications = useMemo(() => {
-    return menuItems.reduce((acc, item) => acc + (item.badge || 0), 0);
-  }, [menuItems]);
-  
+    // TODO: Connect to real notification counts for menu items
+    return 0;
+  }, []);
+
   // Set active index based on current route
   useEffect(() => {
     const index = getActiveIndex();
     setActiveIndex(index);
   }, [pathname]);
-  
-  // Get active index based on current route
-  const getActiveIndex = () => {
-    if (!pathname) return 0;
-    
-    const index = menuItems.findIndex(item => {
-      return pathname.includes(item.route);
-    });
-    
-    return index >= 0 ? index : 0;
-  };
   
   // Find the best magnetic position based on position, velocity and direction
   const getBestMagnetPosition = (x: number, y: number, vx: number, vy: number) => {
@@ -438,11 +448,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = ({ onMenuStateChange }) => {
                         isActive ? "#FFFFFF" : "rgba(255, 255, 255, 0.5)",
                         isActive
                       )}
-                      {item.badge && (
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeValue}>{item.badge}</Text>
-                        </View>
-                      )}
+                      {/* Removed hardcoded badges - use real notification data if needed */}
                     </View>
                     {isActive && (
                       <View style={styles.sidebarItemIndicator} />

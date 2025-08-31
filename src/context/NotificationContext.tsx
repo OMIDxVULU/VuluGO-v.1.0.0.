@@ -73,43 +73,55 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     let unsubscribe: (() => void) | undefined;
+    let isMounted = true; // Track component mount status
 
     const loadNotifications = async () => {
+      if (!isMounted) return; // Early exit if unmounted
+
       setIsLoading(true);
       try {
         // Get initial notification counts
         const firebaseCounts = await notificationService.getNotificationCounts(user.uid);
         const localCounts = convertFirebaseCountsToLocal(firebaseCounts);
-        firebaseCountsRef.current = localCounts; // Keep ref in sync
-        setCounts(localCounts);
 
-        // Set up real-time listener for notifications
-        unsubscribe = notificationService.onNotifications(user.uid, (newNotifications) => {
-          setNotifications(newNotifications);
+        if (isMounted) {
+          firebaseCountsRef.current = localCounts; // Keep ref in sync
+          setCounts(localCounts);
 
-          // Apply incremental changes based on fresh Firebase counts or previous state
-          setCounts(prev => {
-            // Calculate counts from current notifications (only unread)
-            const currentCounts = calculateCountsFromNotifications(newNotifications);
+          // Set up real-time listener for notifications
+          unsubscribe = notificationService.onNotifications(user.uid, (newNotifications) => {
+            if (!isMounted) return; // Prevent updates after unmount
 
-            // Update the ref with the new counts
-            firebaseCountsRef.current = currentCounts;
+            setNotifications(newNotifications);
 
-            return currentCounts;
+            // Apply incremental changes based on fresh Firebase counts or previous state
+            setCounts(prev => {
+              // Calculate counts from current notifications (only unread)
+              const currentCounts = calculateCountsFromNotifications(newNotifications);
+
+              // Update the ref with the new counts
+              firebaseCountsRef.current = currentCounts;
+
+              return currentCounts;
+            });
           });
-        });
+        }
       } catch (error) {
         console.error('Failed to load notifications:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadNotifications();
 
     return () => {
+      isMounted = false; // Mark as unmounted
       if (unsubscribe) {
         unsubscribe();
+        unsubscribe = undefined; // Clear reference to prevent memory leaks
       }
     };
   }, [user, isGuest]);

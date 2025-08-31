@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "VULUGO.app"
-               BlueprintName = "VULUGO"
-               ReferencedContainer = "container:VULUGO.xcodeproj">
+               BuildableName = "VuluGO.app"
+               BlueprintName = "VuluGO"
+               ReferencedContainer = "container:VuluGO.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "VULUGOTests.xctest"
-               BlueprintName = "VULUGOTests"
-               ReferencedContainer = "container:VULUGO.xcodeproj">
+               BuildableName = "VuluGOTests.xctest"
+               BlueprintName = "VuluGOTests"
+               ReferencedContainer = "container:VuluGO.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "VULUGO.app"
-            BlueprintName = "VULUGO"
-            ReferencedContainer = "container:VULUGO.xcodeproj">
+            BuildableName = "VuluGO.app"
+            BlueprintName = "VuluGO"
+            ReferencedContainer = "container:VuluGO.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "VULUGO.app"
-            BlueprintName = "VULUGO"
-            ReferencedContainer = "container:VULUGO.xcodeproj">
+            BuildableName = "VuluGO.app"
+            BlueprintName = "VuluGO"
+            ReferencedContainer = "container:VuluGO.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

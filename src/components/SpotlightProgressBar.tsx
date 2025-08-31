@@ -107,14 +107,14 @@ const SpotlightProgressBar = memo(({
   // Calculate the color based on progress (first 80%, warning color last 20%)
   const animatedColor = useDerivedValue(() => {
     // If progress is less than 0.2 (last 20% of time), transition to warning color
-    return progressAnim.value > 0.2 
+    return progressAnim.value > 0.2
       ? baseColor
       : interpolateColor(
           Math.min(1, progressAnim.value * 5), // Scale 0-0.2 to 0-1 for smooth transition
           [0, 1],
-          [warningColor, baseColor] 
+          [warningColor, baseColor]
         );
-  }, [progressAnim.value, baseColor, warningColor]);
+  }, [baseColor, warningColor]); // Remove progressAnim.value from dependencies
   
   // Adjust animation duration based on duration category
   const getAnimationDuration = (): number => {

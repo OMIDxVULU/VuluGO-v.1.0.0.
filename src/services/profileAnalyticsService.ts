@@ -78,6 +78,25 @@ class ProfileAnalyticsService {
     return auth?.currentUser !== null;
   }
 
+  private isGuestUser(): boolean {
+    // Check if current user is a guest user
+    const currentUser = auth?.currentUser;
+    if (!currentUser) return true; // No user means guest
+
+    // Check for guest user ID pattern
+    if (currentUser.uid?.startsWith('guest_')) return true;
+
+    // Check for anonymous authentication
+    if (currentUser.isAnonymous) return true;
+
+    return false;
+  }
+
+  private shouldSkipFirestoreOperation(): boolean {
+    // Skip Firestore operations for guest users to prevent permission errors
+    return !this.isAuthenticated() || this.isGuestUser();
+  }
+
   /**
    * Record a profile view
    */
@@ -96,6 +115,12 @@ class ProfileAnalyticsService {
     try {
       // Don't record self-views
       if (profileOwnerId === viewerData.viewerId) {
+        return '';
+      }
+
+      // Check if user should skip Firestore operations (guest users)
+      if (this.shouldSkipFirestoreOperation()) {
+        console.warn('Skipping recordProfileView for guest user');
         return '';
       }
 
@@ -160,6 +185,19 @@ class ProfileAnalyticsService {
    */
   async getProfileViews(profileOwnerId: string, limitCount: number = 50): Promise<ProfileView[]> {
     try {
+      // Check if user should skip Firestore operations (guest users)
+      if (this.shouldSkipFirestoreOperation()) {
+        console.warn('Skipping getProfileViews for guest user - returning empty array');
+        return [];
+      }
+
+      // Check if current user has permission to view this profile's analytics
+      const currentUserId = this.getCurrentUserId();
+      if (!currentUserId || currentUserId !== profileOwnerId) {
+        console.warn('User does not have permission to view profile analytics for this user');
+        return [];
+      }
+
       const q = query(
         collection(db, 'profileViews'),
         where('profileOwnerId', '==', profileOwnerId),
@@ -181,6 +219,12 @@ class ProfileAnalyticsService {
 
       return views;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getProfileViews - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getProfileViews', error);
       throw new Error(`Failed to get profile views: ${error.message}`);
     }
@@ -212,8 +256,16 @@ class ProfileAnalyticsService {
 
         callback(views);
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          console.warn('Permission denied for onProfileViews - returning empty array for guest user');
+          callback([]);
+          return;
+        }
+
         console.error('Profile views listener error:', error);
         FirebaseErrorHandler.logError('onProfileViews', error);
+        callback([]);
       });
     } catch (error: any) {
       FirebaseErrorHandler.logError('onProfileViews', error);
@@ -246,6 +298,22 @@ class ProfileAnalyticsService {
         viewsByDay: data.viewsByDay || []
       } as ProfileAnalytics;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getProfileAnalytics - returning empty analytics for guest user');
+        return {
+          userId: profileOwnerId,
+          totalViews: 0,
+          uniqueViewers: 0,
+          viewsToday: 0,
+          viewsThisWeek: 0,
+          viewsThisMonth: 0,
+          topViewers: [],
+          viewsByDay: [],
+          lastUpdated: new Date()
+        };
+      }
+
       FirebaseErrorHandler.logError('getProfileAnalytics', error);
       throw new Error(`Failed to get profile analytics: ${error.message}`);
     }
@@ -369,11 +437,24 @@ class ProfileAnalyticsService {
    */
   async getProfileViewers(profileOwnerId: string): Promise<ProfileViewer[]> {
     try {
+      // Check if user should skip Firestore operations (guest users)
+      if (this.shouldSkipFirestoreOperation()) {
+        console.warn('Skipping getProfileViewers for guest user - returning empty array');
+        return [];
+      }
+
+      // Check if current user has permission to view this profile's analytics
+      const currentUserId = this.getCurrentUserId();
+      if (!currentUserId || currentUserId !== profileOwnerId) {
+        console.warn('User does not have permission to view profile viewers for this user');
+        return [];
+      }
+
       const views = await this.getProfileViews(profileOwnerId, 100);
-      
+
       // Group by viewer and get latest info
       const viewerMap = new Map<string, ProfileViewer>();
-      
+
       views.forEach(view => {
         const existing = viewerMap.get(view.viewerId);
         if (!existing || view.timestamp > existing.lastViewed) {
@@ -393,6 +474,12 @@ class ProfileAnalyticsService {
       return Array.from(viewerMap.values())
         .sort((a, b) => b.lastViewed.getTime() - a.lastViewed.getTime());
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getProfileViewers - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getProfileViewers', error);
       throw new Error(`Failed to get profile viewers: ${error.message}`);
     }

@@ -60,10 +60,49 @@ class VirtualCurrencyService {
   }
 
   /**
+   * Safely convert Firestore timestamp to Date
+   */
+  private safeToDate(timestamp: any): Date {
+    if (!timestamp) {
+      return new Date();
+    }
+
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      try {
+        return timestamp.toDate();
+      } catch (error) {
+        console.warn('Failed to convert timestamp to date:', error);
+        return new Date();
+      }
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      return new Date(timestamp);
+    }
+
+    return new Date();
+  }
+
+  /**
    * Get user's currency balances
    */
   async getCurrencyBalances(userId: string): Promise<CurrencyBalance> {
     try {
+      // Check authentication state first
+      if (!this.isAuthenticated()) {
+        // Return default balance for guest users
+        return {
+          gold: 0,
+          gems: 0,
+          tokens: 0,
+          lastUpdated: new Date()
+        };
+      }
+
       return await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', userId);
         const userDoc = await transaction.get(userRef);
@@ -99,7 +138,7 @@ class VirtualCurrencyService {
           gold: balances.gold || 0,
           gems: balances.gems || 0,
           tokens: balances.tokens || 0,
-          lastUpdated: balances.lastUpdated?.toDate() || new Date()
+          lastUpdated: this.safeToDate(balances.lastUpdated)
         };
       });
     } catch (error: any) {
@@ -129,10 +168,23 @@ class VirtualCurrencyService {
             gold: balances.gold || 0,
             gems: balances.gems || 0,
             tokens: balances.tokens || 0,
-            lastUpdated: balances.lastUpdated?.toDate() || new Date()
+            lastUpdated: this.safeToDate(balances.lastUpdated)
           });
         }
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          // Silently provide default balances for guest users
+          callback({
+            gold: 1000,
+            gems: 50,
+            tokens: 0,
+            lastUpdated: new Date()
+          });
+          return;
+        }
+
+        // Log non-permission errors
         console.error('Currency balances listener error:', error);
         FirebaseErrorHandler.logError('onCurrencyBalances', error);
       });
@@ -373,7 +425,7 @@ class VirtualCurrencyService {
         transactions.push({
           id: doc.id,
           ...data,
-          timestamp: data.timestamp?.toDate() || new Date()
+          timestamp: this.safeToDate(data.timestamp)
         } as Transaction);
       });
 

@@ -4,7 +4,7 @@ import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/fire
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Firebase configuration for VuluGO
+// Firebase configuration for VULU
 const firebaseConfig = {
   apiKey: "AIzaSyBHL5BpkQRDe-03hE5-7TYcbr2aad1ezqg",
   authDomain: "vulugo.firebaseapp.com",
@@ -42,7 +42,7 @@ const initializeFirebase = (): { success: boolean; error?: Error } => {
     app = initializeApp(firebaseConfig);
     console.log('✅ Firebase app initialized');
 
-    // Initialize Auth with persistence
+    // Initialize Auth with persistence (with AsyncStorage fallback handling)
     try {
       auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
@@ -53,6 +53,17 @@ const initializeFirebase = (): { success: boolean; error?: Error } => {
       if (authError.code === 'auth/already-initialized') {
         auth = getAuth(app);
         console.log('✅ Firebase Auth already initialized, using existing instance');
+      } else if (authError.message?.includes('storage') || authError.message?.includes('AsyncStorage')) {
+        // Handle AsyncStorage issues in iOS Simulator
+        console.warn('⚠️ AsyncStorage persistence failed, falling back to memory-only auth:', authError.message);
+        try {
+          // Try to initialize without persistence
+          auth = getAuth(app);
+          console.log('✅ Firebase Auth initialized without persistence (memory-only)');
+        } catch (fallbackError) {
+          console.error('❌ Firebase Auth fallback initialization failed:', fallbackError);
+          throw fallbackError;
+        }
       } else {
         throw authError;
       }

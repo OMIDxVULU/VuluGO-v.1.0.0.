@@ -201,6 +201,12 @@ class ShopService {
 
       return products;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getProducts - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getProducts', error);
       throw new Error(`Failed to get products: ${error.message}`);
     }
@@ -266,8 +272,16 @@ class ShopService {
 
         callback(products);
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          console.warn('Permission denied for onProducts - returning empty array for guest user');
+          callback([]);
+          return;
+        }
+
         console.error('Products listener error:', error);
         FirebaseErrorHandler.logError('onProducts', error);
+        callback([]);
       });
     } catch (error: any) {
       FirebaseErrorHandler.logError('onProducts', error);
@@ -493,6 +507,12 @@ class ShopService {
 
       return purchases;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getPurchaseHistory - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getPurchaseHistory', error);
       throw new Error(`Failed to get purchase history: ${error.message}`);
     }
@@ -527,6 +547,16 @@ class ShopService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as UserInventory;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getUserInventory - returning empty inventory for guest user');
+        return {
+          userId,
+          items: [],
+          lastUpdated: new Date()
+        };
+      }
+
       FirebaseErrorHandler.logError('getUserInventory', error);
       throw new Error(`Failed to get user inventory: ${error.message}`);
     }
@@ -620,6 +650,12 @@ class ShopService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as ShopStats;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getShopStats - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getShopStats', error);
       throw new Error(`Failed to get shop stats: ${error.message}`);
     }
@@ -655,6 +691,12 @@ class ShopService {
 
       return promotions;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getActivePromotions - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getActivePromotions', error);
       throw new Error(`Failed to get active promotions: ${error.message}`);
     }

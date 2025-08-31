@@ -1,14 +1,17 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  SafeAreaView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
   ScrollView,
   Platform,
   Alert
 } from 'react-native';
+
+// Import proper ErrorUtils types
+import type { ErrorHandlerCallback } from '../types/global';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Updates from 'expo-updates';
@@ -28,6 +31,10 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Instance properties to store previous handlers for this specific ErrorBoundary
+  private previousErrorHandler: ErrorHandlerCallback | null = null;
+  private previousRejectionHandler: ((reason: any) => void) | null = null;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -35,6 +42,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       error: null,
       errorInfo: null
     };
+
+    // Set up React Native global error handlers
+    this.setupGlobalErrorHandlers();
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
@@ -45,18 +55,90 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log the error to an error reporting service
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
-    
+
     // Store error details in state
     this.setState({ errorInfo });
-    
+
     // Call the onError callback if provided
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-    
+
     // Send error to your analytics/logging service
     // Example: Firebase Crashlytics, Sentry, etc.
     // logErrorToService(error, errorInfo);
+  }
+
+  // Set up React Native compatible global error handlers
+  private setupGlobalErrorHandlers = () => {
+    // Store previous handlers in instance properties
+    if (ErrorUtils && ErrorUtils.getGlobalHandler) {
+      this.previousErrorHandler = ErrorUtils.getGlobalHandler();
+    }
+
+    // Set up React Native error handler
+    if (ErrorUtils && ErrorUtils.setGlobalHandler) {
+      ErrorUtils.setGlobalHandler(this.handleGlobalError);
+    }
+
+    // Set up promise rejection handler for React Native
+    if (typeof globalThis !== 'undefined') {
+      this.previousRejectionHandler = globalThis.onunhandledrejection;
+      globalThis.onunhandledrejection = this.handleUnhandledRejection;
+    }
+  };
+
+  // Handle global JavaScript errors
+  private handleGlobalError = (error: any, isFatal?: boolean) => {
+    console.error('Global error caught by ErrorBoundary:', error, { isFatal });
+
+    // Call previous handler if it exists
+    if (this.previousErrorHandler) {
+      this.previousErrorHandler(error, isFatal);
+    }
+
+    // Update state to show error UI
+    this.setState({
+      hasError: true,
+      error: error instanceof Error ? error : new Error(String(error)),
+      errorInfo: null
+    });
+  };
+
+  // Handle unhandled promise rejections (React Native compatible)
+  private handleUnhandledRejection = (reason: any) => {
+    console.error('Unhandled promise rejection:', reason);
+
+    // Call previous handler if it exists
+    if (this.previousRejectionHandler) {
+      this.previousRejectionHandler(reason);
+    }
+
+    // Treat as a regular error
+    this.setState({
+      hasError: true,
+      error: new Error(`Unhandled Promise Rejection: ${reason}`),
+      errorInfo: null
+    });
+  };
+
+  componentWillUnmount(): void {
+    // Restore previous error handlers with proper error handling
+    if (ErrorUtils && ErrorUtils.setGlobalHandler && this.previousErrorHandler) {
+      try {
+        ErrorUtils.setGlobalHandler(this.previousErrorHandler);
+      } catch (error) {
+        console.warn('Failed to restore previous error handler:', error);
+      }
+    }
+
+    if (typeof globalThis !== 'undefined' && this.previousRejectionHandler) {
+      try {
+        globalThis.onunhandledrejection = this.previousRejectionHandler;
+      } catch (error) {
+        console.warn('Failed to restore previous rejection handler:', error);
+      }
+    }
   }
   
   handleRestart = async (): Promise<void> => {

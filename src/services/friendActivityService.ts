@@ -208,6 +208,12 @@ class FriendActivityService {
       activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       return activities.slice(0, limitCount);
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getFriendActivities - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getFriendActivities', error);
       throw new Error(`Failed to get friend activities: ${error.message}`);
     }
@@ -260,8 +266,16 @@ class FriendActivityService {
 
         callback(activities);
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          console.warn('Permission denied for onFriendActivities - returning empty array for guest user');
+          callback([]);
+          return;
+        }
+
         console.error('Friend activities listener error:', error);
         FirebaseErrorHandler.logError('onFriendActivities', error);
+        callback([]);
       });
     } catch (error: any) {
       FirebaseErrorHandler.logError('onFriendActivities', error);

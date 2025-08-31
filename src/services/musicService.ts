@@ -248,14 +248,14 @@ class MusicService {
       );
 
       const querySnapshot = await getDocs(q);
-      
+
       if (querySnapshot.empty) {
         return null;
       }
 
       const doc = querySnapshot.docs[0];
       const data = doc.data();
-      
+
       return {
         id: doc.id,
         ...data,
@@ -263,6 +263,12 @@ class MusicService {
         endTime: data.endTime?.toDate()
       } as UserMusicActivity;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getCurrentMusicActivity - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getCurrentMusicActivity', error);
       throw new Error(`Failed to get current music activity: ${error.message}`);
     }
@@ -331,6 +337,12 @@ class MusicService {
       activities.sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
       return activities.slice(0, limitCount);
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getFriendsMusicActivities - returning empty array for guest user');
+        return [];
+      }
+
       FirebaseErrorHandler.logError('getFriendsMusicActivities', error);
       throw new Error(`Failed to get friends music activities: ${error.message}`);
     }
@@ -380,8 +392,16 @@ class MusicService {
 
         callback(activities);
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          console.warn('Permission denied for onMusicActivities - returning empty array for guest user');
+          callback([]);
+          return;
+        }
+
         console.error('Music activities listener error:', error);
         FirebaseErrorHandler.logError('onMusicActivities', error);
+        callback([]);
       });
     } catch (error: any) {
       FirebaseErrorHandler.logError('onMusicActivities', error);
@@ -473,6 +493,12 @@ class MusicService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as MusicPreferences;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getMusicPreferences - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getMusicPreferences', error);
       throw new Error(`Failed to get music preferences: ${error.message}`);
     }

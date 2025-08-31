@@ -1,58 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import NewAuthScreen from '../components/auth/NewAuthScreen';
+import { AuthColors, AuthButton } from '../components/auth/AuthDesignSystem';
 
 const AuthScreen: React.FC = () => {
   const router = useRouter();
-  const { signInAsGuest, signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const { signInAsGuest } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showGuestOption, setShowGuestOption] = useState(false);
+  const insets = useSafeAreaInsets();
 
-  const handleAuth = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
 
-    if (!isLogin && !displayName) {
-      Alert.alert('Error', 'Please enter a display name');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        await signIn(email, password);
-        Alert.alert('Success', 'Welcome back!');
-      } else {
-        await signUp(email, password, displayName);
-        Alert.alert('Success', 'Account created successfully!');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGuestLogin = async () => {
     setLoading(true);
@@ -67,264 +36,110 @@ const AuthScreen: React.FC = () => {
     }
   };
 
-  const toggleAuthMode = () => {
-    setIsLogin(!isLogin);
-    setEmail('');
-    setPassword('');
-    setDisplayName('');
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <LinearGradient
-            colors={['#1C1D23', '#232429', '#2D2E38']}
-            style={styles.gradient}
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <MaterialCommunityIcons
-                name="fire"
-                size={60}
-                color="#FF6B35"
-                style={styles.logo}
-              />
-              <Text style={styles.title}>VULU GO</Text>
-              <Text style={styles.subtitle}>
-                {isLogin ? 'Welcome back!' : 'Create your account'}
-              </Text>
+        {showGuestOption ? (
+          <View style={styles.guestContainer}>
+            <Text style={styles.guestTitle}>Continue as Guest?</Text>
+            <Text style={styles.guestSubtitle}>
+              You'll have limited access to features. Create an account for the full experience.
+            </Text>
+
+            <AuthButton
+              title="Continue as Guest"
+              onPress={handleGuestLogin}
+              loading={loading}
+              disabled={loading}
+              containerStyle={styles.guestButton}
+            />
+
+            <AuthButton
+              title="Create Account Instead"
+              variant="link"
+              onPress={() => setShowGuestOption(false)}
+              containerStyle={styles.backButton}
+            />
+          </View>
+        ) : (
+          <View style={styles.authContainer}>
+            <View style={styles.authContent}>
+              <NewAuthScreen />
             </View>
 
-            {/* Auth Form */}
-            <View style={styles.formContainer}>
-              {!isLogin && (
-                <View style={styles.inputContainer}>
-                  <MaterialIcons
-                    name="person"
-                    size={24}
-                    color="#6E69F4"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Display Name"
-                    placeholderTextColor="#8E8E93"
-                    value={displayName}
-                    onChangeText={setDisplayName}
-                    autoCapitalize="words"
-                  />
-                </View>
-              )}
-
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="email"
-                  size={24}
-                  color="#6E69F4"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor="#8E8E93"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <MaterialIcons
-                  name="lock"
-                  size={24}
-                  color="#6E69F4"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#8E8E93"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <MaterialIcons
-                    name={showPassword ? 'visibility' : 'visibility-off'}
-                    size={24}
-                    color="#8E8E93"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Auth Button */}
+            <View style={[styles.guestOptionContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
               <TouchableOpacity
-                style={[styles.authButton, loading && styles.authButtonDisabled]}
-                onPress={handleAuth}
-                disabled={loading}
+                style={styles.guestOptionButton}
+                onPress={() => setShowGuestOption(true)}
               >
-                <LinearGradient
-                  colors={['#6E69F4', '#8B7CF6']}
-                  style={styles.authButtonGradient}
-                >
-                  <Text style={styles.authButtonText}>
-                    {loading
-                      ? 'Loading...'
-                      : isLogin
-                      ? 'Sign In'
-                      : 'Create Account'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Guest Login Button */}
-              <TouchableOpacity
-                style={styles.guestButton}
-                onPress={handleGuestLogin}
-                disabled={loading}
-              >
-                <Text style={styles.guestButtonText}>Log in as a guest</Text>
-              </TouchableOpacity>
-
-              {/* Toggle Mode */}
-              <TouchableOpacity
-                style={styles.toggleButton}
-                onPress={toggleAuthMode}
-              >
-                <Text style={styles.toggleText}>
-                  {isLogin
-                    ? "Don't have an account? Sign Up"
-                    : 'Already have an account? Sign In'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Skip for now */}
-              <TouchableOpacity
-                style={styles.skipButton}
-                onPress={() => {
-                  // Skip authentication and go to main app
-                  router.replace('/(main)');
-                }}
-              >
-                <Text style={styles.skipText}>Skip for now</Text>
+                <Text style={styles.guestOptionText}>Continue as Guest</Text>
               </TouchableOpacity>
             </View>
-          </LinearGradient>
-        </ScrollView>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1C1D23',
+    backgroundColor: AuthColors.background,
   },
   keyboardView: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  gradient: {
+  authContainer: {
     flex: 1,
-    paddingHorizontal: 24,
   },
-  header: {
-    alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
+  authContent: {
+    flex: 1,
   },
-  logo: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-  formContainer: {
+  guestContainer: {
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: AuthColors.background,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
+  guestTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: AuthColors.primaryText,
+    textAlign: 'center',
     marginBottom: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    color: '#FFFFFF',
+  guestSubtitle: {
     fontSize: 16,
-    paddingVertical: 16,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  authButton: {
-    marginTop: 24,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  authButtonDisabled: {
-    opacity: 0.6,
-  },
-  authButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  authButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: AuthColors.secondaryText,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
   },
   guestButton: {
-    marginTop: 16,
-    alignItems: 'center',
+    marginBottom: 16,
   },
-  guestButtonText: {
-    color: '#6E69F4',
+  backButton: {
+    marginTop: 8,
+  },
+  guestOptionContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+  guestOptionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  guestOptionText: {
+    color: AuthColors.linkColor,
     fontSize: 16,
-    textDecorationLine: 'underline',
-  },
-  toggleButton: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  toggleText: {
-    color: '#6E69F4',
-    fontSize: 16,
-  },
-  skipButton: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  skipText: {
-    color: '#8E8E93',
-    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

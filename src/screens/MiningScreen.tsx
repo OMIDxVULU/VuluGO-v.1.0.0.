@@ -56,7 +56,7 @@ const MiningScreen = () => {
           <MaterialIcons name="monetization-on" size={24} color="#FFD700" style={styles.headerIcon} />
           <Text style={styles.headerTitle}>Mining Gold</Text>
         </View>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/')}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/(main)')}>
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>

@@ -198,8 +198,16 @@ class NotificationService {
 
         callback(notifications);
       }, (error) => {
+        // Handle permission errors gracefully for guest users
+        if (FirebaseErrorHandler.isPermissionError(error)) {
+          console.warn('Permission denied for onNotifications - returning empty array for guest user');
+          callback([]);
+          return;
+        }
+
         console.error('Notifications listener error:', error);
         FirebaseErrorHandler.logError('onNotifications', error);
+        callback([]);
       });
     } catch (error: any) {
       FirebaseErrorHandler.logError('onNotifications', error);
@@ -341,6 +349,19 @@ class NotificationService {
 
       return counts;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getNotificationCounts - returning zero counts for guest user');
+        return {
+          total: 0,
+          unread: 0,
+          friendRequests: 0,
+          profileViews: 0,
+          announcements: 0,
+          activities: 0
+        };
+      }
+
       FirebaseErrorHandler.logError('getNotificationCounts', error);
       throw new Error(`Failed to get notification counts: ${error.message}`);
     }

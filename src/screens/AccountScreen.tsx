@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -20,16 +20,22 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScrollableContentContainer from '../components/ScrollableContentContainer';
 import { authService } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
+import { firestoreService } from '../services/firestoreService';
+import { BiometricSettings } from '../components/auth/BiometricAuthButton';
+import SecurityMonitor from '../components/security/SecurityMonitor';
+import SecuritySettings from '../components/security/SecuritySettings';
 
 const { height } = Dimensions.get('window');
 
 const AccountScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user, userProfile, updateUserProfile, isGuest, updateUserEmail, deleteAccount } = useAuth();
   const [activeField, setActiveField] = useState<string | null>(null);
-  const [username, setUsername] = useState('omidxvulu');
-  const [displayName, setDisplayName] = useState('Amin');
-  const [email, setEmail] = useState('vulu@gmail.com');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -48,7 +54,132 @@ const AccountScreen = () => {
   const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValidatingUsername, setIsValidatingUsername] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+
+  // Load user data from Firebase
+  useEffect(() => {
+    if (userProfile && !isGuest) {
+      setUsername(userProfile.username || '');
+      setDisplayName(userProfile.displayName || '');
+      setEmail(userProfile.email || '');
+      setPhone(userProfile.phoneNumber || '');
+    }
+  }, [userProfile, isGuest]);
+
+  // Validate username uniqueness
+  const validateUsername = async (newUsername: string): Promise<boolean> => {
+    if (!newUsername || newUsername === userProfile?.username) {
+      return true; // No change or empty
+    }
+
+    setIsValidatingUsername(true);
+    try {
+      const isTaken = await firestoreService.isUsernameTaken(newUsername);
+      if (isTaken) {
+        setErrorMessage('Username is already taken');
+        return false;
+      }
+      setErrorMessage('');
+      return true;
+    } catch (error) {
+      setErrorMessage('Failed to validate username');
+      return false;
+    } finally {
+      setIsValidatingUsername(false);
+    }
+  };
+
+  // Update user profile in Firebase
+  const updateProfile = async (field: string, value: string): Promise<boolean> => {
+    if (!user?.uid || isGuest) {
+      showToastMessage('Please sign in to update your profile');
+      return false;
+    }
+
+    setIsLoading(true);
+    try {
+      const updates: any = {};
+
+      switch (field) {
+        case 'username':
+          if (!(await validateUsername(value))) {
+            return false;
+          }
+          updates.username = value;
+          break;
+        case 'displayName':
+          updates.displayName = value;
+          break;
+        case 'email':
+          // Email changes require password confirmation
+          Alert.alert(
+            'Change Email',
+            'To change your email address, please enter your current password for security.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Continue',
+                onPress: () => {
+                  Alert.prompt(
+                    'Enter Password',
+                    'Please enter your current password:',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Change Email',
+                        onPress: async (password) => {
+                          if (!password) {
+                            showToastMessage('Password is required to change email');
+                            return;
+                          }
+                          try {
+                            await updateUserEmail(value, password);
+                            showToastMessage('Email updated successfully. Please verify your new email address.');
+                            setEmail(value);
+                          } catch (error: any) {
+                            showToastMessage(error.message || 'Failed to update email');
+                          }
+                        }
+                      }
+                    ],
+                    'secure-text'
+                  );
+                }
+              }
+            ]
+          );
+          return true; // Return true to close the modal
+        case 'phoneNumber':
+          updates.phoneNumber = value;
+          break;
+        default:
+          return false;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await updateUserProfile(updates);
+        showToastMessage('Profile updated successfully');
+      }
+      return true;
+    } catch (error: any) {
+      showToastMessage(error.message || 'Failed to update profile');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const showToastMessage = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 3000);
+  };
 
   const handleBack = () => {
     router.push('/(main)/profile');
@@ -100,36 +231,35 @@ const AccountScreen = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
-              'Permanently Delete Account',
-              'Please confirm that you want to permanently delete your account. This action is irreversible.',
-              [
-                {
-                  text: 'No, Keep My Account',
-                  style: 'cancel'
-                },
-                {
-                  text: 'Yes, Delete My Account',
-                  style: 'destructive',
-                  onPress: () => {
-                    setIsDeleting(true);
-                    setTimeout(() => {
-                      setIsDeleting(false);
-                      setToastMessage('Your account has been deleted');
-                      setShowToast(true);
-                      setTimeout(() => {
-                        setShowToast(false);
-                        router.replace('/');
-                      }, 1500);
-                    }, 2000);
-                  }
-                }
-              ]
-            );
+            setShowDeleteAccountModal(true);
           }
         }
       ]
     );
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!deleteAccountPassword.trim()) {
+      Alert.alert('Error', 'Please enter your current password to delete your account');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteAccount(deleteAccountPassword);
+      setShowDeleteAccountModal(false);
+      setToastMessage('Your account has been deleted');
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+        router.replace('/auth');
+      }, 1500);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to delete account');
+    } finally {
+      setIsDeleting(false);
+      setDeleteAccountPassword('');
+    }
   };
 
   const openEditModal = (field: string, currentValue: string) => {
@@ -169,8 +299,14 @@ const AccountScreen = () => {
     return true;
   };
 
-  const saveChanges = () => {
-    if (validateField()) {
+  const saveChanges = async () => {
+    if (!validateField()) {
+      return;
+    }
+
+    const success = await updateProfile(fieldType, editValue);
+    if (success) {
+      // Update local state to reflect changes immediately
       if (fieldType === 'username') {
         setUsername(editValue);
       } else if (fieldType === 'displayName') {
@@ -180,7 +316,7 @@ const AccountScreen = () => {
       } else if (fieldType === 'phone') {
         setPhone(editValue);
       }
-      
+
       closeModal();
     }
   };
@@ -216,13 +352,24 @@ const AccountScreen = () => {
     return true;
   };
   
-  const changePassword = () => {
-    if (validatePassword()) {
-      Alert.alert(
-        'Success',
-        'Your password has been updated successfully',
-        [{ text: 'OK', onPress: closePasswordModal }]
-      );
+  const changePassword = async () => {
+    if (!validatePassword()) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await authService.updatePassword(currentPassword, newPassword);
+      showToastMessage('Password updated successfully');
+      closePasswordModal();
+      // Clear password fields
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update password');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -348,7 +495,7 @@ const AccountScreen = () => {
           end={{ x: 0, y: 1 }}
           style={styles.sectionCard}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.fieldContainer}
             onPress={openPasswordModal}
           >
@@ -363,6 +510,10 @@ const AccountScreen = () => {
               <Feather name="chevron-right" size={20} color="#9BA1A6" />
             </View>
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <BiometricSettings />
         </LinearGradient>
       </View>
     );
@@ -564,17 +715,21 @@ const AccountScreen = () => {
               </TouchableOpacity>
               
               <LinearGradient
-                colors={!editValue && fieldType !== 'phone' ? ['rgba(110, 105, 244, 0.5)', 'rgba(110, 105, 244, 0.5)'] : ['#6E69F4', '#5865F2']}
+                colors={(!editValue && fieldType !== 'phone') || isLoading ? ['rgba(110, 105, 244, 0.5)', 'rgba(110, 105, 244, 0.5)'] : ['#6E69F4', '#5865F2']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.saveButtonGradient}
               >
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.saveButton}
                   onPress={saveChanges}
-                  disabled={!editValue && fieldType !== 'phone'}
+                  disabled={(!editValue && fieldType !== 'phone') || isLoading}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  )}
                 </TouchableOpacity>
               </LinearGradient>
             </View>
@@ -706,6 +861,92 @@ const AccountScreen = () => {
     );
   };
 
+  const renderDeleteAccountModal = () => {
+    return (
+      <Modal
+        visible={showDeleteAccountModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDeleteAccountModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowDeleteAccountModal(false)}
+          />
+        </View>
+
+        <View style={styles.modalContentWrapper}>
+          <LinearGradient
+            colors={['#1C1D23', '#15151A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.modalContent}
+          >
+            <View style={styles.statusSelectorHandle} />
+            <Text style={styles.modalTitle}>Delete Account</Text>
+            <Text style={styles.modalSubtitle}>
+              This action cannot be undone. Please enter your password to confirm account deletion.
+            </Text>
+
+            <View style={styles.passwordInputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor="#8E8E93"
+                secureTextEntry
+                value={deleteAccountPassword}
+                onChangeText={setDeleteAccountPassword}
+              />
+              {deleteAccountPassword ? (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => setDeleteAccountPassword('')}
+                >
+                  <AntDesign name="close" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowDeleteAccountModal(false);
+                  setDeleteAccountPassword('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <LinearGradient
+                colors={!deleteAccountPassword ?
+                  ['rgba(255, 59, 48, 0.5)', 'rgba(255, 59, 48, 0.5)'] :
+                  ['#FF3B30', '#FF2D20']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.saveButtonGradient}
+              >
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={confirmDeleteAccount}
+                  disabled={!deleteAccountPassword || isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Delete Account</Text>
+                  )}
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderBlockedUsersModal = () => {
     return (
       <Modal
@@ -799,6 +1040,10 @@ const AccountScreen = () => {
         {renderSignInSection()}
         {renderUsersSection()}
         {renderShopSection()}
+
+        <SecurityMonitor showDetails={true} />
+        <SecuritySettings />
+
         {renderAccountManagement()}
         
         <View style={{ height: 40 }} />
@@ -806,6 +1051,7 @@ const AccountScreen = () => {
       
       {renderEditModal()}
       {renderPasswordModal()}
+      {renderDeleteAccountModal()}
       {renderBlockedUsersModal()}
       
       {showToast && (
@@ -994,6 +1240,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     marginVertical: 15,
+  },
+  modalSubtitle: {
+    textAlign: 'center',
+    color: '#9BA1A6',
+    fontSize: 14,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',

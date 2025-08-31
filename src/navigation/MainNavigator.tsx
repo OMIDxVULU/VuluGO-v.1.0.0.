@@ -17,6 +17,7 @@ import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ShopScreen from '../screens/ShopScreen';
 import SpotlightDurationDemoScreen from '../screens/SpotlightDurationDemoScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import AddFriendsScreen from '../screens/AddFriendsScreen';
 
 // Import components
 import CustomTabBar from '../components/CustomTabBar';
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   Profile: undefined;
   SpotlightDurationDemo: undefined;
   NotificationSettings: undefined;
+  'add-friends': undefined;
   Chat: {
     userId: string;
     name: string;
@@ -106,11 +108,11 @@ const MainTabNavigator = () => {
           tabBarBadge: counts.total > 0 ? counts.total : undefined,
         }}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{
-          tabBarBadge: 3,
+          // Remove hardcoded badge - use real notification data if needed
         }}
       />
     </Tab.Navigator>
@@ -148,6 +150,7 @@ const MainNavigator = () => {
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="SpotlightDurationDemo" component={SpotlightDurationDemoScreen} />
           <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+          <Stack.Screen name="add-friends" component={AddFriendsScreen} />
         </Stack.Navigator>
       </View>
       

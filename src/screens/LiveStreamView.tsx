@@ -32,6 +32,8 @@ import { useAuth } from '../context/AuthContext';
 import { streamingService } from '../services/streamingService';
 import { StreamParticipant } from '../services/streamingService';
 import { firestoreService } from '../services/firestoreService';
+import { AgoraStreamView } from '../components/streaming/AgoraStreamView';
+import { isAgoraConfigured } from '../config/agoraConfig';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -519,6 +521,11 @@ const LiveStreamView = () => {
   const [participants, setParticipants] = useState<Participant[]>(initializeParticipants());
   const [currentStreamSession, setCurrentStreamSession] = useState<any>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // Agora streaming state
+  const [isAgoraEnabled, setIsAgoraEnabled] = useState(isAgoraConfigured());
+  const [agoraConnectionState, setAgoraConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [streamingError, setStreamingError] = useState<string | null>(null);
 
   // Set up real-time stream updates and chat messages
   useEffect(() => {
@@ -1114,6 +1121,25 @@ const LiveStreamView = () => {
     );
   };
   
+  // Agora event handlers
+  const handleAgoraConnectionStateChange = useCallback((connected: boolean) => {
+    setAgoraConnectionState(connected ? 'connected' : 'disconnected');
+    if (connected) {
+      setStreamingError(null);
+    }
+  }, []);
+
+  const handleAgoraParticipantUpdate = useCallback((agoraParticipants: any[]) => {
+    // Update participants with Agora data
+    console.log('🔄 Agora participants updated:', agoraParticipants);
+  }, []);
+
+  const handleAgoraError = useCallback((error: string) => {
+    console.error('❌ Agora error:', error);
+    setStreamingError(error);
+    setAgoraConnectionState('disconnected');
+  }, []);
+
   const renderParticipantsGrid = useCallback(() => (
     <View style={styles.gridContainer}>
       {participants.map((participant, index) => (
@@ -1828,7 +1854,50 @@ const LiveStreamView = () => {
       shadowOpacity: 0.3,
       shadowRadius: 4,
       elevation: 5,
-    }
+    },
+    // Agora streaming styles
+    agoraStreamContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 1, // Behind participants grid
+    },
+    streamingStatusContainer: {
+      position: 'absolute',
+      top: 80,
+      left: 16,
+      zIndex: 10,
+    },
+    streamingStatusIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    streamingStatusText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '600',
+      marginLeft: 4,
+    },
+    errorMessageContainer: {
+      position: 'absolute',
+      top: 120,
+      left: 16,
+      right: 16,
+      backgroundColor: 'rgba(255, 107, 107, 0.9)',
+      padding: 12,
+      borderRadius: 8,
+      zIndex: 10,
+    },
+    errorMessageText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      textAlign: 'center',
+    },
   });
 
   return (
@@ -1847,9 +1916,52 @@ const LiveStreamView = () => {
             }
           ]}
         >
-          {renderTopBar()} 
+          {renderTopBar()}
           {renderStatsBar()}
+
+          {/* Agora Audio/Video Stream Layer */}
+          {isAgoraEnabled && user && (
+            <View style={styles.agoraStreamContainer}>
+              <AgoraStreamView
+                streamId={streamId}
+                userId={user.uid}
+                isHost={stream?.hosts.some(host => host.name === user.displayName) || false}
+                onConnectionStateChange={handleAgoraConnectionStateChange}
+                onParticipantUpdate={handleAgoraParticipantUpdate}
+                onError={handleAgoraError}
+              />
+            </View>
+          )}
+
+          {/* Participants Grid Overlay */}
           {renderParticipantsGrid()}
+
+          {/* Streaming Status Indicator */}
+          {isAgoraEnabled && (
+            <View style={styles.streamingStatusContainer}>
+              <View style={[
+                styles.streamingStatusIndicator,
+                { backgroundColor: agoraConnectionState === 'connected' ? '#4CAF50' : '#FF6B6B' }
+              ]}>
+                <MaterialIcons
+                  name={agoraConnectionState === 'connected' ? 'wifi' : 'wifi-off'}
+                  size={12}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.streamingStatusText}>
+                  {agoraConnectionState === 'connected' ? 'LIVE' : 'OFFLINE'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Error Message */}
+          {streamingError && (
+            <View style={styles.errorMessageContainer}>
+              <Text style={styles.errorMessageText}>{streamingError}</Text>
+            </View>
+          )}
+
           {renderChat()}
         </Animated.View>
       )}

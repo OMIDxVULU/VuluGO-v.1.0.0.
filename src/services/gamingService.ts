@@ -360,14 +360,14 @@ class GamingService {
       );
 
       const querySnapshot = await getDocs(q);
-      
+
       if (querySnapshot.empty) {
         return null;
       }
 
       const doc = querySnapshot.docs[0];
       const data = doc.data();
-      
+
       return {
         id: doc.id,
         ...data,
@@ -375,6 +375,12 @@ class GamingService {
         endTime: data.endTime?.toDate()
       } as MiningSession;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getActiveMiningSession - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getActiveMiningSession', error);
       throw new Error(`Failed to get active mining session: ${error.message}`);
     }
@@ -422,6 +428,12 @@ class GamingService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as MiningStats;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getMiningStats - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getMiningStats', error);
       throw new Error(`Failed to get mining stats: ${error.message}`);
     }
@@ -1013,6 +1025,12 @@ class GamingService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as SlotsStats;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getSlotsStats - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getSlotsStats', error);
       throw new Error(`Failed to get slots stats: ${error.message}`);
     }
@@ -1037,6 +1055,12 @@ class GamingService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as GoldMinerStats;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getGoldMinerStats - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getGoldMinerStats', error);
       throw new Error(`Failed to get gold miner stats: ${error.message}`);
     }
@@ -1088,6 +1112,12 @@ class GamingService {
         lastUpdated: data.lastUpdated?.toDate() || new Date()
       } as UserGameProfile;
     } catch (error: any) {
+      // Handle permission errors gracefully for guest users
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        console.warn('Permission denied for getUserGameProfile - returning null for guest user');
+        return null;
+      }
+
       FirebaseErrorHandler.logError('getUserGameProfile', error);
       throw new Error(`Failed to get user game profile: ${error.message}`);
     }

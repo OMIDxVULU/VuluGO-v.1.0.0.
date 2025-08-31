@@ -243,7 +243,7 @@ const ProfileScreen = () => {
 
 
   // Refs for cleanup
-  const readyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pulseAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Enhanced long press handler with progressive feedback
@@ -1109,31 +1109,33 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
         
-        {/* Friends Section */}
-        <View style={styles.sectionContainer}>
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            onPress={() => setShowFriendsModal(true)}
-          >
-            <LinearGradient
-              colors={['rgba(110, 105, 244, 0.15)', 'rgba(88, 101, 242, 0.15)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.friendsSection}
+        {/* Friends Section - Hidden for guest users */}
+        {!isGuest && (
+          <View style={styles.sectionContainer}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowFriendsModal(true)}
             >
-              <View style={styles.friendsSectionLeft}>
-                <Feather name="users" size={20} color="#FFFFFF" style={styles.friendsIcon} />
-                <Text style={styles.friendsText}>Your Friends</Text>
-                <View style={styles.friendsCountBadge}>
-                  <Text style={styles.friendsCountText}>{friends.length}</Text>
+              <LinearGradient
+                colors={['rgba(110, 105, 244, 0.15)', 'rgba(88, 101, 242, 0.15)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.friendsSection}
+              >
+                <View style={styles.friendsSectionLeft}>
+                  <Feather name="users" size={20} color="#FFFFFF" style={styles.friendsIcon} />
+                  <Text style={styles.friendsText}>Your Friends</Text>
+                  <View style={styles.friendsCountBadge}>
+                    <Text style={styles.friendsCountText}>{friends.length}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.friendsArrowContainer}>
-                <Feather name="chevron-right" size={16} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+                <View style={styles.friendsArrowContainer}>
+                  <Feather name="chevron-right" size={16} color="#FFFFFF" />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
         
         {/* Spacing for bottom of screen */}
         <View style={{ height: 120 }} />

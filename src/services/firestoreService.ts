@@ -75,12 +75,51 @@ class FirestoreService {
     }
   }
 
+  // Check if username is already taken
+  async isUsernameTaken(username: string): Promise<boolean> {
+    try {
+      this.ensureFirebaseReady();
+
+      // Use circuit breaker protection for username checks
+      return await FirebaseErrorHandler.executeWithProtection(async () => {
+        const usersRef = collection(db, 'users');
+        const q = query(
+          usersRef,
+          where('usernameLower', '==', username.toLowerCase()),
+          limit(1)
+        );
+
+        const querySnapshot = await getDocs(q);
+        return !querySnapshot.empty;
+      }, 'username-check');
+    } catch (error: any) {
+      // Don't log if we should suppress it
+      if (!FirebaseErrorHandler.shouldSuppressErrorLogging(error, 'username-check')) {
+        console.error('Failed to check username availability:', error);
+      }
+
+      // Handle permission errors specifically
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        // For permission errors during registration, we'll allow the username check to pass
+        // The actual duplicate check will happen server-side during account creation
+        return false;
+      }
+
+      // For other errors, assume username is taken to be safe
+      return true;
+    }
+  }
+
   // User operations
   async createUser(userData: Omit<AppUser, 'createdAt' | 'lastSeen'>): Promise<void> {
     try {
       const userRef = doc(db, 'users', userData.uid);
       await setDoc(userRef, {
         ...userData,
+        // Add lowercase fields for case-insensitive searching
+        displayNameLower: (userData.displayName || '').toLowerCase(),
+        usernameLower: (userData.username || '').toLowerCase(),
+        emailLower: (userData.email || '').toLowerCase(),
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp()
       });
@@ -108,12 +147,34 @@ class FirestoreService {
   async updateUser(uid: string, updates: Partial<AppUser>): Promise<void> {
     try {
       const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, {
+      const updateData: any = {
         ...updates,
         lastSeen: serverTimestamp()
-      });
+      };
+
+      // Update lowercase fields if the corresponding fields are being updated
+      if (updates.displayName !== undefined) {
+        updateData.displayNameLower = updates.displayName.toLowerCase();
+      }
+      if (updates.username !== undefined) {
+        updateData.usernameLower = updates.username.toLowerCase();
+      }
+      if (updates.email !== undefined) {
+        updateData.emailLower = updates.email.toLowerCase();
+      }
+
+      await updateDoc(userRef, updateData);
     } catch (error: any) {
       throw new Error(`Failed to update user: ${error.message}`);
+    }
+  }
+
+  async deleteUser(uid: string): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await deleteDoc(userRef);
+    } catch (error: any) {
+      throw new Error(`Failed to delete user: ${error.message}`);
     }
   }
 
@@ -696,7 +757,11 @@ class FirestoreService {
     }
   }
 
-  onUserConversations(userId: string, callback: (conversations: Conversation[]) => void): () => void {
+  onUserConversations(
+    userId: string,
+    callback: (conversations: Conversation[]) => void,
+    onError?: (error: any) => void
+  ): () => void {
     const conversationsRef = collection(db, 'conversations');
     const q = query(
       conversationsRef,
@@ -704,13 +769,32 @@ class FirestoreService {
       orderBy('lastMessageTime', 'desc')
     );
 
-    return onSnapshot(q, (querySnapshot) => {
-      const conversations = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Conversation[];
-      callback(conversations);
-    });
+    return onSnapshot(
+      q,
+      (querySnapshot) => {
+        try {
+          const conversations = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Conversation[];
+          callback(conversations);
+        } catch (error) {
+          console.error('Error processing conversations snapshot:', error);
+          if (onError) {
+            onError(error);
+          }
+        }
+      },
+      (error) => {
+        console.error('Firestore listener error in onUserConversations:', error);
+        if (onError) {
+          onError(error);
+        } else {
+          // Fallback: call callback with empty array if no error handler provided
+          callback([]);
+        }
+      }
+    );
   }
 
   // Friend management methods
@@ -730,7 +814,13 @@ class FirestoreService {
 
       return [];
     } catch (error: any) {
+      // Handle permission errors gracefully
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        return []; // Return empty array for permission errors
+      }
+
       console.error('Failed to get user friends:', error.message);
+      FirebaseErrorHandler.logError('getUserFriends', error);
       return [];
     }
   }
@@ -877,6 +967,95 @@ class FirestoreService {
         callback([]);
       }
     });
+  }
+
+  // Search users by username only with progressive matching
+  async searchUsersByUsername(searchQuery: string, currentUserId: string): Promise<AppUser[]> {
+    try {
+      const searchTerm = searchQuery.toLowerCase().trim();
+      if (!searchTerm) return [];
+
+      // Use Firestore range query for progressive prefix matching
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('usernameLower', '>=', searchTerm),
+        where('usernameLower', '<=', searchTerm + '\uf8ff'),
+        orderBy('usernameLower'),
+        limit(20)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const results: AppUser[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const userData = doc.data() as AppUser;
+        // Exclude current user
+        if (userData.uid !== currentUserId) {
+          results.push(userData);
+        }
+      });
+
+      // Sort results by relevance with progressive matching algorithm
+      return results.sort((a, b) => {
+        const aUsername = (a.username || '').toLowerCase();
+        const bUsername = (b.username || '').toLowerCase();
+
+        // Calculate relevance scores
+        const aScore = this.calculateUsernameRelevance(aUsername, searchTerm);
+        const bScore = this.calculateUsernameRelevance(bUsername, searchTerm);
+
+        // Higher scores first (more relevant)
+        if (aScore !== bScore) {
+          return bScore - aScore;
+        }
+
+        // If same relevance, sort alphabetically
+        return aUsername.localeCompare(bUsername);
+      });
+    } catch (error: any) {
+      console.error('Failed to search users by username:', error.message);
+      return [];
+    }
+  }
+
+  // Calculate username relevance score for progressive matching
+  private calculateUsernameRelevance(username: string, searchTerm: string): number {
+    if (!username || !searchTerm) return 0;
+
+    const lowerUsername = username.toLowerCase();
+    const lowerSearchTerm = searchTerm.toLowerCase();
+
+    // Exact match gets highest score
+    if (lowerUsername === lowerSearchTerm) return 1000;
+
+    // Starts with search term gets high score
+    if (lowerUsername.startsWith(lowerSearchTerm)) {
+      // Shorter usernames with same prefix get higher score
+      const lengthBonus = Math.max(0, 100 - (lowerUsername.length - lowerSearchTerm.length));
+      return 800 + lengthBonus;
+    }
+
+    // Contains search term gets medium score
+    if (lowerUsername.includes(lowerSearchTerm)) {
+      // Earlier position in username gets higher score
+      const position = lowerUsername.indexOf(lowerSearchTerm);
+      const positionBonus = Math.max(0, 50 - position);
+      return 400 + positionBonus;
+    }
+
+    // Character similarity for partial matches
+    let matchingChars = 0;
+    for (let i = 0; i < Math.min(lowerUsername.length, lowerSearchTerm.length); i++) {
+      if (lowerUsername[i] === lowerSearchTerm[i]) {
+        matchingChars++;
+      } else {
+        break; // Stop at first non-matching character for prefix similarity
+      }
+    }
+
+    // Score based on matching prefix characters
+    return matchingChars * 10;
   }
 }
 

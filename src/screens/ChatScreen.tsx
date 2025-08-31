@@ -445,9 +445,11 @@ const ChatScreenInternal = ({ userId, name, avatar, goBack, goToDMs, source }: C
           showsVerticalScrollIndicator={false}
           inverted={false}
           getItemLayout={getItemLayout}
-          initialNumToRender={20}
-          maxToRenderPerBatch={10}
-          windowSize={21}
+          initialNumToRender={15}
+          maxToRenderPerBatch={8}
+          windowSize={10}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={100}
           ListHeaderComponent={() => (
             <View style={styles.listHeader}>
               {renderDateSeparator('Today')}

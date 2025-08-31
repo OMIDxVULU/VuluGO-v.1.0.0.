@@ -1,8 +1,7 @@
 import { firestoreService } from './firestoreService';
 import { LiveStream, StreamHost, StreamViewer } from '../context/LiveStreamContext';
-
-// Agora integration would go here
-// For now, we'll create a service that manages stream state via Firebase
+import { agoraService, AgoraEventCallbacks } from './agoraService';
+import { isAgoraConfigured } from '../config/agoraConfig';
 
 export interface StreamParticipant {
   id: string;
@@ -27,8 +26,9 @@ export interface StreamSession {
 class StreamingService {
   private activeStreams = new Map<string, StreamSession>();
   private streamListeners = new Map<string, () => void>();
+  private currentStreamId: string | null = null;
 
-  // Initialize a new stream
+  // Initialize a new stream with Agora integration
   async createStream(
     title: string,
     hostId: string,
@@ -58,12 +58,28 @@ class StreamingService {
       // Store in Firebase
       await firestoreService.createStream(streamId, streamData);
 
+      // Initialize Agora if configured
+      if (isAgoraConfigured()) {
+        console.log('🔄 Initializing Agora for new stream...');
+        const initialized = await agoraService.initialize();
+        if (initialized) {
+          // Join as host
+          await agoraService.joinChannel(streamId, hostId, true);
+          console.log('✅ Host joined Agora channel successfully');
+        } else {
+          console.warn('⚠️ Agora initialization failed, continuing with Firebase-only mode');
+        }
+      } else {
+        console.log('ℹ️ Agora not configured, using Firebase-only mode');
+      }
+
       const session: StreamSession = {
         id: streamId,
         ...streamData
       };
 
       this.activeStreams.set(streamId, session);
+      this.currentStreamId = streamId;
       return streamId;
     } catch (error) {
       console.error('Error creating stream:', error);
@@ -108,17 +124,41 @@ class StreamingService {
       await firestoreService.updateStreamParticipants(streamId, session.participants);
       await firestoreService.updateStreamViewerCount(streamId, session.viewerCount);
 
+      // Join Agora channel if configured
+      if (isAgoraConfigured()) {
+        console.log(`🔄 Joining Agora channel: ${streamId} as viewer`);
+
+        // Set up Agora event callbacks for this stream
+        this.setupAgoraCallbacks(streamId);
+
+        // Join as audience member
+        const joined = await agoraService.joinChannel(streamId, userId, false);
+        if (joined) {
+          console.log('✅ Successfully joined Agora channel as viewer');
+          this.currentStreamId = streamId;
+        } else {
+          console.warn('⚠️ Failed to join Agora channel, continuing with Firebase-only mode');
+        }
+      }
+
     } catch (error) {
       console.error('Error joining stream:', error);
       throw error;
     }
   }
 
-  // Leave a stream
+  // Leave a stream with Agora integration
   async leaveStream(streamId: string, userId: string): Promise<void> {
     try {
       const session = this.activeStreams.get(streamId);
       if (!session) return;
+
+      // Leave Agora channel if this is the current stream
+      if (isAgoraConfigured() && this.currentStreamId === streamId) {
+        console.log('🔄 Leaving Agora channel...');
+        await agoraService.leaveChannel();
+        this.currentStreamId = null;
+      }
 
       // Remove participant
       session.participants = session.participants.filter(p => p.id !== userId);
@@ -248,6 +288,75 @@ class StreamingService {
     } catch (error) {
       console.error('Error updating speaking status:', error);
     }
+  }
+
+  // Set up Agora event callbacks for real-time updates
+  private setupAgoraCallbacks(streamId: string): void {
+    const callbacks: AgoraEventCallbacks = {
+      onUserJoined: (uid: number, elapsed: number) => {
+        console.log(`👤 User ${uid} joined Agora channel`);
+        // Note: User info will be updated via Firebase listeners
+      },
+
+      onUserOffline: (uid: number, reason: number) => {
+        console.log(`👤 User ${uid} left Agora channel (reason: ${reason})`);
+        // Note: User removal will be handled via Firebase listeners
+      },
+
+      onAudioVolumeIndication: (speakers) => {
+        // Update speaking status for participants
+        speakers.forEach(speaker => {
+          if (speaker.volume > 10) { // Speaking threshold
+            // Find user by UID and update speaking status
+            // This would require mapping Agora UIDs to user IDs
+            console.log(`🎤 User ${speaker.uid} is speaking (volume: ${speaker.volume})`);
+          }
+        });
+      },
+
+      onConnectionStateChanged: (state, reason) => {
+        console.log(`🔗 Agora connection state: ${state} (reason: ${reason})`);
+      },
+
+      onError: (errorCode) => {
+        console.error(`❌ Agora error: ${errorCode}`);
+      },
+
+      onWarning: (warningCode) => {
+        console.warn(`⚠️ Agora warning: ${warningCode}`);
+      }
+    };
+
+    agoraService.setEventCallbacks(callbacks);
+  }
+
+  // Mute/unmute local audio in current stream
+  async muteLocalAudio(muted: boolean): Promise<void> {
+    if (isAgoraConfigured() && this.currentStreamId) {
+      await agoraService.muteLocalAudio(muted);
+
+      // Update Firebase state
+      const session = this.activeStreams.get(this.currentStreamId);
+      if (session) {
+        const localParticipant = session.participants.find(p => p.id === 'currentUser'); // You'll need to track current user ID
+        if (localParticipant) {
+          localParticipant.isMuted = muted;
+          await firestoreService.updateStreamParticipants(this.currentStreamId, session.participants);
+        }
+      }
+    }
+  }
+
+  // Enable/disable local video in current stream
+  async enableLocalVideo(enabled: boolean): Promise<void> {
+    if (isAgoraConfigured() && this.currentStreamId) {
+      await agoraService.enableLocalVideo(enabled);
+    }
+  }
+
+  // Get current Agora stream state
+  getAgoraStreamState() {
+    return agoraService.getStreamState();
   }
 
   // Mute/unmute participant

@@ -39,8 +39,8 @@ interface MemoryOptimizerSettings {
  */
 class MemoryOptimizer {
   private settings: MemoryOptimizerSettings;
-  private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
-  private inactivityTimers: Map<string, NodeJS.Timeout> = new Map();
+  private debounceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private inactivityTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private memoryUsage: Record<string, number> = {};
   private cleanupCallbacks: Map<string, () => void> = new Map();
   private isLowMemoryDevice: boolean = false;
