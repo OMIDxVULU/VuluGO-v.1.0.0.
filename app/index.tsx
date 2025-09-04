@@ -1,12 +1,28 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { View, ActivityIndicator, Text } from 'react-native';
-import { useAuth } from '../src/context/AuthContext';
+import { useAuthSafe } from '../src/context/AuthContext';
 
 // CRITICAL FIX: Authentication-first routing component
 function AuthenticationRouter() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+
+  // Safely get auth context - returns null if provider not ready
+  const authContext = useAuthSafe();
+
+  // If auth context is not available, show loading
+  if (!authContext) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#131318' }}>
+        <ActivityIndicator size="large" color="#6E69F4" />
+        <Text style={{ color: '#FFFFFF', marginTop: 16, fontSize: 16 }}>
+          Loading authentication system...
+        </Text>
+      </View>
+    );
+  }
+
+  const { user, loading } = authContext;
 
   useEffect(() => {
     // Don't navigate while still loading authentication state

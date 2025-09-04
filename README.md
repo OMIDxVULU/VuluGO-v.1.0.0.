@@ -2,6 +2,30 @@
 
 A sophisticated social streaming platform with enterprise-grade authentication, real-time chat, SMS verification, and comprehensive Firebase integration. Built with React Native and Expo, featuring Discord-style dark mode UI and production-ready security infrastructure.
 
+## 🚨 CRITICAL: Firebase Deployment Required
+
+**The live stream prevention system is currently non-functional due to missing Firebase deployments.**
+
+### Quick Fix (5 minutes):
+
+1. **Deploy Security Rules**:
+   - Go to [Firebase Console](https://console.firebase.google.com)
+   - Select your `vulugo` project
+   - Navigate to **Firestore Database** → **Rules**
+   - Replace all content with the rules from `firestore.rules` file
+   - Click **"Publish"**
+
+2. **Deploy Indexes**:
+   - In Firebase Console, go to **Firestore Database** → **Indexes**
+   - Click the error link in logs or create these indexes manually:
+     - `streams`: `isActive` (Ascending) + `startedAt` (Ascending)
+     - `streams`: `isActive` (Ascending) + `endedAt` (Ascending)
+
+3. **Restart the app** to test the fixes
+
+**Status**: ❌ Permission errors preventing stream tracking
+**Impact**: Users can join multiple streams simultaneously (security issue)
+
 ## Features
 
 ### 🔐 Enterprise Authentication System
@@ -22,8 +46,11 @@ A sophisticated social streaming platform with enterprise-grade authentication, 
 - **Security**: Input sanitization and spam protection
 
 ### 🎥 Live Streaming Platform
-- Host and join live audio rooms with multiple participants
-- Firebase-based participant management and stream state
+- **Real-time Audio Streaming**: Agora SDK integration for genuine RTC audio transmission
+- **Multi-participant Support**: Host and join live audio rooms with real-time participant tracking
+- **Firebase Integration**: Stream state management, participant tracking, and real-time synchronization
+- **Token-based Security**: Secure Agora token generation via Firebase Cloud Functions
+- **Cross-platform**: iOS ↔ Android audio streaming with connection resilience
 - Real-time viewer count and engagement metrics
 - Interactive progress bar showing stream ranking
 - Stats display showing boosts, rank, and viewer counts
@@ -54,11 +81,62 @@ cd VULUGONEW
 npm install
 ```
 
-3. Start the app:
+3. **For LiveStream testing (REQUIRED for real audio):**
 
 ```bash
-npx expo start
+# Build development clients (includes native Agora SDK)
+eas build --profile development --platform all
+
+# Install the dev builds on your devices, then:
+npx expo start --dev-client
 ```
+
+**Note**: `npx expo start` (Expo Go) uses mock Agora service. For real audio streaming, you MUST use development builds.
+
+## 🎥 LiveStream Setup (Production-Ready)
+
+### Prerequisites
+1. **Agora Account**: Get App ID and App Certificate from [Agora Console](https://console.agora.io/)
+2. **EAS CLI**: `npm install -g @expo/eas-cli && eas login`
+3. **Firebase CLI**: `npm install -g firebase-tools && firebase login`
+
+### Step 1: Configure Agora Credentials
+```bash
+# Add Agora credentials to EAS secrets
+eas secret:create --name EXPO_PUBLIC_AGORA_APP_ID --value "your_agora_app_id"
+eas secret:create --name EXPO_PUBLIC_AGORA_APP_CERTIFICATE --value "your_agora_app_certificate"
+```
+
+### Step 2: Deploy Firebase Functions (Token Generation)
+```bash
+# Set Agora secrets in Firebase Functions
+firebase functions:config:set agora.app_id="your_agora_app_id" agora.app_certificate="your_agora_app_certificate"
+
+# Deploy token generation functions
+firebase deploy --only functions
+```
+
+### Step 3: Deploy Firestore Security Rules
+```bash
+# Deploy rules for stream and participant tracking
+firebase deploy --only firestore:rules
+```
+
+### Step 4: Build Development Clients
+```bash
+# Build for both platforms (includes native Agora SDK)
+eas build --profile development --platform all
+
+# Install the builds on your physical devices
+# Then start Metro for dev client:
+npx expo start --dev-client
+```
+
+### Step 5: Verify Real Audio Streaming
+- **Check logs**: Look for "✅ Real Agora SDK imported successfully" (not "Using Mock")
+- **Two-device test**: Create stream on Device A, join on Device B
+- **Audio verification**: Speak on A, hear on B; toggle mute/unmute
+- **Agora Console**: Verify usage minutes appear in Interactive Live Streaming dashboard
 
 ## Project Structure
 
@@ -343,8 +421,12 @@ cd VULUGONEW
 # Install dependencies
 npm install
 
-# Start the development server
+# For UI development only (uses mock Agora)
 npx expo start
+
+# For LiveStream testing (real audio - REQUIRED)
+eas build --profile development --platform all
+# Then: npx expo start --dev-client
 
 # Run on iOS simulator
 npx expo run:ios

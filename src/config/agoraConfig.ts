@@ -3,6 +3,8 @@
  * Centralized configuration for Agora audio/video streaming
  */
 
+import { throttledAgoraLog } from '../utils/loggingThrottle';
+
 export interface AgoraConfig {
   // Agora credentials
   appId: string;
@@ -56,16 +58,24 @@ export const defaultAgoraConfig: AgoraConfig = {
   logLevel: __DEV__ ? 'INFO' : 'ERROR',
 };
 
+// Throttle debug logging to prevent spam
+let lastDebugLog = 0;
+const DEBUG_LOG_THROTTLE = 60000; // 1 minute
+
 /**
  * Get Agora configuration with validation
  */
 export const getAgoraConfig = (): AgoraConfig => {
   const config = { ...defaultAgoraConfig };
 
-  // Debug environment variables
-  console.log('🔍 Agora Environment Variables Debug:');
-  console.log('EXPO_PUBLIC_AGORA_APP_ID:', process.env.EXPO_PUBLIC_AGORA_APP_ID ? 'SET' : 'NOT SET');
-  console.log('EXPO_PUBLIC_AGORA_APP_CERTIFICATE:', process.env.EXPO_PUBLIC_AGORA_APP_CERTIFICATE ? 'SET' : 'NOT SET');
+  // Debug environment variables (throttled)
+  const now = Date.now();
+  if (now - lastDebugLog > DEBUG_LOG_THROTTLE) {
+    throttledAgoraLog('🔍 Agora Environment Variables Debug:');
+    throttledAgoraLog(`EXPO_PUBLIC_AGORA_APP_ID: ${process.env.EXPO_PUBLIC_AGORA_APP_ID ? 'SET' : 'NOT SET'}`);
+    throttledAgoraLog(`EXPO_PUBLIC_AGORA_APP_CERTIFICATE: ${process.env.EXPO_PUBLIC_AGORA_APP_CERTIFICATE ? 'SET' : 'NOT SET'}`);
+    lastDebugLog = now;
+  }
 
   // Validate required credentials
   if (!config.appId) {

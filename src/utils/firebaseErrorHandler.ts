@@ -1,5 +1,7 @@
 // Firebase error handling utilities
 import { FirebaseCircuitBreakers, executeWithCircuitBreaker } from './circuitBreaker';
+import FirebaseIndexRefresh from './firebaseIndexRefresh';
+import { firebaseConnectionManager } from './firebaseConnectionManager';
 
 export interface FirebaseErrorInfo {
   code: string;
@@ -39,6 +41,17 @@ export enum ErrorSeverity {
 
 export class FirebaseErrorHandler {
   static handleError(error: any): FirebaseErrorInfo {
+    // Check for connection issues and attempt recovery
+    if (this.isConnectionError(error)) {
+      console.log('🔗 Connection error detected, checking Firebase connectivity...');
+      firebaseConnectionManager.checkConnection().catch(err => {
+        console.warn('Connection check failed:', err);
+      });
+    }
+
+    // Auto-refresh Firebase index cache if index errors are detected
+    FirebaseIndexRefresh.autoRefreshOnIndexError(error);
+
     // Handle validation errors (user input issues)
     if (error?.message && this.isValidationError(error.message)) {
       return {
@@ -673,6 +686,17 @@ export class FirebaseErrorHandler {
           buttonText: 'Retry'
         };
     }
+  }
+
+  static isConnectionError(error: any): boolean {
+    if (!error || !error.message) return false;
+
+    const message = error.message.toLowerCase();
+    return message.includes('offline') ||
+           message.includes('network') ||
+           message.includes('connection') ||
+           message.includes('unavailable') ||
+           error.code === 'unavailable';
   }
 
   static isValidationError(message: string): boolean {

@@ -1,0 +1,297 @@
+name: VuluGO CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '18'
+  EXPO_CLI_VERSION: 'latest'
+
+jobs:
+  # Code Quality and Testing
+  quality-check:
+    name: Code Quality & Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run TypeScript check
+      run: npx tsc --noEmit
+      
+    - name: Run ESLint
+      run: npx eslint src/ --ext .ts,.tsx --max-warnings 0
+      
+    - name: Run tests
+      run: npm test -- --watchAll=false --coverage
+      
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        
+    - name: Security audit
+      run: npm audit --audit-level moderate
+      
+    - name: Check for vulnerabilities
+      run: npx audit-ci --moderate
+
+  # Security Scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: quality-check
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Build for different environments
+  build-staging:
+    name: Build Staging
+    runs-on: ubuntu-latest
+    needs: [quality-check, security-scan]
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+      
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Configure environment
+      run: |
+        echo "EXPO_PUBLIC_ENVIRONMENT=staging" >> $GITHUB_ENV
+        echo "EXPO_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }}" >> $GITHUB_ENV
+        
+    - name: Build for staging
+      env:
+        EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.STAGING_FIREBASE_API_KEY }}
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_FIREBASE_PROJECT_ID }}
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_FIREBASE_AUTH_DOMAIN }}
+        EXPO_PUBLIC_AGORA_APP_ID: ${{ secrets.STAGING_AGORA_APP_ID }}
+      run: |
+        expo build:android --type apk --release-channel staging
+        expo build:ios --type simulator --release-channel staging
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: staging-builds
+        path: |
+          *.apk
+          *.app
+
+  build-production:
+    name: Build Production
+    runs-on: ubuntu-latest
+    needs: [quality-check, security-scan]
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+      
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Configure environment
+      run: |
+        echo "EXPO_PUBLIC_ENVIRONMENT=production" >> $GITHUB_ENV
+        echo "EXPO_PUBLIC_API_URL=${{ secrets.PRODUCTION_API_URL }}" >> $GITHUB_ENV
+        
+    - name: Build for production
+      env:
+        EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.PRODUCTION_FIREBASE_API_KEY }}
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.PRODUCTION_FIREBASE_PROJECT_ID }}
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.PRODUCTION_FIREBASE_AUTH_DOMAIN }}
+        EXPO_PUBLIC_AGORA_APP_ID: ${{ secrets.PRODUCTION_AGORA_APP_ID }}
+        EXPO_PUBLIC_AGORA_APP_CERTIFICATE: ${{ secrets.PRODUCTION_AGORA_APP_CERTIFICATE }}
+      run: |
+        expo build:android --type app-bundle --release-channel production
+        expo build:ios --type archive --release-channel production
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-builds
+        path: |
+          *.aab
+          *.ipa
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-staging
+    if: github.ref == 'refs/heads/staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: staging-builds
+        
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add your staging deployment commands here
+        # This could include uploading to app stores, internal distribution, etc.
+        
+    - name: Run post-deployment tests
+      run: |
+        echo "Running post-deployment tests..."
+        # Add your post-deployment test commands here
+        
+    - name: Notify team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: 'VuluGO staging deployment completed successfully! 🚀'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-production
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: production-builds
+        
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Add your production deployment commands here
+        
+    - name: Run smoke tests
+      run: |
+        echo "Running production smoke tests..."
+        # Add your smoke test commands here
+        
+    - name: Create deployment record
+      run: |
+        echo "Recording deployment..."
+        echo "Deployment completed at $(date)" >> deployment-history.log
+        
+    - name: Notify team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: 'VuluGO production deployment completed successfully! 🎉'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Rollback job (manual trigger)
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Execute rollback
+      run: |
+        chmod +x deployment/rollback.sh
+        ./deployment/rollback.sh production ${{ github.event.inputs.target_commit }} "Automated rollback"
+        
+    - name: Notify team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: 'VuluGO production rollback completed! ⚠️'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Performance monitoring
+  performance-check:
+    name: Performance Check
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run performance tests
+      run: |
+        echo "Running performance tests..."
+        # Add your performance testing commands here
+        # This could include Lighthouse CI, load testing, etc.
+        
+    - name: Generate performance report
+      run: |
+        echo "Generating performance report..."
+        # Add performance report generation here

@@ -1,18 +1,19 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  onSnapshot, 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
   serverTimestamp,
   getDocs,
   writeBatch,
   increment,
-  getDoc
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import FirebaseErrorHandler from '../utils/firebaseErrorHandler';

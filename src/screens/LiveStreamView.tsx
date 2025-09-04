@@ -4,67 +4,40 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Image,
-  TextInput,
-  Modal,
-  FlatList,
   Animated,
   Dimensions,
-  Platform,
-  KeyboardAvoidingView,
-  PanResponder,
-  Pressable,
   Alert,
-  ImageStyle
+  TextInput,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  PanResponder,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, Ionicons, FontAwesome5, Entypo, FontAwesome } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Text as PaperText, Avatar, Button } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useUserProfile } from '../context/UserProfileContext';
-import { useLoopProtection } from '../FixInfiniteLoop';
-import { useLiveStreams, LiveStream, StreamHost } from '../context/LiveStreamContext';
+import { useLiveStreams } from '../context/LiveStreamContext';
 import { useAuth } from '../context/AuthContext';
 import { streamingService } from '../services/streamingService';
-import { StreamParticipant } from '../services/streamingService';
-import { firestoreService } from '../services/firestoreService';
 import { AgoraStreamView } from '../components/streaming/AgoraStreamView';
 import { isAgoraConfigured } from '../config/agoraConfig';
+import { permissionService } from '../services/permissionService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Add dynamic sizing constants
-const BASE_ITEM_SIZE = 52; // Increased from 48
-const GRID_GAP = 8; // Keep the same gap
-const OUTER_PADDING = 16; // Increased from 14
-const MIN_WIDGET_SIZE = 120; // Increased from 110
-const MAX_WIDGET_SIZE = 280; // Increased from 260
-const MAX_HOSTS_TO_DISPLAY = 9; // Maximum number of hosts to display (3x3 grid)
-
-// Mock cat placeholder image URL
-const CAT_PLACEHOLDER = 'https://img.icons8.com/ios-filled/100/FFFFFF/cat-profile.png'; // Simple white cat icon
-
-// Mock data removed - now using real participants from Firebase
-
-// Simplify ChatMessage interface
+// Chat message interface
 interface ChatMessage {
   id: string;
   user: {
     name: string;
     avatar: string;
-    isAdmin?: boolean;
   };
   message: string;
   timestamp: number;
-  replyTo?: {
-    id: string;
-    userName: string;
-    message: string;
-  }
 }
 
 // Function to generate unique message IDs
@@ -90,13 +63,6 @@ const timeAgo = (timestamp: number): string => {
 };
 
 // Mock chat messages removed - now using real messages from Firebase
-
-// Room stats for fallback
-const ROOM_STATS = {
-  progress: 75,
-  boosts: 210,
-  rank: 3
-};
 
 interface Participant {
   id: string;
@@ -468,17 +434,57 @@ const LiveStreamView = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { profileImage } = useUserProfile();
-  const { getStreamById, streams, currentlyWatching, isMinimized: contextIsMinimized, setStreamMinimized } = useLiveStreams();
+  const { getStreamById, streams, currentlyWatching, isMinimized: contextIsMinimized, setStreamMinimized, leaveStreamWithConfirmation, leaveStream } = useLiveStreams();
   const { user } = useAuth();
+
+  // Handle leaving stream with proper confirmation for hosts
+  const handleLeaveStream = async () => {
+    try {
+      const userId = user?.uid || 'guest';
+      console.log(`🔍 [LIVESTREAM] User ${userId} attempting to leave stream ${streamId}`);
+
+      // Check if user is host
+      const isHost = await streamingService.isUserStreamHost(streamId, userId);
+      console.log(`🔍 [LIVESTREAM] User ${userId} is host: ${isHost}`);
+
+      if (!isHost) {
+        // Regular viewer - leave immediately and clear state before navigation
+        console.log('🔄 [LIVESTREAM] Regular viewer leaving stream, clearing state immediately');
+        await leaveStream(streamId);
+        router.back();
+        return;
+      }
+
+      // For hosts, use confirmation dialog (Yubo-style)
+      console.log('🔄 [LIVESTREAM] Host leaving stream, showing confirmation dialog');
+      await leaveStreamWithConfirmation(streamId);
+
+      // Only navigate back if the user actually left (not cancelled)
+      console.log('✅ [LIVESTREAM] Host successfully left stream, navigating back');
+      router.back();
+
+    } catch (error: any) {
+      // Don't navigate back if user cancelled
+      if (error && error.message === 'User cancelled') {
+        console.log('🚫 [LIVESTREAM] User cancelled leaving stream, staying on screen');
+        return; // Stay on the stream screen
+      }
+
+      console.error('❌ [LIVESTREAM] Error leaving stream:', error);
+      // Still navigate back on actual error to prevent user from being stuck
+      router.back();
+    }
+  };
   
   // Use streamId from params to fetch the actual stream data from context
   const streamId = params.streamId as string;
   const stream = getStreamById(streamId);
   
-  // Default values if stream not found, otherwise use stream data
-  const streamTitle = stream ? stream.title : (params.title as string || 'Live Audio Room');
+  // Get stream data from context or URL params
+  const rawTitle = stream ? stream.title : (params.title as string);
+  const streamTitle = (rawTitle && rawTitle.trim()) ? rawTitle.trim() : 'Live Stream';
   const hostName = stream?.hosts[0]?.name || (params.hostName as string || 'Host');
-  const hostAvatar = stream?.hosts[0]?.avatar || (params.hostAvatar as string || 'https://randomuser.me/api/portraits/women/43.jpg');
+  const hostAvatar = stream?.hosts[0]?.avatar || (params.hostAvatar as string || '');
   const viewCount = stream?.views.toString() || (params.viewCount as string || '0');
   const formatViewCount = (count: string | number) => {
     const num = typeof count === 'string' ? parseInt(count) : count;
@@ -488,18 +494,16 @@ const LiveStreamView = () => {
     return num.toString();
   };
   const displayViewCount = formatViewCount(stream?.views || viewCount);
-  const boosts = stream?.boost || ROOM_STATS.boosts;
-  const rank = stream?.rank || ROOM_STATS.rank;
-  
-  // Mock profile views (this would come from the user profile in a real app)
-  // Using the host count as profile views for demonstration
-  const hostCount = stream?.hosts.length || parseInt(params.hostCount as string || '0');
-  
-  // In a real app this would come from a user profile context
-  // For demo, using a fixed high number or a value from the URL parameters
-  const profileViews = params.profileViews ? parseInt(params.profileViews as string) : 1400;
-  
-  const userProfileImage = profileImage || 'https://randomuser.me/api/portraits/men/32.jpg';
+  const boosts = stream?.boost || 0;
+  const rank = stream?.rank || 0;
+
+  // Get host count from actual stream data
+  const hostCount = stream?.hosts.length || 0;
+
+  // TODO: Get profile views from user profile context when implemented
+  const profileViews = 0; // Remove hardcoded value
+
+  const userProfileImage = profileImage || '';
   
   // Convert stream hosts to participants
   const initializeParticipants = () => {
@@ -618,6 +622,25 @@ const LiveStreamView = () => {
       console.error('Error updating speaking status:', error);
     }
   }, [streamId]);
+
+  // Update speaking animation refs when participants change
+  useEffect(() => {
+    // Ensure we have the right number of animation refs for current participants
+    const currentLength = speakingAnimationRefs.current.length;
+    const requiredLength = participants.length;
+
+    if (currentLength < requiredLength) {
+      // Add new animation refs for new participants
+      const newRefs = Array(requiredLength - currentLength)
+        .fill(null)
+        .map(() => new Animated.Value(0));
+      speakingAnimationRefs.current = [...speakingAnimationRefs.current, ...newRefs];
+    } else if (currentLength > requiredLength) {
+      // Remove excess animation refs
+      speakingAnimationRefs.current = speakingAnimationRefs.current.slice(0, requiredLength);
+    }
+  }, [participants]);
+
   const [messageText, setMessageText] = useState('');
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false);
   
@@ -629,8 +652,8 @@ const LiveStreamView = () => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const minimizeAnim = useRef(new Animated.Value(1)).current;
   
-  // Speaking animation refs
-  const speakingAnimationRefs = useRef<Animated.Value[]>(MOCK_PARTICIPANTS.map(() => new Animated.Value(0)));
+  // Speaking animation refs - initialize with empty array, will be updated when participants change
+  const speakingAnimationRefs = useRef<Animated.Value[]>([]);
   
   // Add new state variables for mention suggestions
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -1048,7 +1071,7 @@ const LiveStreamView = () => {
         <View style={styles.topBarContainer}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={handleLeaveStream}
           >
             <MaterialIcons name="chevron-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -1306,17 +1329,885 @@ const LiveStreamView = () => {
     );
   };
 
-  // --- Main Return --- 
+  // --- Simple Render Functions (keeping only what we need) ---
+
+
+
+  const renderInteractiveBottomPanel = () => {
+    const [showReactionPicker, setShowReactionPicker] = useState(false);
+    const reactionEmojis = ['❤️', '😍', '🔥', '👏', '😂', '😮', '💯', '🎉'];
+
+    const handleReactionPress = (emoji: string) => {
+      // Add floating reaction animation
+      const floatingReactionsRef = useRef<any>();
+      if (floatingReactionsRef.current) {
+        floatingReactionsRef.current.addFloatingReaction(emoji);
+      }
+      setShowReactionPicker(false);
+    };
+
+    return (
+      <>
+        <BlurView intensity={40} style={styles.interactiveBottomPanel}>
+          <TouchableOpacity
+            style={[styles.reactionButton, showReactionPicker && styles.activeReactionButton]}
+            onPress={() => setShowReactionPicker(!showReactionPicker)}
+          >
+            <MaterialIcons name="favorite" size={24} color="#FF6B9D" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.giftButton}>
+            <MaterialIcons name="card-giftcard" size={24} color="#FFD700" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.chatToggleButton}
+            onPress={() => {/* Toggle chat visibility */}}
+          >
+            <MaterialIcons name="chat" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.moreOptionsButton}>
+            <MaterialIcons name="more-horiz" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </BlurView>
+
+        {/* Reaction Picker */}
+        {showReactionPicker && (
+          <BlurView intensity={60} style={styles.reactionPicker}>
+            <View style={styles.reactionGrid}>
+              {reactionEmojis.map((emoji, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.reactionOption}
+                  onPress={() => handleReactionPress(emoji)}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </BlurView>
+        )}
+      </>
+    );
+  };
+
+  const renderModernChat = () => {
+    const [isChatVisible, setIsChatVisible] = useState(true);
+    const [newMessage, setNewMessage] = useState('');
+
+    const handleSendMessage = () => {
+      if (newMessage.trim() && user) {
+        const message: ChatMessage = {
+          id: generateId(),
+          user: {
+            name: user.displayName || 'Anonymous',
+            avatar: user.photoURL || 'https://randomuser.me/api/portraits/men/32.jpg',
+          },
+          message: newMessage.trim(),
+          timestamp: Date.now(),
+          replyTo: replyingTo ? {
+            id: replyingTo.id,
+            userName: replyingTo.user.name,
+            message: replyingTo.message
+          } : undefined
+        };
+
+        setChatMessages(prev => [...prev, message]);
+        setNewMessage('');
+        setReplyingTo(null);
+      }
+    };
+
+    if (!isChatVisible) return null;
+
+    return (
+      <View style={styles.modernChatContainer}>
+        <BlurView intensity={30} style={styles.modernChatBlur}>
+          <View style={styles.modernChatHeader}>
+            <Text style={styles.modernChatTitle}>Live Chat</Text>
+            <View style={styles.chatHeaderActions}>
+              <TouchableOpacity style={styles.chatActionButton}>
+                <MaterialIcons name="emoji-emotions" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.chatActionButton}
+                onPress={() => setIsChatVisible(false)}
+              >
+                <MaterialIcons name="keyboard-arrow-down" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.modernChatContent}>
+            <MemoizedChatMessages
+              messages={chatMessages}
+              onReply={handleReplyToMessage}
+              onScrollToMessage={scrollToMessage}
+              highlightedId={replyingTo?.id}
+            />
+          </View>
+
+          {/* Modern Chat Input */}
+          <View style={styles.modernChatInputContainer}>
+            {replyingTo && (
+              <View style={styles.replyPreviewContainer}>
+                <View style={styles.replyPreviewLine} />
+                <View style={styles.replyPreviewContent}>
+                  <Text style={styles.replyPreviewName}>{replyingTo.user.name}</Text>
+                  <Text style={styles.replyPreviewMessage} numberOfLines={1}>
+                    {replyingTo.message}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.cancelReplyButton}
+                  onPress={() => setReplyingTo(null)}
+                >
+                  <MaterialIcons name="close" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.chatInputRow}>
+              <TextInput
+                style={styles.modernChatInput}
+                placeholder="Type a message..."
+                placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, newMessage.trim() && styles.sendButtonActive]}
+                onPress={handleSendMessage}
+                disabled={!newMessage.trim()}
+              >
+                <MaterialIcons
+                  name="send"
+                  size={20}
+                  color={newMessage.trim() ? "#FFFFFF" : "rgba(255, 255, 255, 0.5)"}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </BlurView>
+      </View>
+    );
+  };
+
+  const renderHostControls = () => {
+    return (
+      <BlurView intensity={40} style={styles.hostControlsPanel}>
+        <Text style={styles.hostControlsTitle}>Host Controls</Text>
+        <View style={styles.hostControlsGrid}>
+          <TouchableOpacity style={styles.hostControlButton}>
+            <MaterialIcons name="mic-off" size={20} color="#FFFFFF" />
+            <Text style={styles.hostControlText}>Mute All</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.hostControlButton}>
+            <MaterialIcons name="person-add" size={20} color="#FFFFFF" />
+            <Text style={styles.hostControlText}>Invite</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.hostControlButton}>
+            <MaterialIcons name="settings" size={20} color="#FFFFFF" />
+            <Text style={styles.hostControlText}>Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    );
+  };
+
+  const renderModernMinimizedView = () => {
+    return (
+      <BlurView intensity={60} style={styles.modernMinimizedBlur}>
+        <LinearGradient
+          colors={['#6366f1', '#8b5cf6']}
+          style={styles.minimizedGradient}
+        >
+          <View style={styles.minimizedContent}>
+            <Text style={styles.minimizedTitle} numberOfLines={1}>{streamTitle}</Text>
+            <Text style={styles.minimizedViewers}>{displayViewCount} viewers</Text>
+          </View>
+        </LinearGradient>
+      </BlurView>
+    );
+  };
+
+  const renderModernInfoPanel = () => {
+    return (
+      <Animated.View
+        style={[styles.modernInfoPanel, { opacity: infoPanelFadeAnim }]}
+        {...infoPanelPanResponder.panHandlers}
+      >
+        <BlurView intensity={60} style={styles.infoPanelBlur}>
+          <View style={styles.modernInfoHeader}>
+            <Text style={styles.modernInfoTitle}>Stream Details</Text>
+            <TouchableOpacity onPress={toggleInfoPanel}>
+              <MaterialIcons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modernInfoContent} showsVerticalScrollIndicator={false}>
+            {/* Modern info content will be added here */}
+          </ScrollView>
+        </BlurView>
+      </Animated.View>
+    );
+  };
+
+  // --- Main Return ---
 
   // Create styles with animation values
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#121214',
+      backgroundColor: '#1a1a1a',
     },
     content: {
       flex: 1,
+    },
+    // Simple Clean Components
+    simpleTopBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    streamInfo: {
+      flex: 1,
+      marginHorizontal: 16,
+    },
+    streamTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    viewerCount: {
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: 14,
+      marginTop: 2,
+    },
+    minimizeButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    mainContent: {
+      flex: 1,
+      padding: 16,
+    },
+    agoraStreamContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    participantsArea: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 20,
+    },
+    participantCard: {
+      width: (screenWidth - 56) / 3,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 12,
+      padding: 12,
+      alignItems: 'center',
+    },
+    participantAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginBottom: 8,
+    },
+    participantName: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '500',
+      textAlign: 'center',
+    },
+    hostBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#ff4757',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    liveIndicator: {
+      position: 'absolute',
+      top: 80,
+      left: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    liveDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 6,
+    },
+    liveText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    errorContainer: {
+      position: 'absolute',
+      top: 120,
+      left: 16,
+      right: 16,
+      backgroundColor: 'rgba(255, 107, 107, 0.9)',
+      padding: 12,
+      borderRadius: 8,
+    },
+    errorText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      textAlign: 'center',
+    },
+    minimizedWidget: {
+      position: 'absolute',
+      width: 120,
+      height: 80,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      borderRadius: 12,
+      padding: 12,
+      bottom: 100,
+      right: 16,
+    },
+    minimizedContent: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    minimizedTitle: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    minimizedViewers: {
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    modernBackButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    streamTitleContainer: {
+      flex: 1,
+      marginHorizontal: 16,
+    },
+    modernStreamTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '700',
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    hostNameText: {
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontSize: 14,
+      fontWeight: '500',
+      marginTop: 2,
+    },
+    topBarActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    shareButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modernMinimizeButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    streamContentArea: {
+      flex: 1,
+      marginTop: 100,
+    },
+    streamInfoOverlay: {
+      position: 'absolute',
+      top: 120,
+      right: 16,
       flexDirection: 'column',
+      gap: 8,
+      zIndex: 90,
+    },
+    viewerCountBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      gap: 6,
+    },
+    viewerCountText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    rankBadgeModern: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      gap: 6,
+    },
+    rankTextModern: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    modernParticipantsContainer: {
+      position: 'absolute',
+      top: 20,
+      left: 16,
+      right: 16,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      zIndex: 80,
+    },
+    modernParticipantCard: {
+      width: (screenWidth - 56) / 3,
+      aspectRatio: 0.8,
+    },
+    participantCardBlur: {
+      flex: 1,
+      borderRadius: 16,
+      overflow: 'hidden',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      padding: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modernParticipantAvatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginBottom: 8,
+    },
+    speakingIndicatorModern: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      right: 8,
+      bottom: 8,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    speakingRing: {
+      position: 'absolute',
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 3,
+      borderColor: '#00ff88',
+    },
+    modernParticipantName: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    hostBadgeModern: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#ff4757',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    floatingReactionsContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      pointerEvents: 'none',
+      zIndex: 70,
+    },
+    floatingReaction: {
+      position: 'absolute',
+    },
+    floatingReactionEmoji: {
+      fontSize: 32,
+      textShadowColor: 'rgba(0, 0, 0, 0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    interactiveBottomPanel: {
+      position: 'absolute',
+      bottom: 100,
+      right: 16,
+      flexDirection: 'column',
+      gap: 12,
+      zIndex: 90,
+    },
+    reactionButton: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 107, 157, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FF6B9D',
+    },
+    activeReactionButton: {
+      backgroundColor: 'rgba(255, 107, 157, 0.4)',
+      transform: [{ scale: 1.1 }],
+    },
+    reactionPicker: {
+      position: 'absolute',
+      bottom: 170,
+      right: 16,
+      borderRadius: 20,
+      padding: 16,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      zIndex: 95,
+    },
+    reactionGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      width: 160,
+      gap: 8,
+    },
+    reactionOption: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    reactionEmoji: {
+      fontSize: 20,
+    },
+    giftButton: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 215, 0, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FFD700',
+    },
+    chatToggleButton: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+    },
+    moreOptionsButton: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modernChatContainer: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '40%',
+      zIndex: 85,
+    },
+    modernChatBlur: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    },
+    modernChatHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    modernChatTitle: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    chatHeaderActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    chatActionButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modernChatContent: {
+      flex: 1,
+      paddingHorizontal: 16,
+    },
+    modernChatInputContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    replyPreviewContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      borderRadius: 8,
+      padding: 8,
+      marginBottom: 8,
+    },
+    replyPreviewLine: {
+      width: 3,
+      height: 30,
+      backgroundColor: '#6366f1',
+      borderRadius: 2,
+      marginRight: 8,
+    },
+    replyPreviewContent: {
+      flex: 1,
+    },
+    replyPreviewName: {
+      color: '#6366f1',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    replyPreviewMessage: {
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: 12,
+      marginTop: 2,
+    },
+    cancelReplyButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    chatInputRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+    },
+    modernChatInput: {
+      flex: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      color: '#FFFFFF',
+      fontSize: 14,
+      maxHeight: 100,
+    },
+    sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sendButtonActive: {
+      backgroundColor: '#6366f1',
+    },
+    hostControlsPanel: {
+      position: 'absolute',
+      bottom: 20,
+      left: 16,
+      right: 16,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      borderRadius: 16,
+      padding: 16,
+      zIndex: 95,
+    },
+    hostControlsTitle: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    hostControlsGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    hostControlButton: {
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      minWidth: 80,
+    },
+    hostControlText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 4,
+    },
+    liveStatusContainer: {
+      position: 'absolute',
+      top: 120,
+      left: 16,
+      zIndex: 100,
+    },
+    liveStatusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      gap: 6,
+    },
+    liveStatusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#FFFFFF',
+    },
+    liveStatusText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    modernMinimizedContainer: {
+      position: 'absolute',
+      borderRadius: 16,
+      overflow: 'hidden',
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    },
+    modernMinimizedBlur: {
+      flex: 1,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    minimizedGradient: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 12,
+    },
+    minimizedContent: {
+      alignItems: 'center',
+    },
+    minimizedTitle: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    minimizedViewers: {
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontSize: 12,
+      fontWeight: '500',
+      marginTop: 2,
+    },
+    modernInfoPanel: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      width: '70%',
+      height: '100%',
+      zIndex: 1000,
+    },
+    infoPanelBlur: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    modernInfoHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    modernInfoTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    modernInfoContent: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    errorMessageContainer: {
+      position: 'absolute',
+      top: 120,
+      left: 16,
+      right: 16,
+      borderRadius: 12,
+      padding: 16,
+      zIndex: 110,
+    },
+    errorMessageText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      textAlign: 'center',
+      fontWeight: '600',
     },
     infoPanel: {
       position: 'absolute',
@@ -1901,90 +2792,115 @@ const LiveStreamView = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}> 
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="light" />
-      
-      {/* Full screen content - Use fadeAnim for visibility */} 
+
+      {/* Simple Clean Live Stream Interface */}
       {!isHidden && (
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.content, 
-            { 
-              opacity: fadeAnim, 
+            styles.content,
+            {
+              opacity: fadeAnim,
               transform: [{ scale: minimizeAnim }],
               zIndex: isMinimized ? 0 : 1
             }
           ]}
         >
-          {renderTopBar()}
-          {renderStatsBar()}
+          {/* Simple Top Bar */}
+          <View style={styles.simpleTopBar}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleLeaveStream}
+            >
+              <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-          {/* Agora Audio/Video Stream Layer */}
-          {isAgoraEnabled && user && (
-            <View style={styles.agoraStreamContainer}>
-              <AgoraStreamView
-                streamId={streamId}
-                userId={user.uid}
-                isHost={stream?.hosts.some(host => host.name === user.displayName) || false}
-                onConnectionStateChange={handleAgoraConnectionStateChange}
-                onParticipantUpdate={handleAgoraParticipantUpdate}
-                onError={handleAgoraError}
-              />
+            <View style={styles.streamInfo}>
+              <Text style={styles.streamTitle}>{streamTitle}</Text>
+              <Text style={styles.viewerCount}>{displayViewCount} viewers</Text>
             </View>
-          )}
 
-          {/* Participants Grid Overlay */}
-          {renderParticipantsGrid()}
+            <TouchableOpacity
+              style={styles.minimizeButton}
+              onPress={toggleMinimize}
+            >
+              <MaterialIcons name="remove" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
 
-          {/* Streaming Status Indicator */}
-          {isAgoraEnabled && (
-            <View style={styles.streamingStatusContainer}>
-              <View style={[
-                styles.streamingStatusIndicator,
-                { backgroundColor: agoraConnectionState === 'connected' ? '#4CAF50' : '#FF6B6B' }
-              ]}>
-                <MaterialIcons
-                  name={agoraConnectionState === 'connected' ? 'wifi' : 'wifi-off'}
-                  size={12}
-                  color="#FFFFFF"
+          {/* Main Content Area */}
+          <View style={styles.mainContent}>
+            {/* Agora Audio/Video Stream */}
+            {isAgoraEnabled && user && (
+              <View style={styles.agoraStreamContainer}>
+                <AgoraStreamView
+                  streamId={streamId}
+                  userId={user.uid}
+                  isHost={stream?.hosts.some(host => host.name === user.displayName) || false}
+                  onConnectionStateChange={handleAgoraConnectionStateChange}
+                  onParticipantUpdate={handleAgoraParticipantUpdate}
+                  onError={handleAgoraError}
                 />
-                <Text style={styles.streamingStatusText}>
-                  {agoraConnectionState === 'connected' ? 'LIVE' : 'OFFLINE'}
-                </Text>
               </View>
+            )}
+
+            {/* Simple Participants Display */}
+            <View style={styles.participantsArea}>
+              {participants.slice(0, 6).map((participant, index) => (
+                <View key={participant.id} style={styles.participantCard}>
+                  <Image
+                    source={{ uri: participant.avatar }}
+                    style={styles.participantAvatar}
+                  />
+                  <Text style={styles.participantName}>{participant.name}</Text>
+                  {participant.isHost && (
+                    <View style={styles.hostBadge}>
+                      <MaterialIcons name="mic" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+              ))}
             </View>
-          )}
+          </View>
+
+          {/* Simple Live Indicator */}
+          <View style={styles.liveIndicator}>
+            <View style={[
+              styles.liveDot,
+              { backgroundColor: agoraConnectionState === 'connected' ? '#ff4757' : '#747d8c' }
+            ]} />
+            <Text style={styles.liveText}>
+              {agoraConnectionState === 'connected' ? 'LIVE' : 'OFFLINE'}
+            </Text>
+          </View>
 
           {/* Error Message */}
           {streamingError && (
-            <View style={styles.errorMessageContainer}>
-              <Text style={styles.errorMessageText}>{streamingError}</Text>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{streamingError}</Text>
             </View>
           )}
-
-          {renderChat()}
         </Animated.View>
       )}
 
-      {/* Minimized Widget - Only render when minimized is true and animation has completed */} 
+      {/* Simple Minimized Widget */}
       {!isHidden && isMinimized && (
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.minimizedContainer, 
-            { 
-              width: calculateWidgetSize(participants.filter(p => p.isHost).length).size || MIN_WIDGET_SIZE,
-              height: calculateWidgetSize(participants.filter(p => p.isHost).length).size || MIN_WIDGET_SIZE,
+            styles.minimizedWidget,
+            {
               transform: [{ translateX: widgetPan.x }, { translateY: widgetPan.y }],
             }
           ]}
           {...widgetPanResponder.panHandlers}
         >
-          {renderMinimizedView()}
+          <View style={styles.minimizedContent}>
+            <Text style={styles.minimizedTitle} numberOfLines={1}>{streamTitle}</Text>
+            <Text style={styles.minimizedViewers}>{displayViewCount} viewers</Text>
+          </View>
         </Animated.View>
       )}
-
-      {/* Info Panel - Always rendered, controlled by opacity */} 
-      {!isMinimized && !isHidden && renderInfoPanel()}
     </SafeAreaView>
   );
 };

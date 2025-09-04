@@ -11,6 +11,14 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Debug helper function for activeStream access
+    function debugActiveStreamAccess(userId) {
+      // This will help debug permission issues
+      return isAuthenticated() &&
+             request.auth.uid != null &&
+             request.auth.uid == userId;
+    }
+
     // USERS COLLECTION - Core user profiles
     match /users/{userId} {
       // Allow creation only by the user themselves
@@ -21,6 +29,16 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Allow public read for username checking during registration
       allow read: if true;
+
+      // Active stream tracking subcollection - specific document path
+      match /activeStream/current {
+        allow read, write: if debugActiveStreamAccess(userId);
+      }
+
+      // Allow access to any document in activeStream subcollection (for future flexibility)
+      match /activeStream/{documentId} {
+        allow read, write: if debugActiveStreamAccess(userId);
+      }
     }
 
     // SHOP & COMMERCE COLLECTIONS
@@ -54,8 +72,36 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
+    // MINING STATS - aggregated mining statistics per user
+    match /miningStats/{userId} {
+      allow read, write: if isOwner(userId);
+      // Allow authenticated users to read public mining stats for leaderboards
+      allow read: if isAuthenticated();
+    }
+
+    // SLOTS STATS - aggregated slots game statistics per user
+    match /slotsStats/{userId} {
+      allow read, write: if isOwner(userId);
+      // Allow authenticated users to read public slots stats for leaderboards
+      allow read: if isAuthenticated();
+    }
+
+    // GOLD MINER STATS - aggregated gold miner game statistics per user
+    match /goldMinerStats/{userId} {
+      allow read, write: if isOwner(userId);
+      // Allow authenticated users to read public gold miner stats for leaderboards
+      allow read: if isAuthenticated();
+    }
+
     match /gameStats/{userId} {
       allow read, write: if isOwner(userId);
+    }
+
+    // USER GAME PROFILES - for gaming statistics and achievements
+    match /userGameProfiles/{userId} {
+      allow read, write: if isOwner(userId);
+      // Allow authenticated users to read other users' public game stats
+      allow read: if isAuthenticated();
     }
 
     // MUSIC COLLECTIONS
@@ -74,6 +120,23 @@ service cloud.firestore {
       allow read: if isAuthenticated(); // Users can see friends' activities
       allow write: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // FRIENDS COLLECTION - for friend relationships
+    match /friends/{friendshipId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.friendId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.friendId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.friendId == request.auth.uid
+      );
     }
 
     // NOTIFICATIONS COLLECTIONS
@@ -110,10 +173,72 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
-    // STREAMS - PUBLIC READ ACCESS for live streams, authenticated users can write
+    // Helper function to check if user is already in another active stream
+    function userInAnotherStream(userId, currentStreamId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/activeStream/current) &&
+             get(/databases/$(database)/documents/users/$(userId)/activeStream/current).data.streamId != currentStreamId &&
+             get(/databases/$(database)/documents/users/$(userId)/activeStream/current).data.isActive == true;
+    }
+
+    // Helper function to validate stream participant data
+    function isValidParticipant(participant) {
+      return participant.keys().hasAll(['id', 'name', 'avatar', 'isHost', 'isSpeaking', 'isMuted', 'joinedAt']) &&
+             participant.id is string &&
+             participant.name is string &&
+             participant.avatar is string &&
+             participant.isHost is bool &&
+             participant.isSpeaking is bool &&
+             participant.isMuted is bool &&
+             participant.joinedAt is number;
+    }
+
+    // Helper function to check if user is participant in stream
+    function isParticipantInStream(userId, streamData) {
+      return streamData.participants != null &&
+             streamData.participants.size() > 0 &&
+             streamData.participants.hasAny([{'id': userId}]);
+    }
+
+    // STREAMS - Enhanced security rules for single-stream participation
     match /streams/{streamId} {
-      allow read: if true; // Public read access for live streams
-      allow create, update, delete: if isAuthenticated();
+      // Anyone can read streams (both active and inactive)
+      // This allows browsing active streams and cleanup of inactive streams
+      allow read: if true;
+
+      // Simplified stream creation - authenticated users can create streams
+      allow create: if isAuthenticated() &&
+                   request.auth.uid == request.resource.data.hostId &&
+                   request.resource.data.isActive == true;
+
+      // Simplified stream updates - authenticated users can update streams they participate in
+      allow update: if isAuthenticated() && (
+        // Host can always update their stream
+        request.auth.uid == resource.data.hostId ||
+        // Participants can update stream (join/leave)
+        resource.data.isActive == true
+      ) ||
+
+      // ADMIN/CLEANUP: Allow system cleanup operations for stale/inactive streams
+      // This allows background cleanup service to mark streams as inactive
+      (
+        // Only allow marking streams as inactive (isActive: true -> false)
+        resource.data.isActive == true &&
+        request.resource.data.isActive == false &&
+
+        // Must include cleanup metadata
+        request.resource.data.keys().hasAll(['endedAt', 'endReason']) &&
+        request.resource.data.endReason in ['timeout_cleanup', 'emergency_cleanup', 'system_cleanup'] &&
+
+        // Cannot modify participants during cleanup (safety check)
+        request.resource.data.participants == resource.data.participants &&
+
+        // Cannot change host during cleanup (safety check)
+        request.resource.data.hostId == resource.data.hostId
+      );
+
+      // Only host can delete/end streams
+      allow delete: if isAuthenticated() &&
+                   request.auth.uid == resource.data.hostId;
     }
 
     // Stream messages - PUBLIC READ for viewing, authenticated users can write
@@ -158,6 +283,12 @@ service cloud.firestore {
 
     match /promotions/{promotionId} {
       allow read: if true; // Public read for active promotions
+    }
+
+    // SHOP PROMOTIONS - specific collection for shop promotions
+    match /shopPromotions/{promotionId} {
+      allow read: if true; // Public read for shop promotions
+      allow write: if false; // Only admin can modify (server-side)
     }
 
     // LEADERBOARDS & ACHIEVEMENTS

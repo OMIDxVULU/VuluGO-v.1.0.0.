@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testExecutions version="1">
+  <file path="/Users/omid/VuluGO v6/VuluGO-v.1.0.0./__tests__/e2e/streamingComponents.test.tsx">
+  </file>
+  <file path="/Users/omid/VuluGO v6/VuluGO-v.1.0.0./__tests__/integration/streamingFlow.test.ts">
+  </file>
+  <file path="/Users/omid/VuluGO v6/VuluGO-v.1.0.0./__tests__/services/streamService.test.ts">
+  </file>
+</testExecutions>

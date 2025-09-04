@@ -6,21 +6,21 @@ export const useGuestRestrictions = () => {
   const { isGuest, signOut } = useAuth();
   const router = useRouter();
 
-  const navigateToUpgrade = () => {
-    console.log('🔄 Guest user navigating to upgrade screen');
-    router.push('/auth/upgrade');
+  const navigateToAuthSelection = () => {
+    console.log('🔄 Guest user navigating to auth selection screen');
+    router.push('/auth/selection');
   };
 
   const handleGuestRestriction = (feature: string) => {
     Alert.alert(
-      'Upgrade Account',
-      `Guest users can browse but need a full account to access ${feature}. Would you like to upgrade your account?`,
+      'Account Required',
+      `Guest users can browse but need a full account to access ${feature}. Choose how you'd like to continue.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Upgrade Account',
+          text: 'Choose Account Option',
           style: 'default',
-          onPress: navigateToUpgrade
+          onPress: navigateToAuthSelection
         }
       ]
     );

@@ -422,7 +422,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin, onSwitchTo
                     editable={false}
                     required
                     error={errors.dateOfBirth}
-                    rightIcon="date-range"
                   />
                 </TouchableOpacity>
 
@@ -495,7 +494,6 @@ const SignupScreen: React.FC<SignupScreenProps> = ({ onSwitchToLogin, onSwitchTo
                   linkText="Sign In"
                   onLinkPress={onSwitchToLogin}
                 />
-              </View>
             </AuthContainer>
           </ScrollView>
         </KeyboardAvoidingView>

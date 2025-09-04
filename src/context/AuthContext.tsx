@@ -55,6 +55,17 @@ export const useAuth = () => {
   return context;
 };
 
+// Safe version of useAuth that returns null instead of throwing
+// Use this in components that might render before AuthProvider is ready
+export const useAuthSafe = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    console.warn('⚠️ useAuthSafe: AuthProvider not available yet');
+    return null;
+  }
+  return context;
+};
+
 interface AuthProviderProps {
   children: React.ReactNode;
 }

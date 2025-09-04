@@ -22,10 +22,87 @@ import {
 import { db, auth, isFirebaseInitialized } from './firebase';
 import type { AppUser, ChatMessage, DirectMessage, Conversation } from './types';
 import FirebaseErrorHandler from '../utils/firebaseErrorHandler';
+import UserDataSanitizer from '../utils/userDataSanitizer';
 
 // Re-export types for backward compatibility
 export type { AppUser as User, ChatMessage, DirectMessage, Conversation };
 
+// Enhanced streaming interfaces
+export interface Stream {
+  // Core identifiers
+  id: string;
+  hostId: string;
+  hostName: string;
+  hostAvatar?: string;
+
+  // Stream metadata
+  title: string;
+  description?: string;
+  category: StreamCategory;
+  tags: string[];
+  thumbnailUrl?: string;
+
+  // Status and timing
+  isActive: boolean;
+  isPublic: boolean;
+  startedAt: Timestamp;
+  endedAt?: Timestamp;
+  scheduledFor?: Timestamp;
+
+  // Participant tracking
+  viewerCount: number;
+  maxViewers: number;
+  totalViewers: number;
+  participants: StreamParticipant[];
+
+  // Stream settings
+  allowChat: boolean;
+  allowReactions: boolean;
+  isRecording: boolean;
+  quality: StreamQuality;
+
+  // Moderation
+  moderatorIds: string[];
+  bannedUserIds: string[];
+  chatSettings: ChatSettings;
+
+  // Analytics
+  totalMessages: number;
+  totalReactions: number;
+  totalGifts: number;
+  revenue: number;
+
+  // Metadata
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  lastActivity: Timestamp;
+}
+
+export interface StreamParticipant {
+  id: string;
+  name: string;
+  avatar?: string;
+  role: 'host' | 'moderator' | 'viewer';
+  joinedAt: Timestamp;
+  lastSeen: Timestamp;
+  isMuted: boolean;
+  isBanned: boolean;
+  isActive: boolean;
+}
+
+export interface ChatSettings {
+  slowMode: number;
+  subscribersOnly: boolean;
+  moderatorsOnly: boolean;
+  profanityFilter: boolean;
+  linkFilter: boolean;
+  maxMessageLength: number;
+}
+
+export type StreamCategory = 'gaming' | 'music' | 'talk' | 'education' | 'entertainment' | 'other';
+export type StreamQuality = 'low' | 'medium' | 'high' | 'auto';
+
+// Legacy interface for backward compatibility
 export interface LiveStream {
   id: string;
   userId: string;
@@ -39,6 +116,45 @@ export interface LiveStream {
   endedAt?: Timestamp;
 }
 
+// Enhanced chat message interface
+export interface StreamChatMessage {
+  id: string;
+  streamId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar?: string;
+  senderRole: 'host' | 'moderator' | 'viewer';
+
+  // Message content
+  message: string;
+  type: MessageType;
+  mentions: string[];
+
+  // Reactions and engagement
+  reactions: MessageReaction[];
+  reactionCount: number;
+
+  // Moderation
+  isDeleted: boolean;
+  deletedBy?: string;
+  deleteReason?: string;
+  isFiltered: boolean;
+
+  // Metadata
+  timestamp: Timestamp;
+  editedAt?: Timestamp;
+  clientTimestamp: number;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  userIds: string[];
+  count: number;
+}
+
+export type MessageType = 'text' | 'emoji' | 'system' | 'gift' | 'announcement';
+
+// Legacy interface for backward compatibility
 export interface GlobalChatMessage {
   id: string;
   senderId: string;
@@ -178,7 +294,152 @@ class FirestoreService {
     }
   }
 
-  // Chat operations
+  // Enhanced chat operations
+  async sendStreamMessage(streamId: string, messageText: string, mentions: string[] = []): Promise<string> {
+    try {
+      this.requireAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+
+      // Get stream data to check permissions and settings
+      const streamRef = doc(db, 'streams', streamId);
+      const streamDoc = await getDoc(streamRef);
+
+      if (!streamDoc.exists()) {
+        throw new Error('Stream not found');
+      }
+
+      const streamData = streamDoc.data() as Stream;
+      if (!streamData.isActive) {
+        throw new Error('Stream is not active');
+      }
+
+      // Check if user is banned (guard against undefined)
+      const bannedUserIds = Array.isArray(streamData.bannedUserIds) ? streamData.bannedUserIds : [];
+      if (currentUser?.uid && bannedUserIds.includes(currentUser.uid)) {
+        throw new Error('You are banned from this stream');
+      }
+
+      // Check chat settings
+      if (!streamData.allowChat) {
+        throw new Error('Chat is disabled for this stream');
+      }
+
+      // Get user role in stream (guard participants)
+      const participants = Array.isArray(streamData.participants) ? streamData.participants : [];
+      const participant = participants.find(p => p.id === currentUser.uid);
+      const userRole = participant?.role || 'viewer';
+
+      // Check moderators only setting (guard chatSettings)
+      if (streamData.chatSettings?.moderatorsOnly && !['host', 'moderator'].includes(userRole)) {
+        throw new Error('Only moderators can chat in this stream');
+      }
+
+      // Validate message length (guard chatSettings)
+      if (streamData.chatSettings && messageText.length > streamData.chatSettings.maxMessageLength) {
+        throw new Error(`Message too long. Maximum ${streamData.chatSettings.maxMessageLength} characters.`);
+      }
+
+      // Create chat message
+      const chatMessage: Omit<StreamChatMessage, 'id'> = {
+        streamId,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        senderAvatar: currentUser.photoURL || undefined,
+        senderRole: userRole,
+        message: messageText,
+        type: 'text',
+        mentions,
+        reactions: [],
+        reactionCount: 0,
+        isDeleted: false,
+        isFiltered: false,
+        timestamp: serverTimestamp() as Timestamp,
+        clientTimestamp: Date.now()
+      };
+
+      // Add message to chat subcollection
+      const chatRef = collection(db, `streams/${streamId}/chat`);
+      const messageRef = await addDoc(chatRef, chatMessage);
+
+      // Update stream message count
+      await updateDoc(streamRef, {
+        totalMessages: increment(1),
+        lastActivity: serverTimestamp()
+      });
+
+      // Update participant message count
+      const participantRef = doc(db, `streams/${streamId}/participants`, currentUser.uid);
+      await updateDoc(participantRef, {
+        messagesSent: increment(1),
+        lastSeen: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      console.log(`✅ Message sent to stream ${streamId}: ${messageRef.id}`);
+      return messageRef.id;
+    } catch (error: any) {
+      console.error('Failed to send stream message:', error.message);
+      throw error;
+    }
+  }
+
+  async addMessageReaction(streamId: string, messageId: string, emoji: string): Promise<void> {
+    try {
+      this.requireAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+
+      await runTransaction(db, async (transaction) => {
+        const messageRef = doc(db, `streams/${streamId}/chat`, messageId);
+        const messageDoc = await transaction.get(messageRef);
+
+        if (!messageDoc.exists()) {
+          throw new Error('Message not found');
+        }
+
+        const messageData = messageDoc.data() as StreamChatMessage;
+        const reactions = Array.isArray(messageData.reactions) ? messageData.reactions : [];
+        const existingReaction = reactions.find(r => r.emoji === emoji);
+
+        if (existingReaction) {
+          // Toggle reaction
+          if (existingReaction.userIds.includes(currentUser.uid)) {
+            // Remove reaction
+            existingReaction.userIds = existingReaction.userIds.filter(id => id !== currentUser.uid);
+            existingReaction.count = existingReaction.userIds.length;
+          } else {
+            // Add reaction
+            existingReaction.userIds.push(currentUser.uid);
+            existingReaction.count = existingReaction.userIds.length;
+          }
+        } else {
+          // Add new reaction
+          reactions.push({
+            emoji,
+            userIds: [currentUser.uid],
+            count: 1
+          });
+        }
+
+        // Remove empty reactions
+        const filteredReactions = reactions.filter(r => r.count > 0);
+        const reactionCount = filteredReactions.reduce((sum, r) => sum + r.count, 0);
+
+        transaction.update(messageRef, {
+          reactions: filteredReactions,
+          reactionCount
+        });
+      });
+
+      console.log(`✅ Reaction ${emoji} toggled on message ${messageId}`);
+    } catch (error: any) {
+      console.error('Failed to add message reaction:', error.message);
+      throw error;
+    }
+  }
+
+  // Legacy method for backward compatibility
   async sendMessage(streamId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<string> {
     try {
       const messageRef = await addDoc(collection(db, `streams/${streamId}/messages`), {
@@ -470,18 +731,222 @@ class FirestoreService {
     }
   }
 
-  // Streaming methods
-  async createStream(streamId: string, streamData: any): Promise<void> {
+  // Enhanced streaming methods
+  async createStream(streamId: string, streamData: Partial<Stream>): Promise<void> {
     try {
-      this.requireAuth(); // Require authentication for creating streams
-      const streamsRef = collection(db, 'streams');
-      await setDoc(doc(streamsRef, streamId), {
+      this.requireAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+
+      const defaultChatSettings: ChatSettings = {
+        slowMode: 0,
+        subscribersOnly: false,
+        moderatorsOnly: false,
+        profanityFilter: true,
+        linkFilter: false,
+        maxMessageLength: 500
+      };
+
+      // Create stream document with sanitized data (no undefined values)
+      const streamDoc: Partial<Stream> = {
         ...streamData,
+        id: streamId,
+        hostId: currentUser.uid,
+        hostName: currentUser.displayName || 'Unknown Host',
+        hostAvatar: currentUser.photoURL || null, // Use null instead of undefined
+        isActive: true,
+        isPublic: streamData.isPublic ?? true,
+        viewerCount: 1, // Host counts as viewer
+        maxViewers: 1,
+        totalViewers: 1,
+        participants: [{
+          id: currentUser.uid,
+          name: currentUser.displayName || 'Host',
+          avatar: currentUser.photoURL || null, // Use null instead of undefined
+          role: 'host',
+          isHost: true, // Ensure streaming layer detects host presence
+          joinedAt: serverTimestamp() as Timestamp,
+          lastSeen: serverTimestamp() as Timestamp,
+          isMuted: false,
+          isBanned: false,
+          isActive: true
+        }],
+        allowChat: streamData.allowChat ?? true,
+        allowReactions: streamData.allowReactions ?? true,
+        isRecording: false,
+        quality: streamData.quality || 'auto',
+        moderatorIds: [],
+        bannedUserIds: [],
+        chatSettings: defaultChatSettings,
+        totalMessages: 0,
+        totalReactions: 0,
+        totalGifts: 0,
+        revenue: 0,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+        updatedAt: serverTimestamp(),
+        lastActivity: serverTimestamp(),
+        startedAt: serverTimestamp()
+      };
+
+      // Sanitize the stream document to remove any undefined values
+      const sanitizedStreamDoc = UserDataSanitizer.removeUndefinedValues(streamDoc);
+
+      const streamsRef = collection(db, 'streams');
+
+      // TEMPORARY WORKAROUND: Handle permission errors gracefully
+      try {
+        await setDoc(doc(streamsRef, streamId), sanitizedStreamDoc);
+        console.log(`✅ Created stream ${streamId} with enhanced schema`);
+      } catch (permissionError: any) {
+        if (permissionError?.code === 'permission-denied') {
+          console.warn('🚨 FIREBASE RULES NOT DEPLOYED - Stream creation blocked by permissions');
+          console.warn('📋 To fix: Deploy the updated firestore.rules to Firebase Console');
+          console.warn('🔗 Go to: https://console.firebase.google.com/project/vulugo/firestore/rules');
+
+          // Create a more user-friendly error message
+          throw new Error('Live streaming is temporarily unavailable. Please contact support or try again later.');
+        }
+        throw permissionError;
+      }
     } catch (error: any) {
       console.error('Failed to create stream:', error.message);
+      throw error;
+    }
+  }
+
+  // Enhanced participant management
+  async joinStream(streamId: string): Promise<void> {
+    try {
+      this.requireAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+
+      await runTransaction(db, async (transaction) => {
+        const streamRef = doc(db, 'streams', streamId);
+        const streamDoc = await transaction.get(streamRef);
+
+        if (!streamDoc.exists()) {
+          throw new Error('Stream not found');
+        }
+
+        const streamData = streamDoc.data() as Stream;
+        if (!streamData.isActive) {
+          throw new Error('Stream is not active');
+        }
+
+        // Check if user is already in stream
+        const participants = Array.isArray(streamData.participants) ? streamData.participants : [];
+        const existingParticipant = participants.find(p => p.id === currentUser.uid);
+        if (existingParticipant) {
+          // Update existing participant as active
+          const updatedParticipants = participants.map(p =>
+            p.id === currentUser.uid
+              ? { ...p, isActive: true, lastSeen: serverTimestamp() as Timestamp }
+              : p
+          );
+
+          transaction.update(streamRef, {
+            participants: updatedParticipants,
+            lastActivity: serverTimestamp()
+          });
+        } else {
+          // Add new participant
+          const newParticipant: StreamParticipant = {
+            id: currentUser.uid,
+            name: currentUser.displayName || 'Viewer',
+            avatar: currentUser.photoURL || undefined,
+            role: 'viewer',
+            joinedAt: serverTimestamp() as Timestamp,
+            lastSeen: serverTimestamp() as Timestamp,
+            isMuted: false,
+            isBanned: false,
+            isActive: true
+          };
+
+          const updatedParticipants = [...participants, newParticipant];
+          const newViewerCount = (streamData.viewerCount ?? 0) + 1;
+          const newMaxViewers = Math.max(streamData.maxViewers ?? 0, newViewerCount);
+
+          transaction.update(streamRef, {
+            participants: updatedParticipants,
+            viewerCount: newViewerCount,
+            maxViewers: newMaxViewers,
+            totalViewers: streamData.totalViewers + 1,
+            lastActivity: serverTimestamp()
+          });
+        }
+
+        // Create participant detail record with sanitized data
+        const participantRef = doc(db, `streams/${streamId}/participants`, currentUser.uid);
+        transaction.set(participantRef, {
+          userId: currentUser.uid,
+          streamId: streamId,
+          displayName: currentUser.displayName || 'Viewer',
+          username: currentUser.email?.split('@')[0] || 'viewer',
+          avatar: currentUser.photoURL || null, // Use null instead of undefined
+          role: 'viewer',
+          joinedAt: serverTimestamp(),
+          isActive: true,
+          lastSeen: serverTimestamp(),
+          connectionQuality: 'good',
+          messagesSent: 0,
+          reactionsGiven: 0,
+          giftsGiven: 0,
+          giftValue: 0,
+          isMuted: false,
+          isBanned: false,
+          warnings: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      });
+
+      console.log(`✅ User ${currentUser.uid} joined stream ${streamId}`);
+    } catch (error: any) {
+      console.error('Failed to join stream:', error.message);
+      throw error;
+    }
+  }
+
+  async leaveStream(streamId: string): Promise<void> {
+    try {
+      this.requireAuth();
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('User not authenticated');
+
+      await runTransaction(db, async (transaction) => {
+        const streamRef = doc(db, 'streams', streamId);
+        const streamDoc = await transaction.get(streamRef);
+
+        if (!streamDoc.exists()) {
+          throw new Error('Stream not found');
+        }
+
+        const streamData = streamDoc.data() as Stream;
+
+        // Remove participant from stream
+        const participants = Array.isArray(streamData.participants) ? streamData.participants : [];
+        const updatedParticipants = participants.filter(p => p.id !== currentUser.uid);
+        const newViewerCount = Math.max(0, (streamData.viewerCount ?? 0) - 1);
+
+        transaction.update(streamRef, {
+          participants: updatedParticipants,
+          viewerCount: newViewerCount,
+          lastActivity: serverTimestamp()
+        });
+
+        // Update participant detail record
+        const participantRef = doc(db, `streams/${streamId}/participants`, currentUser.uid);
+        transaction.update(participantRef, {
+          isActive: false,
+          leftAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      });
+
+      console.log(`✅ User ${currentUser.uid} left stream ${streamId}`);
+    } catch (error: any) {
+      console.error('Failed to leave stream:', error.message);
       throw error;
     }
   }
@@ -497,7 +962,7 @@ class FirestoreService {
       const streamsRef = collection(db, 'streams');
       const q = query(
         streamsRef,
-        where('isLive', '==', true),
+        where('isActive', '==', true),
         orderBy('startedAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
@@ -517,6 +982,54 @@ class FirestoreService {
       // For other errors, return empty array but log more prominently
       console.error('Failed to get active streams:', error.message);
       return [];
+    }
+  }
+
+  async getAllStreams(): Promise<any[]> {
+    try {
+      // Get all streams regardless of status (for cleanup purposes)
+      if (!db) {
+        console.warn('Firestore not initialized');
+        return [];
+      }
+
+      const streamsRef = collection(db, 'streams');
+      const q = query(streamsRef, orderBy('startedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error: any) {
+      FirebaseErrorHandler.logError('getAllStreams', error);
+      console.error('Error getting all streams:', error.message);
+      return [];
+    }
+  }
+
+  async getStreamById(streamId: string): Promise<any | null> {
+    try {
+      if (!db) {
+        console.warn('Firestore not initialized');
+        return null;
+      }
+
+      const streamRef = doc(db, 'streams', streamId);
+      const streamDoc = await getDoc(streamRef);
+
+      if (streamDoc.exists()) {
+        return {
+          id: streamDoc.id,
+          ...streamDoc.data()
+        };
+      }
+
+      return null;
+    } catch (error: any) {
+      FirebaseErrorHandler.logError('getStreamById', error);
+      console.error('Error getting stream by ID:', error.message);
+      return null;
     }
   }
 
@@ -580,7 +1093,7 @@ class FirestoreService {
       const streamsRef = collection(db, 'streams');
       const q = query(
         streamsRef,
-        where('isLive', '==', true),
+        where('isActive', '==', true),
         orderBy('startedAt', 'desc')
       );
 
@@ -590,6 +1103,7 @@ class FirestoreService {
             id: doc.id,
             ...doc.data()
           }));
+          console.log(`🔄 Firebase real-time update: ${streams.length} streams received`);
           callback(streams);
         },
         (error) => {
@@ -630,9 +1144,9 @@ class FirestoreService {
   async getLiveStreams(): Promise<LiveStream[]> {
     try {
       const streamsRef = collection(db, 'streams');
-      const q = query(streamsRef, where('isLive', '==', true), orderBy('startedAt', 'desc'));
+      const q = query(streamsRef, where('isActive', '==', true), orderBy('startedAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      
+
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -642,15 +1156,34 @@ class FirestoreService {
     }
   }
 
-  async endStream(streamId: string): Promise<void> {
+  async endStream(streamId: string, endReason: string = 'system_cleanup'): Promise<void> {
     try {
       const streamRef = doc(db, 'streams', streamId);
       await updateDoc(streamRef, {
-        isLive: false,
-        endedAt: serverTimestamp()
+        isActive: false,
+        endedAt: serverTimestamp(),
+        endReason: endReason
       });
     } catch (error: any) {
       throw new Error(`Failed to end stream: ${error.message}`);
+    }
+  }
+
+  // Get all streams (including inactive ones) for cleanup purposes
+  async getAllStreams(): Promise<any[]> {
+    try {
+      const streamsRef = collection(db, 'streams');
+      const snapshot = await getDocs(streamsRef);
+
+      const streams = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      console.log(`📊 [FIRESTORE] Retrieved ${streams.length} total streams (active and inactive)`);
+      return streams;
+    } catch (error: any) {
+      throw new Error(`Failed to get all streams: ${error.message}`);
     }
   }
 
@@ -678,7 +1211,7 @@ class FirestoreService {
       }
 
       const streamsRef = collection(db, 'streams');
-      const q = query(streamsRef, where('isLive', '==', true), orderBy('startedAt', 'desc'));
+      const q = query(streamsRef, where('isActive', '==', true), orderBy('startedAt', 'desc'));
 
       return onSnapshot(q,
         (querySnapshot) => {

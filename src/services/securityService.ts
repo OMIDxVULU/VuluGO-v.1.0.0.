@@ -32,7 +32,7 @@ export interface DeviceFingerprint {
   language?: string;
 }
 
-class SecurityService {
+export class SecurityService {
   private static instance: SecurityService;
   private readonly SECURITY_EVENTS_KEY = '@vulugo_security_events';
   private readonly ACCOUNT_LOCKS_KEY = '@vulugo_account_locks';
@@ -47,6 +47,11 @@ class SecurityService {
   private readonly ACCOUNT_LOCK_DURATION = 30 * 60 * 1000; // 30 minutes
   private readonly SUSPICIOUS_ACTIVITY_THRESHOLD = 10;
   private readonly MAX_EVENTS_STORED = 1000;
+
+  // DDoS Protection thresholds
+  private readonly DDOS_REQUEST_THRESHOLD = 100; // requests per minute
+  private readonly DDOS_BLOCK_DURATION = 60 * 60 * 1000; // 1 hour
+  private readonly IP_RATE_LIMIT = 50; // requests per minute per IP
 
   private constructor() {
     this.initializeDeviceFingerprint();
@@ -394,6 +399,89 @@ class SecurityService {
     } catch (error) {
       console.warn('Error analyzing suspicious activity:', error);
     }
+  }
+
+  // DDoS Protection - Track IP-based request rates
+  private ipRequestCounts = new Map<string, { count: number; lastReset: number; blocked: boolean; blockUntil?: number }>();
+
+  checkDDoSProtection(ipAddress: string): { allowed: boolean; remainingTime?: number } {
+    const now = Date.now();
+    const record = this.ipRequestCounts.get(ipAddress);
+
+    if (!record) {
+      this.ipRequestCounts.set(ipAddress, { count: 1, lastReset: now, blocked: false });
+      return { allowed: true };
+    }
+
+    // Check if IP is currently blocked
+    if (record.blocked && record.blockUntil && now < record.blockUntil) {
+      return { allowed: false, remainingTime: record.blockUntil - now };
+    }
+
+    // Reset counter if minute has passed
+    if (now - record.lastReset > 60 * 1000) {
+      record.count = 1;
+      record.lastReset = now;
+      record.blocked = false;
+      record.blockUntil = undefined;
+      return { allowed: true };
+    }
+
+    // Increment counter
+    record.count++;
+
+    // Check if threshold exceeded
+    if (record.count > this.IP_RATE_LIMIT) {
+      record.blocked = true;
+      record.blockUntil = now + this.DDOS_BLOCK_DURATION;
+
+      // Log DDoS attempt
+      this.logSecurityEvent({
+        type: 'suspicious_activity',
+        ipAddress,
+        details: { type: 'ddos_attempt', requestCount: record.count }
+      });
+
+      return { allowed: false, remainingTime: this.DDOS_BLOCK_DURATION };
+    }
+
+    return { allowed: true };
+  }
+
+  // Content filtering for harmful content
+  filterContent(content: string): { filtered: string; flagged: boolean; reasons: string[] } {
+    const reasons: string[] = [];
+    let filtered = content;
+
+    // Profanity filter (basic implementation)
+    const profanityPatterns = [
+      /\b(spam|scam|hack|cheat|bot|fake)\b/gi,
+      /\b(password|login|account|steal|phish)\b/gi,
+      /(http[s]?:\/\/[^\s]+)/gi, // URLs
+    ];
+
+    profanityPatterns.forEach((pattern, index) => {
+      if (pattern.test(filtered)) {
+        switch (index) {
+          case 0:
+            reasons.push('spam_keywords');
+            break;
+          case 1:
+            reasons.push('security_keywords');
+            break;
+          case 2:
+            reasons.push('external_links');
+            break;
+        }
+        filtered = filtered.replace(pattern, '[FILTERED]');
+      }
+    });
+
+    return {
+      filtered,
+      flagged: reasons.length > 0,
+      reasons
+    };
   }
 
   // Get recent events

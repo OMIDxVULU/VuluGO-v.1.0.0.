@@ -72,15 +72,20 @@ export const useErrorReporting = (componentName: string) => {
       event.preventDefault();
     };
 
-    // Set up global handlers
-    window.addEventListener('unhandledrejection', handlePromiseRejection);
-    window.addEventListener('error', handleGlobalError);
+    // Set up global handlers only on web
+    if (typeof window !== 'undefined') {
+      window.addEventListener('unhandledrejection', handlePromiseRejection);
+      window.addEventListener('error', handleGlobalError);
 
-    // Clean up event listeners
-    return () => {
-      window.removeEventListener('unhandledrejection', handlePromiseRejection);
-      window.removeEventListener('error', handleGlobalError);
-    };
+      // Clean up event listeners
+      return () => {
+        window.removeEventListener('unhandledrejection', handlePromiseRejection);
+        window.removeEventListener('error', handleGlobalError);
+      };
+    }
+
+    // For React Native, return empty cleanup function
+    return () => {};
   }, [reportError]);
 
   /**

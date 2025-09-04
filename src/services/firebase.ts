@@ -1,7 +1,8 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence, Auth } from 'firebase/auth';
+import { getAuth, Auth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFunctions, Functions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration for VULU
@@ -9,17 +10,19 @@ const firebaseConfig = {
   apiKey: "AIzaSyBHL5BpkQRDe-03hE5-7TYcbr2aad1ezqg",
   authDomain: "vulugo.firebaseapp.com",
   projectId: "vulugo",
-  storageBucket: "vulugo.firebasestorage.app",
+  // Correct storage bucket host for Firebase Storage
+  storageBucket: "vulugo.appspot.com",
   messagingSenderId: "876918371895",
   appId: "1:876918371895:web:49d57bd00939d49889b1b2",
   measurementId: "G-LLTSS9NFCD"
 };
 
 // Firebase service instances
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
+let app!: FirebaseApp;
+let auth!: Auth;
+let db!: Firestore;
+let storage!: FirebaseStorage;
+let functions!: Functions;
 
 // Initialization status
 let initializationAttempted = false;
@@ -42,31 +45,16 @@ const initializeFirebase = (): { success: boolean; error?: Error } => {
     app = initializeApp(firebaseConfig);
     console.log('✅ Firebase app initialized');
 
-    // Initialize Auth with persistence (with AsyncStorage fallback handling)
+    // Initialize Auth with AsyncStorage persistence (fallback-safe)
     try {
+      // Use initializeAuth with AsyncStorage persistence for React Native
       auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
       });
       console.log('✅ Firebase Auth initialized with AsyncStorage persistence');
     } catch (authError: any) {
-      // Handle case where auth is already initialized
-      if (authError.code === 'auth/already-initialized') {
-        auth = getAuth(app);
-        console.log('✅ Firebase Auth already initialized, using existing instance');
-      } else if (authError.message?.includes('storage') || authError.message?.includes('AsyncStorage')) {
-        // Handle AsyncStorage issues in iOS Simulator
-        console.warn('⚠️ AsyncStorage persistence failed, falling back to memory-only auth:', authError.message);
-        try {
-          // Try to initialize without persistence
-          auth = getAuth(app);
-          console.log('✅ Firebase Auth initialized without persistence (memory-only)');
-        } catch (fallbackError) {
-          console.error('❌ Firebase Auth fallback initialization failed:', fallbackError);
-          throw fallbackError;
-        }
-      } else {
-        throw authError;
-      }
+      console.error('❌ Firebase Auth initialization failed:', authError);
+      throw authError;
     }
 
     // Initialize Firestore
@@ -76,6 +64,10 @@ const initializeFirebase = (): { success: boolean; error?: Error } => {
     // Initialize Storage
     storage = getStorage(app);
     console.log('✅ Firebase Storage initialized');
+
+    // Initialize Functions
+    functions = getFunctions(app);
+    console.log('✅ Firebase Functions initialized');
 
     // Development environment setup
     if (__DEV__) {
@@ -91,11 +83,7 @@ const initializeFirebase = (): { success: boolean; error?: Error } => {
     console.error('❌ Firebase initialization failed:', error);
     initializationError = error;
 
-    // Reset services to null on failure
-    app = null;
-    auth = null;
-    db = null;
-    storage = null;
+    // Keep service variables uninitialized; accessors will guard usage
 
     return { success: false, error };
   }
@@ -116,6 +104,7 @@ export const getFirebaseServices = () => {
     auth,
     db,
     storage,
+    functions,
     isInitialized: result.success,
     initializationError: result.error
   };
@@ -125,7 +114,7 @@ export const getFirebaseServices = () => {
  * Check if Firebase is properly initialized
  */
 export const isFirebaseInitialized = (): boolean => {
-  return !!app && !!auth && !!db && !!storage;
+  return !!app && !!auth && !!db && !!storage && !!functions;
 };
 
 /**
@@ -140,7 +129,8 @@ export const getFirebaseStatus = () => {
       app: !!app,
       auth: !!auth,
       db: !!db,
-      storage: !!storage
+      storage: !!storage,
+      functions: !!functions
     }
   };
 };
@@ -148,6 +138,16 @@ export const getFirebaseStatus = () => {
 // Initialize Firebase immediately
 const initResult = initializeFirebase();
 
+// Initialize Firebase utilities after successful initialization
+if (initResult.success) {
+  // Dynamically import to avoid circular dependencies
+  import('../utils/firebaseOperationWrapper').then(({ default: FirebaseOperationWrapper }) => {
+    FirebaseOperationWrapper.initialize();
+  }).catch(error => {
+    console.warn('⚠️ Failed to initialize Firebase utilities:', error);
+  });
+}
+
 // Export services (may be null if initialization failed)
-export { auth, db, storage };
+export { auth, db, storage, functions };
 export default app;

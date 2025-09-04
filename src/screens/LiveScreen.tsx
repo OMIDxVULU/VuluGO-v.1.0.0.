@@ -23,7 +23,9 @@ const LiveScreen: React.FC = () => {
   const {
     streams,
     friendStreams,
-    joinStream
+    joinStream,
+    currentlyWatching,
+    leaveStreamWithConfirmation
   } = useLiveStreams();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -65,6 +67,7 @@ const LiveScreen: React.FC = () => {
       return;
     }
 
+    // The joinStream function now handles active stream checking and confirmation internally
     try {
       await joinStream(streamId);
       router.push({
@@ -79,7 +82,10 @@ const LiveScreen: React.FC = () => {
       });
     } catch (error: any) {
       console.error('Failed to join stream:', error);
-      Alert.alert('Error', 'Failed to join stream. Please try again.');
+      // Don't show error if user just cancelled the confirmation
+      if (error && error.message !== 'User cancelled stream join') {
+        Alert.alert('Error', 'Failed to join stream. Please try again.');
+      }
     }
   };
 

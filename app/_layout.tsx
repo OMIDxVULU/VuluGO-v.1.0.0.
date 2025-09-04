@@ -15,11 +15,17 @@ import { NotificationProvider } from '../src/context/NotificationContext';
 import { MusicProvider } from '../src/context/MusicContext';
 import { GamingProvider } from '../src/context/GamingContext';
 import { ShopProvider } from '../src/context/ShopContext';
-import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { AuthProvider, useAuthSafe } from '../src/context/AuthContext';
+import { MiniPlayerProvider } from '../src/context/MiniPlayerContext';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import WebResponsiveWrapper from '../src/components/WebResponsiveWrapper';
 
 import { analyticsService } from '../src/services/AnalyticsService';
+
+// Import debug utilities (development only)
+if (process.env.NODE_ENV !== 'production') {
+  import('../src/utils/debugPhantomStreams');
+}
 
 // Create a custom Material theme
 const paperTheme = {
@@ -90,7 +96,8 @@ const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
 // Loading state wrapper component to handle auth initialization
 // This component must be inside AuthProvider to access useAuth
 const AppLoadingWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const authContext = useAuth();
+  // Safely get auth context - returns null if provider not ready
+  const authContext = useAuthSafe();
 
   // Safety check - if auth context is not available, show loading
   if (!authContext) {
@@ -138,7 +145,17 @@ export default function RootLayout() {
       console.error('Failed to initialize analytics:', error);
     });
 
-    // Cleanup analytics on unmount
+    // Initialize monitoring service lazily to avoid circular dependencies
+    setTimeout(async () => {
+      try {
+        const { monitoringService } = await import('../src/services/monitoringService');
+        await monitoringService.initialize();
+      } catch (error) {
+        console.error('Failed to initialize monitoring:', error);
+      }
+    }, 1000); // Delay initialization by 1 second
+
+    // Cleanup services on unmount
     return () => {
       analyticsService.shutdown();
     };
@@ -206,13 +223,20 @@ export default function RootLayout() {
                                                   console.error('Shop Provider Error:', error, errorInfo);
                                                 }}>
                                                   <ShopProvider>
-                                                    <StatusBar style="light" backgroundColor="#131318" />
-                                                    <Stack
-                                                      screenOptions={{
-                                                        headerShown: false,
-                                                        contentStyle: { backgroundColor: '#0f1117' },
-                                                      }}
-                                                    />
+                                                    {/* MiniPlayerProvider for global mini player overlay */}
+                                                    <ErrorBoundary onError={(error, errorInfo) => {
+                                                      console.error('MiniPlayer Provider Error:', error, errorInfo);
+                                                    }}>
+                                                      <MiniPlayerProvider>
+                                                        <StatusBar style="light" backgroundColor="#131318" />
+                                                        <Stack
+                                                          screenOptions={{
+                                                            headerShown: false,
+                                                            contentStyle: { backgroundColor: '#0f1117' },
+                                                          }}
+                                                        />
+                                                      </MiniPlayerProvider>
+                                                    </ErrorBoundary>
                                                   </ShopProvider>
                                                 </ErrorBoundary>
                                               </GamingProvider>

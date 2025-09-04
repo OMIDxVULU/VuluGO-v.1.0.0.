@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Instructions for deploying Firebase rules on another computer
+# Use this if your Node.js version is too old
+
+echo "🔥 Firebase Rules Deployment on Another Computer"
+echo "==============================================="
+echo ""
+echo "📋 Instructions for someone with Node.js >=20:"
+echo ""
+echo "1. Copy the firestore.rules file to their computer"
+echo "2. Have them run these commands:"
+echo ""
+echo "   # Install Firebase CLI"
+echo "   npm install -g firebase-tools"
+echo ""
+echo "   # Login to Firebase (they'll need access to vulugo project)"
+echo "   firebase login"
+echo ""
+echo "   # Set the project"
+echo "   firebase use vulugo"
+echo ""
+echo "   # Deploy the rules"
+echo "   firebase deploy --only firestore:rules"
+echo ""
+echo "3. They should see: '✅ Deploy complete!'"
+echo ""
+echo "📄 Make sure they have the firestore.rules file with the updated content!"
+echo ""
+echo "🔐 Note: They need to be added as an editor/owner on the Firebase project"
+echo "    or use your Google account for firebase login"

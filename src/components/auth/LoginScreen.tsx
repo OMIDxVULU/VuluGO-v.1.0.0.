@@ -34,7 +34,7 @@ import {
 
 interface LoginScreenProps {
   onSwitchToSignup: () => void;
-  onSwitchToPasswordReset: () => void;
+  onSwitchToPasswordReset?: () => void; // Made optional since it's not always provided
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToSignup, onSwitchToPasswordReset }) => {

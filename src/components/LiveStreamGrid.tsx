@@ -6,6 +6,8 @@ import { useLiveStreams, LiveStream } from '../context/LiveStreamContext';
 import { useAuth } from '../context/AuthContext';
 import { streamingService } from '../services/streamingService';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StreamErrorBoundary } from './StreamErrorBoundary';
+import LiveStreamRefreshButton from './LiveStreamRefreshButton';
 
 const { width } = Dimensions.get('window');
 
@@ -31,9 +33,10 @@ interface LiveStreamItemProps {
   stream: LiveStream;
   rank: number;
   onPress: (stream: LiveStream) => void;
+  isCurrentlyWatching?: boolean;
 }
 
-const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
+const LiveStreamItem = ({ stream, rank, onPress, isCurrentlyWatching = false }: LiveStreamItemProps) => {
   const [isPressing, setIsPressing] = useState(false);
   const pressAnimation = useRef(new Animated.Value(0)).current;
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,8 +182,11 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
   };
 
   return (
-    <TouchableOpacity 
-      style={styles.streamItem}
+    <TouchableOpacity
+      style={[
+        styles.streamItem,
+        isCurrentlyWatching && styles.currentlyWatchingItem
+      ]}
       onPress={() => onPress(stream)}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -199,6 +205,14 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
           // Regular rank badge for non-boosted streams
           <View style={[styles.rankBadge, getRankBadgeStyle(rank)]}>
             <Text style={styles.rankText}>{getRankText(rank)}</Text>
+          </View>
+        )}
+
+        {/* Currently Watching Indicator */}
+        {isCurrentlyWatching && (
+          <View style={styles.watchingIndicator}>
+            <MaterialIcons name="visibility" size={16} color="#5865F2" />
+            <Text style={styles.watchingText}>WATCHING</Text>
           </View>
         )}
         
@@ -222,12 +236,12 @@ const LiveStreamItem = ({ stream, rank, onPress }: LiveStreamItemProps) => {
       {/* Information Frame - separate from the images */}
       <View style={styles.infoFrame}>
         {/* Stream title */}
-        <Text 
+        <Text
           style={styles.streamTitle}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {stream.title || 'Live Stream'}
+          {(stream.title && stream.title.trim()) ? stream.title.trim() : 'Live Stream'}
         </Text>
       </View>
       
@@ -265,7 +279,7 @@ const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
 
 const LiveStreamGrid = () => {
   const router = useRouter();
-  const { streams } = useLiveStreams();
+  const { streams, currentlyWatching, joinStream, leaveStreamWithConfirmation, hasActiveStream, isOperationInProgress } = useLiveStreams();
   const { user, isGuest } = useAuth();
   
   // Create a global state for controlling the tutorial visibility
@@ -276,14 +290,37 @@ const LiveStreamGrid = () => {
     setShowTutorialState(false);
   };
 
-  // Handle stream selection
-  const handleStreamPress = (stream: LiveStream) => {
-    router.push({
-      pathname: '/livestream',
-      params: {
-        streamId: stream.id,
+  // Handle stream selection with confirmation dialog for stream switching
+  const handleStreamPress = async (stream: LiveStream) => {
+    // Check if user is a guest
+    if (isGuest) {
+      Alert.alert(
+        'Sign In Required',
+        'You need to sign in to join live streams.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/auth') }
+        ]
+      );
+      return;
+    }
+
+    // The joinStream function now handles active stream checking and confirmation internally
+    try {
+      await joinStream(stream.id);
+      router.push({
+        pathname: '/livestream',
+        params: {
+          streamId: stream.id,
+        }
+      });
+    } catch (error) {
+      console.error('Failed to join stream:', error);
+      // Don't show error if user just cancelled the confirmation
+      if (error && (error as any).message !== 'User cancelled stream join') {
+        Alert.alert('Error', 'Failed to join stream. Please try again.');
       }
-    });
+    }
   };
   
   // Sort streams: first by boost values (descending), then by view count (descending)
@@ -333,15 +370,15 @@ const LiveStreamGrid = () => {
       if (isGuest) {
         console.log('🎭 Guest user wants to go live - offering account upgrade');
         Alert.alert(
-          'Upgrade Account',
-          'Guest users can view live streams but need a full account to create them. Would you like to upgrade your account?',
+          'Account Required',
+          'Guest users can view live streams but need a full account to create them. Choose how you\'d like to continue.',
           [
             { text: 'Cancel', style: 'cancel' },
             {
-              text: 'Upgrade Account',
+              text: 'Choose Account Option',
               onPress: () => {
-                console.log('🔄 Guest user upgrading account');
-                router.push('/auth/upgrade');
+                console.log('🔄 Guest user choosing account option');
+                router.push('/auth/selection');
               }
             }
           ]
@@ -349,106 +386,37 @@ const LiveStreamGrid = () => {
         return;
       }
 
-      console.log('✅ User authenticated, proceeding with stream creation');
+      console.log('✅ User authenticated, proceeding to live stream setup');
       console.log('👤 User info:', {
         uid: user.uid,
         displayName: user.displayName,
         photoURL: user.photoURL
       });
 
-      // 2. Validate user data before creating stream
+      // 2. Validate user data before proceeding to setup
       if (!user.uid) {
         throw new Error('User ID is missing. Please sign in again.');
       }
 
-      // 3. Create new stream using streamingService
-      const streamTitle = `Live Stream by ${user.displayName || 'Host'}`;
-      const hostName = user.displayName || 'Host';
-      const hostAvatar = user.photoURL || 'https://via.placeholder.com/150/6E69F4/FFFFFF?text=H';
-
-      console.log('🔄 Creating new stream with:', {
-        title: streamTitle,
-        hostId: user.uid,
-        hostName,
-        hostAvatar
-      });
-
-      // Show loading state (you could add a loading indicator here)
-      const streamId = await streamingService.createStream(
-        streamTitle,
-        user.uid,
-        hostName,
-        hostAvatar
-      );
-
-      console.log('✅ Stream created successfully with ID:', streamId);
-
-      // 4. Validate stream creation
-      if (!streamId) {
-        throw new Error('Stream creation failed - no stream ID returned');
-      }
-
-      // 5. Navigate to livestream screen as host
-      console.log('🔄 Navigating to livestream screen as host');
-      const navigationParams = {
-        streamId,
-        title: streamTitle,
-        hostName,
-        hostAvatar,
-        isHost: 'true',
-        viewCount: '0',
-        // Additional params for better stream handling
-        createdAt: Date.now().toString(),
-        hostId: user.uid
-      };
-
-      console.log('📋 Navigation parameters:', navigationParams);
-
-      router.push({
-        pathname: '/livestream',
-        params: navigationParams
-      });
-
-      console.log('✅ Navigation completed successfully');
+      // 3. Navigate to live stream setup screen
+      console.log('🔄 Navigating to live stream setup screen');
+      router.push('/livestream-setup');
+      console.log('✅ Navigation to setup screen completed successfully');
 
     } catch (error: any) {
-      console.error('❌ Error in Go Live flow:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
+      console.error('❌ Navigation to setup failed:', error);
 
-      // 6. Enhanced error handling with user-friendly alerts
-      let errorMessage = 'Failed to start live stream. Please try again.';
-      let errorTitle = 'Stream Creation Failed';
+      // Enhanced error handling with more specific messages
+      let errorMessage = 'An unexpected error occurred while opening the live stream setup.';
 
-      if (error.message?.includes('permission') || error.code === 'permission-denied') {
-        errorTitle = 'Permission Denied';
-        errorMessage = 'You don\'t have permission to create streams. Please check your account settings.';
-      } else if (error.message?.includes('network') || error.code === 'unavailable') {
-        errorTitle = 'Network Error';
-        errorMessage = 'Network error. Please check your internet connection and try again.';
-      } else if (error.message?.includes('Firebase') || error.code?.startsWith('firestore')) {
-        errorTitle = 'Server Error';
-        errorMessage = 'Server error. Please try again in a moment.';
-      } else if (error.message?.includes('User ID is missing')) {
-        errorTitle = 'Authentication Error';
-        errorMessage = 'Authentication error. Please sign out and sign in again.';
-      } else if (error.message?.includes('Stream creation failed')) {
-        errorTitle = 'Stream Creation Failed';
-        errorMessage = 'Unable to create stream. Please try again.';
-      } else if (error.message?.includes('Agora')) {
-        errorTitle = 'Streaming Service Error';
-        errorMessage = 'Audio streaming service error. The stream was created but audio may not work properly.';
+      if (error.message) {
+        errorMessage = error.message;
       }
 
       Alert.alert(
-        errorTitle,
-        errorMessage,
-        [
-          { text: 'OK', style: 'default' }
-        ]
+        'Setup Failed',
+        `Could not open live stream setup:\n\n${errorMessage}\n\nPlease try again.`,
+        [{ text: 'OK' }]
       );
     }
   };
@@ -456,18 +424,28 @@ const LiveStreamGrid = () => {
   // Create button to start new stream
   const StartStreamButton = () => (
     <TouchableOpacity
-      style={styles.startStreamButton}
+      style={[styles.startStreamButton, isOperationInProgress && styles.disabledButton]}
       onPress={handleGoLive}
-      activeOpacity={0.8}
+      activeOpacity={isOperationInProgress ? 1 : 0.8}
+      disabled={isOperationInProgress}
     >
       <LinearGradient
-        colors={['#6E56F7', '#9056F7']}
+        colors={isOperationInProgress ? ['#666', '#888'] : ['#6E56F7', '#9056F7']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.buttonGradient}
       >
-        <Ionicons name="add-circle" size={18} color="#FFF" />
-        <Text style={styles.startStreamText}>Go Live</Text>
+        {isOperationInProgress ? (
+          <>
+            <Ionicons name="hourglass" size={18} color="#FFF" />
+            <Text style={styles.startStreamText}>Processing...</Text>
+          </>
+        ) : (
+          <>
+            <Ionicons name="add-circle" size={18} color="#FFF" />
+            <Text style={styles.startStreamText}>Go Live</Text>
+          </>
+        )}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -489,10 +467,11 @@ const LiveStreamGrid = () => {
                 index === 0 && styles.firstItemInRow
               ]}
             >
-              <LiveStreamItem 
+              <LiveStreamItem
                 stream={stream}
                 rank={stream.rank}
                 onPress={handleStreamPress}
+                isCurrentlyWatching={currentlyWatching === stream.id}
               />
             </View>
           ))}
@@ -510,7 +489,9 @@ const LiveStreamGrid = () => {
       <View style={styles.container}>
         <View style={styles.header}>
           <SectionHeader title="Lives" count={sortedStreams.length} />
-          <StartStreamButton />
+          <View style={styles.headerActions}>
+            <StartStreamButton />
+          </View>
         </View>
         
         {/* Global tutorial bubble - positioned at a fixed place in the UI */}
@@ -547,6 +528,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -607,6 +593,32 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: 2, // Small margin to make shadow visible
     position: 'relative', // Added for absolute positioning of tutorial
+  },
+  currentlyWatchingItem: {
+    borderWidth: 2,
+    borderColor: '#5865F2', // Discord blue for active stream
+    shadowColor: '#5865F2',
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 20,
+    backgroundColor: '#1F2037', // Slightly different background for active stream
+  },
+  watchingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(88, 101, 242, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#5865F2',
+  },
+  watchingText: {
+    color: '#5865F2',
+    fontSize: 10,
+    fontWeight: '700',
+    marginLeft: 4,
+    letterSpacing: 0.5,
   },
   // Global tutorial container - positioned to cover the whole grid area
   globalTutorialContainer: {
@@ -806,6 +818,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 20,
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   buttonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -833,4 +848,16 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LiveStreamGrid; 
+// Wrap with error boundary for graceful error handling
+const LiveStreamGridWithErrorBoundary = () => (
+  <StreamErrorBoundary
+    onError={(error, errorInfo) => {
+      console.error('🚨 LiveStreamGrid Error:', error);
+      console.error('Error Info:', errorInfo);
+    }}
+  >
+    <LiveStreamGrid />
+  </StreamErrorBoundary>
+);
+
+export default LiveStreamGridWithErrorBoundary;

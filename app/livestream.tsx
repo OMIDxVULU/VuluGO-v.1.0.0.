@@ -1,11 +1,11 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import LiveStreamView from '../src/screens/LiveStreamView';
+import LiveStreamViewSimple from '../src/screens/LiveStreamViewSimple';
 
 export default function LiveStream() {
   return (
     <View style={styles.container}>
-      <LiveStreamView />
+      <LiveStreamViewSimple />
     </View>
   );
 }

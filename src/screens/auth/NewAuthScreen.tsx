@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import WelcomeLandingScreen from './WelcomeLandingScreen';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../context/AuthContext';
+import AuthSelectionScreen from './AuthSelectionScreen';
 import RegistrationNavigator from '../../navigation/RegistrationNavigator';
 import { RegistrationProvider } from '../../context/RegistrationContext';
 import LoginScreen from '../../components/auth/LoginScreen';
 import { AuthColors } from '../../components/auth/AuthDesignSystem';
 
-type AuthFlow = 'landing' | 'register' | 'login';
+type AuthFlow = 'auth-selection' | 'register' | 'login';
 
 const NewAuthScreen: React.FC = () => {
-  const [currentFlow, setCurrentFlow] = useState<AuthFlow>('landing');
+  const router = useRouter();
+  const { signInAsGuest } = useAuth();
+  const [currentFlow, setCurrentFlow] = useState<AuthFlow>('auth-selection');
 
   const handleRegisterPress = () => {
     setCurrentFlow('register');
@@ -19,39 +23,54 @@ const NewAuthScreen: React.FC = () => {
     setCurrentFlow('login');
   };
 
-  const handleBackToLanding = () => {
-    setCurrentFlow('landing');
+  const handleBackToAuthSelection = () => {
+    setCurrentFlow('auth-selection');
+  };
+
+  const handleGuestContinue = async () => {
+    try {
+      await signInAsGuest();
+      router.replace('/(main)');
+    } catch (error) {
+      console.error('Guest login failed:', error);
+    }
   };
 
   const renderCurrentFlow = () => {
     switch (currentFlow) {
-      case 'landing':
+      case 'auth-selection':
         return (
-          <WelcomeLandingScreen
-            onRegisterPress={handleRegisterPress}
+          <AuthSelectionScreen
+            onSignUpPress={handleRegisterPress}
             onLoginPress={handleLoginPress}
+            onGuestContinue={handleGuestContinue}
+            showBackButton={false}
+            onBackPress={undefined}
           />
         );
-      
+
       case 'register':
         return (
           <RegistrationProvider>
-            <RegistrationNavigator onBackToLanding={handleBackToLanding} />
+            <RegistrationNavigator onBackToLanding={handleBackToAuthSelection} />
           </RegistrationProvider>
         );
-      
+
       case 'login':
         return (
           <LoginScreen
-            onSwitchToSignup={handleBackToLanding}
+            onSwitchToSignup={handleBackToAuthSelection}
           />
         );
-      
+
       default:
         return (
-          <WelcomeLandingScreen
-            onRegisterPress={handleRegisterPress}
+          <AuthSelectionScreen
+            onSignUpPress={handleRegisterPress}
             onLoginPress={handleLoginPress}
+            onGuestContinue={handleGuestContinue}
+            showBackButton={false}
+            onBackPress={undefined}
           />
         );
     }
