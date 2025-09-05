@@ -2,6 +2,7 @@ import { firestoreService } from './firestoreService';
 import { LiveStream, StreamHost, StreamViewer } from '../context/LiveStreamContext';
 import { agoraService, AgoraEventCallbacks } from './agoraService';
 import { isAgoraConfigured } from '../config/agoraConfig';
+import { StreamingCircuitBreakers } from '../utils/circuitBreaker';
 
 export interface StreamParticipant {
   id: string;
@@ -27,6 +28,25 @@ class StreamingService {
   private activeStreams = new Map<string, StreamSession>();
   private streamListeners = new Map<string, () => void>();
   private currentStreamId: string | null = null;
+
+  // Helper method to check if local session is stale compared to server data
+  private isSessionStale(localSession: StreamSession, serverData: any): boolean {
+    if (!serverData) return false;
+
+    // Check if server data is newer
+    const serverTimestamp = serverData.updatedAt?.toMillis?.() || serverData.updatedAt || 0;
+    const localTimestamp = localSession.startedAt || 0;
+
+    // Consider session stale if server data is significantly newer (more than 30 seconds)
+    const stalenessThreshold = 30 * 1000; // 30 seconds
+    const isStale = serverTimestamp > localTimestamp + stalenessThreshold;
+
+    if (isStale) {
+      console.log(`[STREAMING_SERVICE] Session ${localSession.id} is stale (server: ${new Date(serverTimestamp)}, local: ${new Date(localTimestamp)})`);
+    }
+
+    return isStale;
+  }
 
   // Initialize a new stream with Agora integration
   async createStream(
@@ -87,7 +107,7 @@ class StreamingService {
     }
   }
 
-  // Join a stream as viewer
+  // Join a stream as viewer with validation and error handling
   async joinStream(
     streamId: string,
     userId: string,
@@ -95,26 +115,68 @@ class StreamingService {
     userAvatar: string
   ): Promise<void> {
     try {
-      const session = this.activeStreams.get(streamId);
-      if (!session) {
-        throw new Error('Stream not found');
-      }
+      return await StreamingCircuitBreakers.STREAM_ACCESS.execute(async () => {
+        console.log(`[STREAMING_SERVICE] Attempting to join stream ${streamId} as ${userName}`);
 
-      // Check if user is already a participant
-      const existingParticipant = session.participants.find(p => p.id === userId);
-      if (existingParticipant) {
-        return; // Already joined
-      }
+        // Enhanced stream validation with state synchronization
+        console.log(`[STREAMING_SERVICE] Validating stream access for ${streamId}...`);
+        const validation = await firestoreService.validateStreamAccess(streamId, userId);
 
-      const newParticipant: StreamParticipant = {
-        id: userId,
-        name: userName,
-        avatar: userAvatar,
-        isHost: false,
-        isSpeaking: false,
-        isMuted: false,
-        joinedAt: Date.now()
-      };
+        if (!validation.exists) {
+          console.error(`[STREAMING_SERVICE] Stream ${streamId} does not exist`);
+          throw new Error(`Stream ${streamId} not found`);
+        }
+
+        if (!validation.accessible) {
+          console.error(`[STREAMING_SERVICE] Stream ${streamId} access denied: ${validation.error}`);
+          throw new Error(`Stream access denied: ${validation.error}`);
+        }
+
+        console.log(`[STREAMING_SERVICE] Stream ${streamId} validation successful`);
+
+        // Synchronize local session with server state
+        let session = this.activeStreams.get(streamId);
+        const serverStreamData = validation.stream;
+
+        if (!session || this.isSessionStale(session, serverStreamData)) {
+          console.log(`[STREAMING_SERVICE] Creating/updating local session for stream ${streamId}`);
+
+          // Create or update session from validated stream data
+          const newSession: StreamSession = {
+            id: streamId,
+            title: serverStreamData?.title || 'Live Stream',
+            hostId: serverStreamData?.hostId || '',
+            participants: serverStreamData?.participants || [],
+            startedAt: serverStreamData?.startedAt?.toMillis?.() || serverStreamData?.startedAt || Date.now(),
+            isActive: serverStreamData?.isActive || serverStreamData?.isLive || true,
+            viewerCount: serverStreamData?.viewerCount || 0
+          };
+
+          this.activeStreams.set(streamId, newSession);
+          session = newSession;
+
+          console.log(`[STREAMING_SERVICE] Local session synchronized with server state`);
+        } else {
+          console.log(`[STREAMING_SERVICE] Using existing local session for stream ${streamId}`);
+        }
+
+        // Check if user is already a participant
+        const currentSession = this.activeStreams.get(streamId)!;
+        const existingParticipant = currentSession.participants.find(p => p.id === userId);
+        if (existingParticipant) {
+          console.log(`[STREAMING_SERVICE] User ${userName} already joined stream ${streamId}`);
+          return; // Already joined
+        }
+
+        const newParticipant: StreamParticipant = {
+          id: userId,
+          name: userName,
+          avatar: userAvatar,
+          isHost: false,
+          isSpeaking: false,
+          isMuted: false,
+          joinedAt: Date.now()
+        };
 
       // Update session
       session.participants.push(newParticipant);
@@ -124,25 +186,35 @@ class StreamingService {
       await firestoreService.updateStreamParticipants(streamId, session.participants);
       await firestoreService.updateStreamViewerCount(streamId, session.viewerCount);
 
-      // Join Agora channel if configured
-      if (isAgoraConfigured()) {
-        console.log(`🔄 Joining Agora channel: ${streamId} as viewer`);
+        // Join Agora channel if configured
+        if (isAgoraConfigured()) {
+          console.log(`[STREAMING_SERVICE] Joining Agora channel: ${streamId} as viewer`);
 
-        // Set up Agora event callbacks for this stream
-        this.setupAgoraCallbacks(streamId);
+          // Set up Agora event callbacks for this stream
+          this.setupAgoraCallbacks(streamId);
 
-        // Join as audience member
-        const joined = await agoraService.joinChannel(streamId, userId, false);
-        if (joined) {
-          console.log('✅ Successfully joined Agora channel as viewer');
-          this.currentStreamId = streamId;
-        } else {
-          console.warn('⚠️ Failed to join Agora channel, continuing with Firebase-only mode');
+          // Join as audience member with error handling
+          try {
+            const joined = await agoraService.joinChannel(streamId, userId, false);
+            if (joined) {
+              console.log('[STREAMING_SERVICE] Successfully joined Agora channel as viewer');
+              this.currentStreamId = streamId;
+            } else {
+              console.warn('[STREAMING_SERVICE] Failed to join Agora channel, continuing with Firebase-only mode');
+              // Don't throw error, allow Firebase-only mode
+            }
+          } catch (agoraError: any) {
+            console.error('[STREAMING_SERVICE] Agora join error:', agoraError.message);
+            // Continue with Firebase-only mode instead of failing completely
+            console.warn('[STREAMING_SERVICE] Continuing with Firebase-only mode due to Agora error');
+          }
         }
-      }
 
-    } catch (error) {
-      console.error('Error joining stream:', error);
+        console.log(`[STREAMING_SERVICE] Successfully joined stream ${streamId} as ${userName}`);
+      });
+
+    } catch (error: any) {
+      console.error(`[STREAMING_SERVICE] Error joining stream ${streamId}:`, error.message);
       throw error;
     }
   }

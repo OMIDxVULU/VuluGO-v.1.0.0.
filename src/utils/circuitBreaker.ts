@@ -146,22 +146,55 @@ export const FirebaseCircuitBreakers = {
     resetTimeout: 30000, // 30 seconds
     maxRetries: 2
   }),
-  
+
   FIRESTORE: getCircuitBreaker('firebase-firestore', {
     failureThreshold: 5,
     resetTimeout: 60000, // 1 minute
     maxRetries: 3
   }),
-  
+
   USERNAME_CHECK: getCircuitBreaker('username-check', {
     failureThreshold: 2,
     resetTimeout: 15000, // 15 seconds
     maxRetries: 1
   }),
-  
+
   STORAGE: getCircuitBreaker('firebase-storage', {
     failureThreshold: 3,
     resetTimeout: 45000, // 45 seconds
+    maxRetries: 2
+  })
+};
+
+// Streaming-specific circuit breakers
+export const StreamingCircuitBreakers = {
+  AGORA_ENGINE: getCircuitBreaker('agora-engine', {
+    failureThreshold: 2,
+    resetTimeout: 20000, // 20 seconds
+    maxRetries: 3
+  }),
+
+  CHANNEL_JOIN: getCircuitBreaker('channel-join', {
+    failureThreshold: 3,
+    resetTimeout: 30000, // 30 seconds
+    maxRetries: 2
+  }),
+
+  STREAM_ACCESS: getCircuitBreaker('stream-access', {
+    failureThreshold: 4,
+    resetTimeout: 25000, // 25 seconds
+    maxRetries: 2
+  }),
+
+  STREAM_RECOVERY: getCircuitBreaker('stream-recovery', {
+    failureThreshold: 2,
+    resetTimeout: 45000, // 45 seconds
+    maxRetries: 1
+  }),
+
+  RTC_ENGINE_CLEANUP: getCircuitBreaker('rtc-engine-cleanup', {
+    failureThreshold: 3,
+    resetTimeout: 15000, // 15 seconds
     maxRetries: 2
   })
 };

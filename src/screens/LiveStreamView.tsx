@@ -34,6 +34,8 @@ import { StreamParticipant } from '../services/streamingService';
 import { firestoreService } from '../services/firestoreService';
 import { AgoraStreamView } from '../components/streaming/AgoraStreamView';
 import { isAgoraConfigured } from '../config/agoraConfig';
+import { StreamingErrorBoundary } from '../components/streaming/StreamingErrorBoundary';
+import { useStreamRecovery } from '../hooks/useStreamRecovery';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -526,6 +528,18 @@ const LiveStreamView = () => {
   const [isAgoraEnabled, setIsAgoraEnabled] = useState(isAgoraConfigured());
   const [agoraConnectionState, setAgoraConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [streamingError, setStreamingError] = useState<string | null>(null);
+
+  // Stream recovery system
+  const {
+    recoveryState,
+    handleStreamingError,
+    resetRecovery,
+    validateStreamAccess
+  } = useStreamRecovery({
+    maxRecoveryAttempts: 3,
+    enableAutoRecovery: true,
+    fallbackToFirebaseOnly: true
+  });
 
   // Set up real-time stream updates and chat messages
   useEffect(() => {
@@ -1134,11 +1148,28 @@ const LiveStreamView = () => {
     console.log('🔄 Agora participants updated:', agoraParticipants);
   }, []);
 
-  const handleAgoraError = useCallback((error: string) => {
+  const handleAgoraError = useCallback(async (error: string) => {
     console.error('❌ Agora error:', error);
     setStreamingError(error);
     setAgoraConnectionState('disconnected');
-  }, []);
+
+    // Use recovery system for Agora errors
+    if (user && streamId) {
+      const streamError = new Error(`Agora error: ${error}`);
+      const recovered = await handleStreamingError(
+        streamError,
+        streamId,
+        user.uid,
+        stream?.hosts.some(host => host.name === user.displayName) || false
+      );
+
+      if (recovered) {
+        console.log('✅ Successfully recovered from Agora error');
+        setStreamingError(null);
+        setAgoraConnectionState('connected');
+      }
+    }
+  }, [user, streamId, stream, handleStreamingError]);
 
   const renderParticipantsGrid = useCallback(() => (
     <View style={styles.gridContainer}>
@@ -1900,22 +1931,58 @@ const LiveStreamView = () => {
     },
   });
 
+  const handleRetryStreaming = useCallback(async () => {
+    console.log('🔄 Retrying streaming connection...');
+
+    if (user && streamId) {
+      try {
+        // Reset recovery state
+        resetRecovery();
+
+        // Validate stream access
+        await validateStreamAccess(streamId, user.uid);
+
+        // Reset error states
+        setStreamingError(null);
+        setAgoraConnectionState('connecting');
+
+        console.log('✅ Streaming retry successful');
+      } catch (error: any) {
+        console.error('❌ Streaming retry failed:', error);
+        setStreamingError(error.message);
+      }
+    }
+  }, [user, streamId, resetRecovery, validateStreamAccess]);
+
+  const handleFallbackMode = useCallback(() => {
+    console.log('🔄 Switching to fallback mode...');
+    setStreamingError(null);
+    setAgoraConnectionState('disconnected');
+    setIsAgoraEnabled(false);
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}> 
-      <StatusBar style="light" />
-      
-      {/* Full screen content - Use fadeAnim for visibility */} 
-      {!isHidden && (
-        <Animated.View 
-          style={[
-            styles.content, 
-            { 
-              opacity: fadeAnim, 
-              transform: [{ scale: minimizeAnim }],
-              zIndex: isMinimized ? 0 : 1
-            }
-          ]}
-        >
+    <StreamingErrorBoundary
+      streamId={streamId}
+      userId={user?.uid}
+      onRetry={handleRetryStreaming}
+      onFallback={handleFallbackMode}
+    >
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <StatusBar style="light" />
+
+        {/* Full screen content - Use fadeAnim for visibility */}
+        {!isHidden && (
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ scale: minimizeAnim }],
+                zIndex: isMinimized ? 0 : 1
+              }
+            ]}
+          >
           {renderTopBar()}
           {renderStatsBar()}
 
@@ -1985,7 +2052,8 @@ const LiveStreamView = () => {
 
       {/* Info Panel - Always rendered, controlled by opacity */} 
       {!isMinimized && !isHidden && renderInfoPanel()}
-    </SafeAreaView>
+      </SafeAreaView>
+    </StreamingErrorBoundary>
   );
 };
 

@@ -497,7 +497,7 @@ class FirestoreService {
       const streamsRef = collection(db, 'streams');
       const q = query(
         streamsRef,
-        where('isLive', '==', true),
+        where('isActive', '==', true), // Fixed: was 'isLive', should be 'isActive'
         orderBy('startedAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
@@ -517,6 +517,172 @@ class FirestoreService {
       // For other errors, return empty array but log more prominently
       console.error('Failed to get active streams:', error.message);
       return [];
+    }
+  }
+
+  // Enhanced stream access validation with retry logic and better error handling
+  async validateStreamAccess(streamId: string, userId?: string, retryCount: number = 0): Promise<{
+    exists: boolean;
+    accessible: boolean;
+    stream?: any;
+    error?: string
+  }> {
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+
+    try {
+      if (!db) {
+        return {
+          exists: false,
+          accessible: false,
+          error: 'Firestore not initialized'
+        };
+      }
+
+      // Validate streamId format
+      if (!streamId || typeof streamId !== 'string' || streamId.trim().length === 0) {
+        console.warn(`[STREAM_VALIDATION] Invalid streamId: ${streamId}`);
+        return {
+          exists: false,
+          accessible: false,
+          error: 'Invalid stream ID'
+        };
+      }
+
+      console.log(`[STREAM_VALIDATION] Validating access for stream ${streamId} (attempt ${retryCount + 1})`);
+
+      // Check if stream document exists with timeout
+      const streamRef = doc(db, 'streams', streamId);
+      const streamDoc = await Promise.race([
+        getDoc(streamRef),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Stream validation timeout')), 10000)
+        )
+      ]) as any;
+
+      if (!streamDoc.exists()) {
+        console.warn(`[STREAM_VALIDATION] Stream ${streamId} not found in Firestore`);
+
+        // For not-found errors, implement retry with backoff
+        if (retryCount < maxRetries) {
+          console.log(`[STREAM_VALIDATION] Retrying stream validation in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return this.validateStreamAccess(streamId, userId, retryCount + 1);
+        }
+
+        return {
+          exists: false,
+          accessible: false,
+          error: 'Stream not found after retries'
+        };
+      }
+
+      const streamData = streamDoc.data();
+      console.log(`[STREAM_VALIDATION] Stream ${streamId} found, checking accessibility...`);
+
+      // Validate stream data structure
+      if (!streamData) {
+        console.warn(`[STREAM_VALIDATION] Stream ${streamId} has no data`);
+        return {
+          exists: true,
+          accessible: false,
+          error: 'Stream data is empty'
+        };
+      }
+
+      // Check if stream is active (handle both isActive and isLive for compatibility)
+      const isStreamActive = streamData.isActive === true || streamData.isLive === true;
+      if (!isStreamActive) {
+        console.warn(`[STREAM_VALIDATION] Stream ${streamId} is not active (isActive: ${streamData.isActive}, isLive: ${streamData.isLive})`);
+        return {
+          exists: true,
+          accessible: false,
+          stream: streamData,
+          error: 'Stream is not active'
+        };
+      }
+
+      // Check stream expiration (if stream is older than 24 hours, consider it stale)
+      const streamAge = Date.now() - (streamData.startedAt?.toMillis?.() || streamData.startedAt || 0);
+      const maxStreamAge = 24 * 60 * 60 * 1000; // 24 hours
+      if (streamAge > maxStreamAge) {
+        console.warn(`[STREAM_VALIDATION] Stream ${streamId} is stale (age: ${Math.round(streamAge / 1000 / 60)} minutes)`);
+        return {
+          exists: true,
+          accessible: false,
+          stream: streamData,
+          error: 'Stream has expired'
+        };
+      }
+
+      // For authenticated users, check if they have access
+      if (userId && this.isAuthenticated()) {
+        console.log(`[STREAM_VALIDATION] Stream ${streamId} accessible to authenticated user ${userId}`);
+        return {
+          exists: true,
+          accessible: true,
+          stream: streamData
+        };
+      }
+
+      // For guest users, allow access to public streams only
+      const isPublicStream = streamData.isPublic !== false; // Default to public if not specified
+      if (isPublicStream) {
+        console.log(`[STREAM_VALIDATION] Stream ${streamId} accessible to guest user (public stream)`);
+        return {
+          exists: true,
+          accessible: true,
+          stream: streamData
+        };
+      } else {
+        console.warn(`[STREAM_VALIDATION] Stream ${streamId} is private, guest access denied`);
+        return {
+          exists: true,
+          accessible: false,
+          stream: streamData,
+          error: 'Private stream - authentication required'
+        };
+      }
+
+    } catch (error: any) {
+      console.error(`[STREAM_VALIDATION] Failed to validate stream access for ${streamId} (attempt ${retryCount + 1}):`, error);
+
+      // Handle specific error types
+      if (error.message === 'Stream validation timeout') {
+        if (retryCount < maxRetries) {
+          console.log(`[STREAM_VALIDATION] Timeout, retrying in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return this.validateStreamAccess(streamId, userId, retryCount + 1);
+        }
+        return {
+          exists: false,
+          accessible: false,
+          error: 'Stream validation timeout after retries'
+        };
+      }
+
+      if (FirebaseErrorHandler.isPermissionError(error)) {
+        return {
+          exists: false,
+          accessible: false,
+          error: 'Permission denied'
+        };
+      }
+
+      // For network errors, retry
+      if (error.code === 'unavailable' || error.message.includes('network')) {
+        if (retryCount < maxRetries) {
+          console.log(`[STREAM_VALIDATION] Network error, retrying in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return this.validateStreamAccess(streamId, userId, retryCount + 1);
+        }
+      }
+
+      return {
+        exists: false,
+        accessible: false,
+        error: error.message || 'Unknown validation error'
+      };
     }
   }
 
@@ -580,7 +746,7 @@ class FirestoreService {
       const streamsRef = collection(db, 'streams');
       const q = query(
         streamsRef,
-        where('isLive', '==', true),
+        where('isActive', '==', true), // Fixed: was 'isLive', should be 'isActive'
         orderBy('startedAt', 'desc')
       );
 
