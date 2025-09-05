@@ -179,17 +179,21 @@ export class DebugStreamTest {
 }
 
 // Make functions globally available (development only)
-if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-  (window as any).testFirebaseStreams = () => DebugStreamTest.testFirebaseStreams();
-  (window as any).forceCleanupTest = () => DebugStreamTest.forceCleanupTest();
-  (window as any).testAutoEndLogic = () => DebugStreamTest.testAutoEndLogic();
-  (window as any).testRefreshSystem = () => DebugStreamTest.testRefreshSystem();
-  
-  console.log('🔧 [DEBUG_TEST] Global test functions available:');
-  console.log('  - testFirebaseStreams() - Check all Firebase stream data');
-  console.log('  - forceCleanupTest() - Test force cleanup');
-  console.log('  - testAutoEndLogic() - Test auto-end logic');
-  console.log('  - testRefreshSystem() - Test refresh cleanup');
+if (typeof window !== 'undefined' && __DEV__) {
+  try {
+    (window as any).testFirebaseStreams = () => DebugStreamTest.testFirebaseStreams();
+    (window as any).forceCleanupTest = () => DebugStreamTest.forceCleanupTest();
+    (window as any).testAutoEndLogic = () => DebugStreamTest.testAutoEndLogic();
+    (window as any).testRefreshSystem = () => DebugStreamTest.testRefreshSystem();
+
+    console.log('🔧 [DEBUG_TEST] Global test functions available:');
+    console.log('  - testFirebaseStreams() - Check all Firebase stream data');
+    console.log('  - forceCleanupTest() - Test force cleanup');
+    console.log('  - testAutoEndLogic() - Test auto-end logic');
+    console.log('  - testRefreshSystem() - Test refresh cleanup');
+  } catch (error) {
+    console.warn('⚠️ Failed to attach debug test functions:', error);
+  }
 }
 
 export default DebugStreamTest;

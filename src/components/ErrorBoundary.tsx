@@ -97,12 +97,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       this.previousErrorHandler(error, isFatal);
     }
 
-    // Update state to show error UI
-    this.setState({
-      hasError: true,
-      error: error instanceof Error ? error : new Error(String(error)),
-      errorInfo: null
-    });
+    // Prevent infinite loops by checking if already in error state
+    if (!this.state.hasError) {
+      // Update state to show error UI
+      this.setState({
+        hasError: true,
+        error: error instanceof Error ? error : new Error(String(error)),
+        errorInfo: null
+      });
+    }
   };
 
   // Handle unhandled promise rejections (React Native compatible)
@@ -114,12 +117,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       this.previousRejectionHandler(reason);
     }
 
-    // Treat as a regular error
-    this.setState({
-      hasError: true,
-      error: new Error(`Unhandled Promise Rejection: ${reason}`),
-      errorInfo: null
-    });
+    // Prevent infinite loops by checking if already in error state
+    if (!this.state.hasError) {
+      // Treat as a regular error
+      this.setState({
+        hasError: true,
+        error: new Error(`Unhandled Promise Rejection: ${reason}`),
+        errorInfo: null
+      });
+    }
   };
 
   componentWillUnmount(): void {

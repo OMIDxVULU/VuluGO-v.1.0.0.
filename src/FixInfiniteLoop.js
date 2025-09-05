@@ -6,7 +6,14 @@ export function useLoopProtection() {
   useEffect(() => {
     // Fix for React Native infinite loop protection
     const originalConsoleError = console.error;
-    console.error = (...args) => {
+    let isOverrideActive = true;
+
+    const protectedConsoleError = (...args) => {
+      // Only intercept if override is still active
+      if (!isOverrideActive) {
+        return originalConsoleError(...args);
+      }
+
       // Suppress "Maximum update depth exceeded" warnings
       if (args[0] && typeof args[0] === 'string' && args[0].includes('Maximum update depth exceeded')) {
         // Break the loop by pausing state updates for a moment
@@ -19,7 +26,10 @@ export function useLoopProtection() {
       return originalConsoleError(...args);
     };
 
+    console.error = protectedConsoleError;
+
     return () => {
+      isOverrideActive = false;
       console.error = originalConsoleError;
     };
   }, []);

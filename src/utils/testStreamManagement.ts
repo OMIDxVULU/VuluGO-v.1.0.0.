@@ -461,8 +461,14 @@ export const quickStreamTest = async () => {
   }
 };
 
-// Make it available globally for console testing
-(global as any).quickStreamTest = quickStreamTest;
+// Make it available globally for console testing (development only)
+if (__DEV__) {
+  try {
+    (global as any).quickStreamTest = quickStreamTest;
+  } catch (error) {
+    console.warn('⚠️ Failed to attach quickStreamTest globally:', error);
+  }
+}
 
 /**
  * Show test results in an alert

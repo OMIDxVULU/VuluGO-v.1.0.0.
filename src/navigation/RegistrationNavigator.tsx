@@ -116,8 +116,10 @@ const RegistrationNavigator: React.FC<RegistrationNavigatorProps> = ({ onBackToL
         // CRITICAL FIX: Skip phone verification for email users
         if (registrationData.contactMethod === 'email' || registrationData.skipPhoneVerification) {
           console.log('  → Skipping PhoneVerificationScreen for email user, jumping to DisplayNameScreen');
-          // Automatically move to step 3 for email users
-          setTimeout(() => setCurrentStep(3), 100);
+          // Automatically advance to next step for email users
+          if (currentStep === 2) {
+            setCurrentStep(3);
+          }
           return <DisplayNameScreen />;
         }
         console.log('  → Rendering PhoneVerificationScreen');

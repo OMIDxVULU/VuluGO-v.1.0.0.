@@ -216,19 +216,23 @@ export class PhantomStreamDebugger {
 }
 
 // Make functions globally available in development
-if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-  (window as any).analyzePhantomStreams = () => PhantomStreamDebugger.analyzePhantomStreams();
-  (window as any).testCleanupSystem = () => PhantomStreamDebugger.testCleanupSystem();
-  (window as any).debugCleanupPhantomStreams = () => PhantomStreamDebugger.cleanupPhantomStreams();
-  (window as any).cleanupSpecificStream = (streamId: string) => PhantomStreamDebugger.cleanupSpecificStream(streamId);
-  (window as any).testStream = (streamId: string) => PhantomStreamDebugger.testStream(streamId);
-  
-  console.log('🔧 [PHANTOM_DEBUG] Debug functions available:');
-  console.log('  - analyzePhantomStreams() - Analyze all active streams for phantoms');
-  console.log('  - testCleanupSystem() - Test the cleanup system end-to-end');
-  console.log('  - debugCleanupPhantomStreams() - Force cleanup all phantom streams');
-  console.log('  - cleanupSpecificStream(streamId) - Clean up a specific stream by ID');
-  console.log('  - testStream(streamId) - Test a specific stream by ID');
+if (typeof window !== 'undefined' && __DEV__) {
+  try {
+    (window as any).analyzePhantomStreams = () => PhantomStreamDebugger.analyzePhantomStreams();
+    (window as any).testCleanupSystem = () => PhantomStreamDebugger.testCleanupSystem();
+    (window as any).debugCleanupPhantomStreams = () => PhantomStreamDebugger.cleanupPhantomStreams();
+    (window as any).cleanupSpecificStream = (streamId: string) => PhantomStreamDebugger.cleanupSpecificStream(streamId);
+    (window as any).testStream = (streamId: string) => PhantomStreamDebugger.testStream(streamId);
+
+    console.log('🔧 [PHANTOM_DEBUG] Debug functions available:');
+    console.log('  - analyzePhantomStreams() - Analyze all active streams for phantoms');
+    console.log('  - testCleanupSystem() - Test the cleanup system end-to-end');
+    console.log('  - debugCleanupPhantomStreams() - Force cleanup all phantom streams');
+    console.log('  - cleanupSpecificStream(streamId) - Clean up a specific stream by ID');
+    console.log('  - testStream(streamId) - Test a specific stream by ID');
+  } catch (error) {
+    console.warn('⚠️ Failed to attach phantom debug functions:', error);
+  }
 }
 
 export default PhantomStreamDebugger;

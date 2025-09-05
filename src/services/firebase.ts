@@ -141,11 +141,18 @@ const initResult = initializeFirebase();
 // Initialize Firebase utilities after successful initialization
 if (initResult.success) {
   // Dynamically import to avoid circular dependencies
-  import('../utils/firebaseOperationWrapper').then(({ default: FirebaseOperationWrapper }) => {
-    FirebaseOperationWrapper.initialize();
-  }).catch(error => {
-    console.warn('⚠️ Failed to initialize Firebase utilities:', error);
-  });
+  setTimeout(() => {
+    import('../utils/firebaseOperationWrapper').then(({ default: FirebaseOperationWrapper }) => {
+      try {
+        FirebaseOperationWrapper.initialize();
+        console.log('✅ Firebase utilities initialized successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize Firebase utilities:', error);
+      }
+    }).catch(error => {
+      console.warn('⚠️ Failed to import Firebase utilities:', error);
+    });
+  }, 100); // Small delay to ensure Firebase is fully initialized
 }
 
 // Export services (may be null if initialization failed)

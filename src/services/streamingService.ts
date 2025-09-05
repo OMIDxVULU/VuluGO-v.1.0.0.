@@ -1149,10 +1149,14 @@ class StreamingService {
 export const streamingService = new StreamingService();
 
 // Make debug functions globally accessible for testing (development only)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  (window as any).debugStreamCleanup = () => streamingService.debugCleanupTest();
-  (window as any).forceStreamCleanup = () => streamingService.forceCleanupPhantomStreams();
-  console.log('🔧 [DEBUG] Global debug functions available:');
-  console.log('  - debugStreamCleanup() - Run detailed cleanup test');
-  console.log('  - forceStreamCleanup() - Force cleanup phantom streams');
+if (typeof window !== 'undefined' && __DEV__) {
+  try {
+    (window as any).debugStreamCleanup = () => streamingService.debugCleanupTest();
+    (window as any).forceStreamCleanup = () => streamingService.forceCleanupPhantomStreams();
+    console.log('🔧 [DEBUG] Global debug functions available:');
+    console.log('  - debugStreamCleanup() - Run detailed cleanup test');
+    console.log('  - forceStreamCleanup() - Force cleanup phantom streams');
+  } catch (error) {
+    console.warn('⚠️ Failed to attach streaming debug functions:', error);
+  }
 }
