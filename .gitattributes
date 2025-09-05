@@ -1,0 +1,28 @@
+# Exclude test coverage reports from language statistics
+coverage/ linguist-generated=true
+coverage/** linguist-generated=true
+
+# Exclude test results from language statistics  
+test-results/ linguist-generated=true
+test-results/** linguist-generated=true
+
+# Exclude node_modules from language statistics (should already be ignored by .gitignore)
+node_modules/ linguist-vendored=true
+node_modules/** linguist-vendored=true
+
+# Exclude build outputs from language statistics
+dist/ linguist-generated=true
+dist/** linguist-generated=true
+web-build/ linguist-generated=true
+web-build/** linguist-generated=true
+.expo/ linguist-generated=true
+.expo/** linguist-generated=true
+
+# Exclude documentation files that might contain HTML
+*.md linguist-documentation=true
+
+# Ensure React/TypeScript files are properly detected
+*.tsx linguist-language=TypeScript
+*.ts linguist-language=TypeScript
+*.jsx linguist-language=JavaScript
+*.js linguist-language=JavaScript
